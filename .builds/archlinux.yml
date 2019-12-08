@@ -1,0 +1,29 @@
+image: archlinux
+packages:
+- arm-none-eabi-gcc
+- arm-none-eabi-newlib
+sources:
+- https://github.com/nickray/littlefs2
+
+tasks:
+
+- setup: |
+    curl -sSf https://sh.rustup.rs | sh -s -- -y -q
+    source $HOME/.cargo/env
+    rustup target add thumbv7em-none-eabi
+
+- build-thumb: |
+    cd littlefs2
+    source $HOME/.cargo/env
+    RUSTFLAGS="-D warnings" cargo build --target thumbv7em-none-eabi --release --verbose
+
+- build-desktop: |
+    cd littlefs2
+    source $HOME/.cargo/env
+    RUSTFLAGS="-D warnings" cargo build --target thumbv7em-none-eabi --verbose
+    RUSTFLAGS="-D warnings" cargo build --target thumbv7em-none-eabi --release --verbose
+
+- test-desktop: |
+    cd littlefs2
+    source $HOME/.cargo/env
+    cargo test

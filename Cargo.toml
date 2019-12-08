@@ -1,0 +1,15 @@
+[package]
+name = "littlefs2"
+description = "Rust API for littlefs2"
+version = "0.1.0"
+authors = ["Nicolas Stalder <n@stalder.io>", "Brandon Edens <brandonedens@gmail.com>"]
+edition = "2018"
+license = "Apache-2.0 OR MIT"
+readme = "README.md"
+categories = ["embedded", "filesystem", "no-std"]
+repository = "https://github.com/nickray/littlefs2"
+
+[dependencies]
+littlefs2-sys = "0.1.0"
+bitflags = "1.0.4"
+cty = "0.2.1"
