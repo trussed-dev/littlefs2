@@ -196,14 +196,64 @@ where
         Ok(())
     }
 
-    // // Opens a file in write-only mode.
-    // // This function will create a file if it does not exist, and will truncate it if it does
-    // pub fn create(
-    //     path:
-    //     alloc: &'alloc mut FileAllocation<Storage>,
-    //     storage: &mut Storage,
-    // ) ->
-    //     Self
-    // {
-    // }
+    pub fn len(
+        &mut self,
+        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+    ) ->
+        Result<usize>
+    {
+        let return_code = unsafe { ll::lfs_file_size(
+            &mut fs.alloc.state, &mut self.alloc.state
+        ) };
+        Error::usize_from(return_code)
+    }
+
+}
+
+impl<'alloc, Storage> traits::Read<'alloc, Storage> for File<'alloc, Storage>
+where
+    Storage: traits::Storage,
+    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn read(
+        &mut self,
+        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        _storage: &mut Storage,
+        buf: &mut [u8],
+    ) ->
+        Result<usize>
+    {
+        let return_code = unsafe { ll::lfs_file_read(
+            &mut fs.alloc.state,
+            &mut self.alloc.state,
+            buf.as_mut_ptr() as *mut cty::c_void,
+            buf.len() as u32,
+        ) };
+        Error::usize_from(return_code)
+    }
+}
+
+impl<'alloc, Storage> traits::Write<'alloc, Storage> for File<'alloc, Storage>
+where
+    Storage: traits::Storage,
+    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn write(
+        &mut self,
+        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        _storage: &mut Storage,
+        buf: &[u8],
+    ) ->
+        Result<usize>
+    {
+        let return_code = unsafe { ll::lfs_file_write(
+            &mut fs.alloc.state,
+            &mut self.alloc.state,
+            buf.as_ptr() as *const cty::c_void,
+            buf.len() as u32,
+        ) };
+        Error::usize_from(return_code)
+    }
 }

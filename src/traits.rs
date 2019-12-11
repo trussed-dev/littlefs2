@@ -1,5 +1,10 @@
 use littlefs2_sys as lfs;
-use crate::error::Result;
+use generic_array::ArrayLength;
+use crate::{
+    error::Result,
+    LittleFs,
+    mount_state,
+};
 
 /// Users of this library provide a "storage driver" by implementing this trait.
 ///
@@ -69,5 +74,33 @@ pub trait Storage {
     fn erase(&mut self, off: usize, len: usize) -> Result<usize>;
     // /// Synchronize writes to the storage device.
     // fn sync(&mut self) -> Result<usize>;
+}
+
+pub trait Read<'alloc, S>
+where
+    S: Storage,
+    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn read(
+        &mut self,
+        fs: &mut LittleFs<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
+        buf: &mut [u8],
+    ) -> Result<usize>;
+}
+
+pub trait Write<'alloc, S>
+where
+    S: Storage,
+    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn write(
+        &mut self,
+        fs: &mut LittleFs<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
+        buf: &[u8],
+    ) -> Result<usize>;
 }
 
