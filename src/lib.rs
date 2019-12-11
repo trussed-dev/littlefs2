@@ -32,6 +32,7 @@ pub use storage::Storage as StorageTrait;
 // }
 
 /// The three global buffers used by LittleFS
+// #[derive(Debug)]
 pub struct Buffers<Storage>
 where
     Storage: storage::Storage,
@@ -52,6 +53,8 @@ pub mod mount_state {
     impl MountState for NotMounted {}
 
 }
+
+// #[derive(Debug)]
 pub struct LittleFsAllocation<Storage>
 where
     Storage: storage::Storage,
@@ -63,6 +66,7 @@ where
     config: lfs::lfs_config,
 }
 
+// #[derive(Debug)]
 pub struct LittleFs<'alloc, Storage, MountState = mount_state::NotMounted>
 where
     Storage: storage::Storage,
@@ -189,11 +193,26 @@ where
 
     }
 
-    pub fn mount(&mut self, storage: &mut Storage) -> Result<()> {
+    pub fn mount(mut self, storage: &mut Storage) ->
+        core::result::Result<
+            LittleFs<'alloc, Storage, mount_state::Mounted>,
+            (LittleFs<'alloc, Storage, mount_state::NotMounted>, Error)
+        >
+    {
         debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         let return_code = unsafe { lfs::lfs_mount(&mut self.alloc.state, &self.alloc.config) };
-        Error::empty_from(return_code)?;
-        Ok(())
+        match Error::empty_from(return_code) {
+            Ok(_) => {
+                let mounted = LittleFs {
+                    alloc: self.alloc,
+                    mount_state: mount_state::Mounted,
+                };
+                Ok(mounted)
+            },
+            Err(error) => {
+                Err((self, error))
+            }
+        }
     }
 
     pub fn format(&mut self, storage: &mut Storage) -> Result<()> {

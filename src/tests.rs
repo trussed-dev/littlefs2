@@ -76,30 +76,26 @@ fn test_format() {
     let mut storage = RamStorage::default();
 
     let mut alloc = LittleFs::allocate();
-    let mut lfs = LittleFs::new_at(&mut alloc, &mut storage);
+    let mut unmounted_lfs = LittleFs::new_at(&mut alloc, &mut storage);
 
-    assert!(lfs.mount(&mut storage).is_err());
+    let mut formatted_lfs = {
+        let first_try = unmounted_lfs.mount(&mut storage);
+        match first_try {
+            Ok(_) => unreachable!("this is not supposed to happen!"),
+            Err((mut lfs, error)) => {
+                lfs.format(&mut storage).unwrap();
+                lfs
+            }
+        }
+    };
 
-    lfs.format(&mut storage).unwrap();
-    lfs.mount(&mut storage).unwrap();
-
-    // let alloc = LittleFs::<_, RamStorage, >::allocate();
-
-    // let mut buffers: Buffers<RamStorage> = Buffers {
-    //     read: Default::default(),
-    //     write: Default::default(),
-    //     lookahead: Default::default(),
-    // };
-    // // state (lfs::lfs)
-    // let lfs = match LittleFs::try_mount(&mut storage, &mut buffers) {
-    //     Ok(lfs) => lfs,
-    //     Err(_) => {
-    //         println!("failed at first");
-    //         LittleFs::try_format(&mut storage, &mut buffers).unwrap();
-    //         LittleFs::try_mount(&mut storage, &mut buffers).unwrap()
-    //     },
-    // };
-    // lfs.unmount().unwrap();
+    let mut mounted_lfs = {
+        let second_try = formatted_lfs.mount(&mut storage);
+        match second_try {
+            Ok(mut lfs) => lfs,
+            Err(_) => unreachable!("this is not supposed to happen!"),
+        }
+    };
 
     // // need to get rid of these annotations again somehow
     // // let mut cache = FileCache::<RamStorage>::new();

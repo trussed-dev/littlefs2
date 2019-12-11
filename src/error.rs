@@ -1,4 +1,8 @@
+use generic_array::{
+    ArrayLength,
+};
 use littlefs2_sys as lfs;
+use crate::storage;
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -34,6 +38,16 @@ pub enum Error {
 }
 
 // NB: core::convert::From does not work here due to coherence rules
+// #[derive(Debug)]
+pub struct MountError<'alloc, Storage>
+where
+    Storage: storage::Storage,
+    <Storage as storage::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as storage::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    not_mounted: super::LittleFs<'alloc, Storage, super::mount_state::NotMounted>,
+    error: Error,
+}
 
 impl Error {
     pub(crate) fn empty_from(error_code: lfs::lfs_error) -> Result<()> {
