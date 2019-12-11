@@ -9,16 +9,23 @@ use core::{
 use generic_array::{
     ArrayLength,
     GenericArray,
-    typenum::marker_traits::Unsigned,
+    typenum::marker_traits::Unsigned as _,
 };
 
 use littlefs2_sys as lfs;
+
+// errr what is the syntax again here?
+#[macro_use]
+extern crate bitflags;
+
 
 pub mod error;
 pub use error::{
     Error,
     Result,
 };
+
+pub mod file;
 
 pub mod storage;
 pub use storage::Storage as StorageTrait;
@@ -87,6 +94,7 @@ where
     <Storage as storage::Storage>::BLOCK_SIZE: ArrayLength<u8>,
     <Storage as storage::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as storage::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    <Storage as storage::Storage>::FILENAME_MAX: ArrayLength<u8>,
 {
     pub fn allocate() -> LittleFsAllocation<Storage> {
         let read_size: u32 = Storage::READ_SIZE as _;
@@ -128,6 +136,8 @@ where
             lookahead: Default::default(),
         };
 
+        let name_max: u32 = <Storage as storage::Storage>::FILENAME_MAX::to_u32();
+
         let config = lfs::lfs_config {
             context: core::ptr::null_mut(),
             read: Some(<LittleFs<'alloc, Storage, mount_state::Mounted>>::lfs_config_read),
@@ -150,7 +160,7 @@ where
             prog_buffer: core::ptr::null_mut(),
             lookahead_buffer: core::ptr::null_mut(),
 
-            name_max: Storage::FILENAME_MAX as u32,
+            name_max,
             file_max: Storage::FILEBYTES_MAX as u32,
             attr_max: Storage::ATTRBYTES_MAX as u32,
         };
@@ -164,6 +174,8 @@ where
         alloc
     }
 
+    // TODO: make this an internal method,
+    // expose just `mount` and `format`.
     pub fn new_at(
         alloc: &'alloc mut LittleFsAllocation<Storage>,
         storage: &mut Storage
@@ -220,6 +232,29 @@ where
         let return_code = unsafe { lfs::lfs_format(&mut self.alloc.state, &self.alloc.config) };
         Error::empty_from(return_code)?;
         Ok(())
+    }
+}
+
+impl<'alloc, Storage> LittleFs<'alloc, Storage, mount_state::Mounted>
+where
+    Storage: storage::Storage,
+    Storage: 'alloc,
+    // MountState: mount_state::MountState,
+    <Storage as storage::Storage>::BLOCK_SIZE: ArrayLength<u8>,
+    <Storage as storage::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as storage::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    <Storage as storage::Storage>::FILENAME_MAX: ArrayLength<u8>,
+{
+    pub fn unmount(mut self, storage: &mut Storage) -> Result<LittleFs<'alloc, Storage, mount_state::NotMounted>> {
+        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        let return_code = unsafe { lfs::lfs_unmount(&mut self.alloc.state) };
+        Error::empty_from(return_code)?;
+        Ok(
+            LittleFs {
+                alloc: self.alloc,
+                mount_state: mount_state::NotMounted,
+            }
+        )
     }
 }
 

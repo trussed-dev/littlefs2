@@ -48,7 +48,9 @@ pub trait Storage {
 
     /// Maximum length of a filename. Stored in superblock.
     /// Defaults to 255. At most 1_022.
-    const FILENAME_MAX: usize = lfs::LFS_NAME_MAX as _;
+    // const FILENAME_MAX: usize = lfs::LFS_NAME_MAX as _;
+    type FILENAME_MAX;
+
     /// Maximum size of file. Stored in superblock.
     /// Defaults to 2_147_483_647. At most 2_147_483_647.
     const FILEBYTES_MAX: usize = lfs::LFS_FILE_MAX as _;

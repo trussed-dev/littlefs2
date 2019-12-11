@@ -23,4 +23,4 @@ generic-array = "0.13.2"
 # path = "../littlefs2-sys"
 git = "https://github.com/nickray/littlefs2-sys"
 branch = "main"
-# features = ["assertions", "trace"]
+features = ["assertions", "trace"]

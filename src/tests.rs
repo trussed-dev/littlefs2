@@ -8,6 +8,7 @@ use crate::{
     // File,
     // FileCache,
     // LittleFsAllocation,
+    file::File,
     LittleFs,
     error::Result,
     storage,
@@ -34,6 +35,7 @@ impl storage::Storage for RamStorage {
     type BLOCK_SIZE = consts::U128;
     type CACHE_SIZE = consts::U32;
     type LOOKAHEADWORDS_SIZE = consts::U1;
+    type FILENAME_MAX = consts::U255;
     const BLOCK_COUNT: usize = STORAGE_SIZE / 128;
 
     fn read(&self, off: usize, buf: &mut [u8]) -> Result<usize> {
@@ -96,6 +98,42 @@ fn test_format() {
             Err(_) => unreachable!("this is not supposed to happen!"),
         }
     };
+}
+
+#[test]
+fn test_create() {
+    let mut storage = RamStorage::default();
+
+    let mut alloc = LittleFs::allocate();
+    let mut lfs = LittleFs::new_at(&mut alloc, &mut storage);
+    lfs.format(&mut storage).unwrap();
+
+    let mut lfs = {
+        match lfs.mount(&mut storage) {
+            Ok(mut lfs) => lfs,
+            Err(_) => unreachable!("this is not supposed to happen!"),
+        }
+    };
+
+    let mut alloc = File::allocate();
+    let mut file = File::create(
+        "/test_open.txt",
+        &mut alloc,
+        &mut lfs,
+        &mut storage,
+    ).unwrap();
+
+    let mut alloc = File::allocate();
+    let mut file = File::open(
+        "/test_open.txt",
+        &mut alloc,
+        &mut lfs,
+        &mut storage,
+    ).unwrap();
+
+    lfs.unmount(&mut storage).unwrap();
+
+}
 
     // // need to get rid of these annotations again somehow
     // // let mut cache = FileCache::<RamStorage>::new();
@@ -115,5 +153,4 @@ fn test_format() {
     //     Ok(lfs) => lfs,
     //     Err((_, error)) => { panic!("{:?}", &error); }
     // };
-}
 
