@@ -1,13 +1,14 @@
-use littlefs2_sys as lfs;
+use bitflags::bitflags;
+use littlefs2_sys as ll;
 
 use crate::{
-    LittleFs,
-    mount_state,
-    storage,
     error::{
         Error,
         Result,
     },
+    LittleFs,
+    mount_state,
+    traits,
 };
 
 use generic_array::{
@@ -20,24 +21,24 @@ use core::{
     // marker::PhantomData,
     cmp,
     mem,
-    slice,
+    // slice,
 };
 
 pub struct FileAllocation<Storage>
 where
-    Storage: storage::Storage,
-    <Storage as storage::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    Storage: traits::Storage,
+    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
 {
     cache: GenericArray<u8, Storage::CACHE_SIZE>,
-    state: lfs::lfs_file_t,
-    config: lfs::lfs_file_config,
+    state: ll::lfs_file_t,
+    config: ll::lfs_file_config,
 }
 
 pub struct File<'alloc, Storage>
 where
-    Storage: storage::Storage,
+    Storage: traits::Storage,
     Storage: 'alloc,
-    <Storage as storage::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
 {
     alloc: &'alloc mut FileAllocation<Storage>,
 }
@@ -65,18 +66,18 @@ bitflags! {
 
 impl<'alloc, Storage> File<'alloc, Storage>
 where
-    Storage: storage::Storage,
+    Storage: traits::Storage,
     Storage: 'alloc,
-    <Storage as storage::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as storage::Storage>::FILENAME_MAX: ArrayLength<u8>,
-    <Storage as storage::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as traits::Storage>::FILENAME_MAX: ArrayLength<u8>,
+    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     pub fn allocate() -> FileAllocation<Storage> {
         // TODO: more checks
-        let cache_size: u32 = <Storage as storage::Storage>::CACHE_SIZE::to_u32();
+        let cache_size: u32 = <Storage as traits::Storage>::CACHE_SIZE::to_u32();
         debug_assert!(cache_size > 0);
 
-        let config = lfs::lfs_file_config {
+        let config = ll::lfs_file_config {
             buffer: core::ptr::null_mut(),
             attrs: core::ptr::null_mut(),
             attr_count: 0,
@@ -102,19 +103,20 @@ where
     ) ->
         Result<Self>
     {
+        debug_assert!(littlefs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
 
-        let mut file = File {
+        let file = File {
             alloc,
         };
 
         // let mut cstr_path = [0u8; Storage::FILENAME_MAX];
         let mut cstr_path: GenericArray<u8, Storage::FILENAME_MAX> = Default::default();
-        let name_max = <Storage as storage::Storage>::FILENAME_MAX::to_usize();
+        let name_max = <Storage as traits::Storage>::FILENAME_MAX::to_usize();
         let len = cmp::min(name_max - 1, path.len());
         cstr_path[..len].copy_from_slice(&path.as_bytes()[..len]);
 
-        let return_code = unsafe { lfs::lfs_file_opencfg(
+        let return_code = unsafe { ll::lfs_file_opencfg(
                 &mut littlefs.alloc.state,
                 &mut file.alloc.state,
                 cstr_path.as_ptr() as *const cty::c_char,
@@ -135,18 +137,19 @@ where
     ) ->
         Result<Self>
     {
+        debug_assert!(littlefs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
 
-        let mut file = File {
+        let file = File {
             alloc,
         };
 
         let mut cstr_path: GenericArray<u8, Storage::FILENAME_MAX> = Default::default();
-        let name_max = <Storage as storage::Storage>::FILENAME_MAX::to_usize();
+        let name_max = <Storage as traits::Storage>::FILENAME_MAX::to_usize();
         let len = cmp::min(name_max - 1, path.len());
         cstr_path[..len].copy_from_slice(&path.as_bytes()[..len]);
 
-        let return_code = unsafe { lfs::lfs_file_opencfg(
+        let return_code = unsafe { ll::lfs_file_opencfg(
                 &mut littlefs.alloc.state,
                 &mut file.alloc.state,
                 cstr_path.as_ptr() as *const cty::c_char,
@@ -155,8 +158,42 @@ where
         ) };
 
         Error::empty_from(return_code)?;
-
         Ok(file)
+    }
+
+    /// Sync the file and drop it.
+    /// NB: `std::fs` does not have this, just drops at end of scope.
+    pub fn close(
+        self,
+        littlefs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        storage: &mut Storage,
+    ) ->
+        Result<()>
+    {
+        debug_assert!(littlefs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        let return_code = unsafe { ll::lfs_file_close(
+            &mut littlefs.alloc.state,
+            &mut self.alloc.state,
+        ) };
+        Error::empty_from(return_code)?;
+        Ok(())
+    }
+
+    /// Synchronize file contents to storage.
+    pub fn sync(
+        &mut self,
+        littlefs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        storage: &mut Storage,
+    ) ->
+        Result<()>
+    {
+        debug_assert!(littlefs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        let return_code = unsafe { ll::lfs_file_sync(
+            &mut littlefs.alloc.state,
+            &mut self.alloc.state,
+        ) };
+        Error::empty_from(return_code)?;
+        Ok(())
     }
 
     // // Opens a file in write-only mode.

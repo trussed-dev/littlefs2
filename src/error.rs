@@ -1,8 +1,8 @@
 use generic_array::{
     ArrayLength,
 };
-use littlefs2_sys as lfs;
-use crate::storage;
+use littlefs2_sys as ll;
+use crate::traits;
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -41,38 +41,38 @@ pub enum Error {
 // #[derive(Debug)]
 pub struct MountError<'alloc, Storage>
 where
-    Storage: storage::Storage,
-    <Storage as storage::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as storage::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    Storage: traits::Storage,
+    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
-    not_mounted: super::LittleFs<'alloc, Storage, super::mount_state::NotMounted>,
-    error: Error,
+    pub not_mounted: super::LittleFs<'alloc, Storage, super::mount_state::NotMounted>,
+    pub error: Error,
 }
 
 impl Error {
-    pub(crate) fn empty_from(error_code: lfs::lfs_error) -> Result<()> {
+    pub(crate) fn empty_from(error_code: ll::lfs_error) -> Result<()> {
         match error_code {
             // negative codes
-            lfs::lfs_error_LFS_ERR_IO => Err(Error::Io),
-            lfs::lfs_error_LFS_ERR_CORRUPT => Err(Error::CorruptFile),
-            lfs::lfs_error_LFS_ERR_NOENT => Err(Error::NoSuchEntry),
-            lfs::lfs_error_LFS_ERR_EXIST => Err(Error::EntryAlreadyExisted),
-            lfs::lfs_error_LFS_ERR_NOTDIR => Err(Error::PathNotDir),
-            lfs::lfs_error_LFS_ERR_ISDIR => Err(Error::PathIsDir),
-            lfs::lfs_error_LFS_ERR_NOTEMPTY => Err(Error::DirNotEmpty),
-            lfs::lfs_error_LFS_ERR_BADF => Err(Error::BadFileDescriptor),
-            lfs::lfs_error_LFS_ERR_FBIG => Err(Error::FileTooBig),
-            lfs::lfs_error_LFS_ERR_INVAL => Err(Error::Invalid),
-            lfs::lfs_error_LFS_ERR_NOSPC => Err(Error::NoSpace),
-            lfs::lfs_error_LFS_ERR_NOMEM => Err(Error::NoMemory),
-            lfs::lfs_error_LFS_ERR_OK => Ok(()),
+            ll::lfs_error_LFS_ERR_IO => Err(Error::Io),
+            ll::lfs_error_LFS_ERR_CORRUPT => Err(Error::CorruptFile),
+            ll::lfs_error_LFS_ERR_NOENT => Err(Error::NoSuchEntry),
+            ll::lfs_error_LFS_ERR_EXIST => Err(Error::EntryAlreadyExisted),
+            ll::lfs_error_LFS_ERR_NOTDIR => Err(Error::PathNotDir),
+            ll::lfs_error_LFS_ERR_ISDIR => Err(Error::PathIsDir),
+            ll::lfs_error_LFS_ERR_NOTEMPTY => Err(Error::DirNotEmpty),
+            ll::lfs_error_LFS_ERR_BADF => Err(Error::BadFileDescriptor),
+            ll::lfs_error_LFS_ERR_FBIG => Err(Error::FileTooBig),
+            ll::lfs_error_LFS_ERR_INVAL => Err(Error::Invalid),
+            ll::lfs_error_LFS_ERR_NOSPC => Err(Error::NoSpace),
+            ll::lfs_error_LFS_ERR_NOMEM => Err(Error::NoMemory),
+            ll::lfs_error_LFS_ERR_OK => Ok(()),
             // positive codes, the suer should see these only in usize results
             _ => Err(Error::Unknown(error_code)),
         }
     }
 
     #[allow(dead_code)]
-    pub(crate) fn usize_from(error_code: lfs::lfs_error) -> Result<usize> {
+    pub(crate) fn usize_from(error_code: ll::lfs_error) -> Result<usize> {
         let result = Error::empty_from(error_code);
         match result {
             Ok(()) => Ok(0),
