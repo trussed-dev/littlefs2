@@ -38,7 +38,7 @@ macro_rules! ram_storage { (
             type BLOCK_SIZE = $block_size_ty;
             const BLOCK_COUNT: usize = $block_count;
             type LOOKAHEADWORDS_SIZE = $lookaheadwords_size;
-            type FILENAME_MAX = $filename_max;
+            type PATH_MAX = $filename_max;
 
             fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
                 debug_assert!(buf.len() % Self::READ_SIZE == 0);

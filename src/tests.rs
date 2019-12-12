@@ -1,19 +1,19 @@
 use generic_array::typenum::consts;
 
 use crate::{
-    error::Result,
-    file::{
+    fs::{
         File,
+        Filesystem,
         OpenOptions,
+        SeekFrom,
     },
-    Filesystem,
-    SeekFrom,
-    traits::{
-        self,
+    io::{
+        Result,
         Read,
         Write,
         Seek,
     },
+    traits,
 };
 
 ram_storage!(

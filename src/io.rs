@@ -1,12 +1,75 @@
-use generic_array::{
-    ArrayLength,
-};
 use littlefs2_sys as ll;
+
+use generic_array::ArrayLength;
+
 use crate::{
-    Filesystem,
-    mount_state,
-    traits,
+    fs::{
+        Filesystem,
+        mount_state,
+        SeekFrom,
+    },
+    traits::Storage,
 };
+
+/// The `Read` trait allows for reading bytes from a file.
+pub trait Read<'alloc, S>
+where
+    S: Storage,
+    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn read(
+        &mut self,
+        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
+        buf: &mut [u8],
+    ) -> Result<usize>;
+}
+
+/** The `Write` trait allows for writing bytes to a file.
+
+By analogy with `std::io::Write`, we also define a `flush()`
+method. In the current implementation, writes are final and
+flush has no effect.
+*/
+pub trait Write<'alloc, S>
+where
+    S: Storage,
+    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn write(
+        &mut self,
+        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
+        buf: &[u8],
+    ) -> Result<usize>;
+
+    fn flush(
+        &mut self,
+        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
+    ) -> Result<()>;
+
+}
+
+/** The `Seek` trait provides a cursor which can be moved within a file.
+
+It is possible to seek relative to either end or the current offset.
+*/
+pub trait Seek<'alloc, S>
+where
+    S: Storage,
+    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn seek(
+        &mut self,
+        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
+        pos: SeekFrom,
+    ) -> Result<usize>;
+}
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -43,36 +106,36 @@ pub enum Error {
 
 // NB: core::convert::From does not work here due to coherence rules
 // #[derive(Debug)]
-pub struct MountError<'alloc, Storage> (
-    pub(crate) Filesystem<'alloc, Storage, mount_state::NotMounted>,
+pub struct MountError<'alloc, S> (
+    pub(crate) Filesystem<'alloc, S, mount_state::NotMounted>,
     pub(crate) Error,
 )
 where
-    Storage: traits::Storage,
-    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    S: Storage,
+    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 ;
 
 /// This gets its own implementation of `.unwrap()`, `.is_ok()`,
 /// `.is_err()` etc., as normal unwrap on a Result would need the
 /// error value to be `fmt::Debug`.
-pub enum MountResult<'alloc, Storage>
+pub enum MountResult<'alloc, S>
 where
-    Storage: traits::Storage,
-    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    S: Storage,
+    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
-    Ok(Filesystem<'alloc, Storage, mount_state::Mounted>),
-    Err(MountError<'alloc, Storage>),
+    Ok(Filesystem<'alloc, S, mount_state::Mounted>),
+    Err(MountError<'alloc, S>),
 }
 
-impl<'alloc, Storage> MountResult<'alloc, Storage>
+impl<'alloc, S> MountResult<'alloc, S>
 where
-    Storage: traits::Storage,
-    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    S: Storage,
+    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
-    pub fn unwrap(self) -> Filesystem<'alloc, Storage, mount_state::Mounted> {
+    pub fn unwrap(self) -> Filesystem<'alloc, S, mount_state::Mounted> {
         match self {
             MountResult::Ok(fs) => fs,
             MountResult::Err(error) => Err(error.1).unwrap(),
@@ -86,7 +149,7 @@ where
         }
     }
 
-    pub fn ok(self) -> Option<Filesystem<'alloc, Storage, mount_state::Mounted>> {
+    pub fn ok(self) -> Option<Filesystem<'alloc, S, mount_state::Mounted>> {
         match self {
             MountResult::Ok(fs) => Some(fs),
             MountResult::Err(_) => None,
@@ -97,7 +160,7 @@ where
         !self.is_ok()
     }
 
-    pub fn err(self) -> Option<MountError<'alloc, Storage>> {
+    pub fn err(self) -> Option<MountError<'alloc, S>> {
         match self {
             MountResult::Ok(_) => None,
             MountResult::Err(error) => Some(error),
@@ -137,4 +200,27 @@ impl Error {
             Err(error) => Err(error),
         }
     }
+}
+
+#[derive(Clone,Copy,Debug,Eq,Hash,PartialEq)]
+pub enum FileType {
+    File,
+    Directory,
+}
+
+impl FileType {
+    pub fn is_dir(&self) -> bool {
+        match *self {
+            FileType::File => false,
+            FileType::Directory => true,
+        }
+    }
+
+    pub fn is_file(&self) -> bool {
+        match *self {
+            FileType::File => true,
+            FileType::Directory => false,
+        }
+    }
+
 }

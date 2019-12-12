@@ -37,9 +37,10 @@ at different locations.
 
 
 ```
-use littlefs2::{Filesystem, File, OpenOptions, prelude::*};
+use littlefs2::fs::{Filesystem, File, OpenOptions, SeekFrom};
+use littlefs2::prelude::*;
 #
-# use littlefs2::{consts, ram_storage, traits, Result};
+# use littlefs2::{consts, ram_storage, traits, io::Result};
 #
 # ram_storage!(
 #     name=RamStorage,
@@ -55,7 +56,7 @@ use littlefs2::{Filesystem, File, OpenOptions, prelude::*};
 #     filename_max_ty=consts::U255,
 # );
 
-// example storage backend, see later
+// example storage backend
 let mut storage = RamStorage::default();
 
 // must allocate state statically before use, must format before first mount
@@ -72,9 +73,9 @@ let mut file = OpenOptions::new()
 	.open("example.txt", &mut alloc, &mut fs, &mut storage)
 	.unwrap();
 
-// can read/write/seek as usual
+// may read/write/seek as usual
 file.write(&mut fs, &mut storage, b"Why is black smoke coming out?!").unwrap();
-file.seek(&mut fs, &mut storage, littlefs2::SeekFrom::End(-24)).unwrap();
+file.seek(&mut fs, &mut storage, SeekFrom::End(-24)).unwrap();
 let mut buf = [0u8; 11];
 assert_eq!(file.read(&mut fs, &mut storage, &mut buf).unwrap(), 11);
 assert_eq!(&buf, b"black smoke");
@@ -90,46 +91,35 @@ Directories and file attributes are not exposed yet.
 
 */
 
+/// Low-level bindings
 use littlefs2_sys as ll;
 
 /// Re-export of `typenum::consts`.
 pub use generic_array::typenum::consts;
 
-/// The Read, Write, Seek traits
 pub mod prelude;
 
 /// cf. Macros section below
 #[macro_use]
 pub mod macros;
 
-/// The error and result types.
-pub mod error;
-pub use error::{
-    Error,
-    Result,
-	MountError,
-	MountResult,
-};
-
-/// The `File` abstraction.
-pub mod file;
-pub use file::{
-    // FileAllocation,
-    File,
-    OpenOptions,
-    SeekFrom,
-};
-
-/// The `Filesystem` abstraction.
 pub mod fs;
-pub use fs::{
-    // FilesystemAllocation,
-    Filesystem,
-};
+
+/// Traits and types for core I/O functionality.
+pub mod io;
+
+pub mod path;
 
 /// The `Storage`, `Read`, `Write` and `Seek` traits.
 pub mod traits;
-pub use traits::Storage;
+
+/// get information about the C backend
+pub fn version() -> Version {
+    Version {
+        format: (ll::LFS_DISK_VERSION_MAJOR, ll::LFS_DISK_VERSION_MINOR),
+        backend: (ll::LFS_VERSION_MAJOR, ll::LFS_VERSION_MINOR),
+    }
+}
 
 /// Information about the C backend
 #[derive(Copy,Clone,Debug)]
@@ -138,23 +128,6 @@ pub struct Version {
     pub format: (u32, u32),
 	/// Backend release (currently: 2.1)
     pub backend: (u32, u32),
-}
-
-pub fn version() -> Version {
-    Version {
-        format: (ll::LFS_DISK_VERSION_MAJOR, ll::LFS_DISK_VERSION_MINOR),
-        backend: (ll::LFS_VERSION_MAJOR, ll::LFS_VERSION_MINOR),
-    }
-}
-
-/// Typestates to distinguish mounted from not mounted filesystems
-pub mod mount_state {
-    pub trait MountState {}
-    pub struct Mounted;
-    impl MountState for Mounted {}
-    pub struct NotMounted;
-    impl MountState for NotMounted {}
-
 }
 
 #[cfg(test)]

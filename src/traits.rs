@@ -1,10 +1,7 @@
-use littlefs2_sys as lfs;
-use generic_array::ArrayLength;
+use littlefs2_sys as ll;
+
 use crate::{
-    error::Result,
-    file::SeekFrom,
-    Filesystem,
-    mount_state,
+    io::Result,
 };
 
 /// Users of this library provide a "storage driver" by implementing this trait.
@@ -54,15 +51,15 @@ pub trait Storage {
 
     /// Maximum length of a filename. Stored in superblock.
     /// Defaults to 255. At most 1_022.
-    // const FILENAME_MAX: usize = lfs::LFS_NAME_MAX as _;
-    type FILENAME_MAX;
+    // const PATH_MAX: usize = ll::LFS_NAME_MAX as _;
+    type PATH_MAX;
 
     /// Maximum size of file. Stored in superblock.
     /// Defaults to 2_147_483_647. At most 2_147_483_647.
-    const FILEBYTES_MAX: usize = lfs::LFS_FILE_MAX as _;
+    const FILEBYTES_MAX: usize = ll::LFS_FILE_MAX as _;
     /// Maximum size of custom attributes.
     /// Defaults to 1_022. At most 1_022.
-    const ATTRBYTES_MAX: usize = lfs::LFS_ATTR_MAX as _;
+    const ATTRBYTES_MAX: usize = ll::LFS_ATTR_MAX as _;
 
     /// Read data from the storage device.
     /// Called with bufs of length a multiple of READ_SIZE.
@@ -75,47 +72,5 @@ pub trait Storage {
     fn erase(&mut self, off: usize, len: usize) -> Result<usize>;
     // /// Synchronize writes to the storage device.
     // fn sync(&mut self) -> Result<usize>;
-}
-
-pub trait Read<'alloc, S>
-where
-    S: Storage,
-    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
-    fn read(
-        &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
-        storage: &mut S,
-        buf: &mut [u8],
-    ) -> Result<usize>;
-}
-
-pub trait Write<'alloc, S>
-where
-    S: Storage,
-    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
-    fn write(
-        &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
-        storage: &mut S,
-        buf: &[u8],
-    ) -> Result<usize>;
-}
-
-pub trait Seek<'alloc, S>
-where
-    S: Storage,
-    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
-    fn seek(
-        &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
-        storage: &mut S,
-        pos: SeekFrom,
-    ) -> Result<usize>;
 }
 
