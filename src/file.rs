@@ -6,12 +6,9 @@ use crate::{
         Error,
         Result,
     },
-    LittleFs,
+    Filesystem,
     mount_state,
-    traits::{
-        self,
-        SeekFrom,
-    },
+    traits,
 };
 
 use generic_array::{
@@ -83,7 +80,7 @@ impl OpenOptions {
         &self,
         path: &str,
         alloc: &'alloc mut FileAllocation<Storage>,
-        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, Storage, mount_state::Mounted>,
         storage: &mut Storage,
     ) ->
         Result<File<'alloc, Storage>>
@@ -98,15 +95,15 @@ impl OpenOptions {
 
         let file = File { alloc };
 
-        let mut cstr_path: GenericArray<u8, Storage::FILENAME_MAX> = Default::default();
+        let mut padded_path: GenericArray<u8, Storage::FILENAME_MAX> = Default::default();
         let name_max = <Storage as traits::Storage>::FILENAME_MAX::to_usize();
         let len = cmp::min(name_max - 1, path.len());
-        cstr_path[..len].copy_from_slice(&path.as_bytes()[..len]);
+        padded_path[..len].copy_from_slice(&path.as_bytes()[..len]);
 
         let return_code = unsafe { ll::lfs_file_opencfg(
                 &mut fs.alloc.state,
                 &mut file.alloc.state,
-                cstr_path.as_ptr() as *const cty::c_char,
+                padded_path.as_ptr() as *const cty::c_char,
                 self.0.bits() as i32,
                 &file.alloc.config,
         ) };
@@ -117,6 +114,32 @@ impl OpenOptions {
     }
 
 }
+
+#[derive(Clone,Copy,Debug,Eq,PartialEq)]
+pub enum SeekFrom {
+    Start(u32),
+    End(i32),
+    Current(i32),
+}
+
+impl SeekFrom {
+    pub(crate) fn off(self) -> i32 {
+        match self {
+            SeekFrom::Start(u) => u as i32,
+            SeekFrom::End(i) => i,
+            SeekFrom::Current(i) => i,
+        }
+    }
+
+    pub(crate) fn whence(self) -> i32 {
+        match self {
+            SeekFrom::Start(_) => 0,
+            SeekFrom::End(_) => 2,
+            SeekFrom::Current(_) => 1,
+        }
+    }
+}
+
 
 pub struct FileAllocation<Storage>
 where
@@ -192,7 +215,7 @@ where
     pub fn open(
         path: &str,
         alloc: &'alloc mut FileAllocation<Storage>,
-        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, Storage, mount_state::Mounted>,
         storage: &mut Storage,
     ) ->
         Result<Self>
@@ -205,7 +228,7 @@ where
     pub fn create(
         path: &str,
         alloc: &'alloc mut FileAllocation<Storage>,
-        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, Storage, mount_state::Mounted>,
         storage: &mut Storage,
     ) ->
         Result<Self>
@@ -221,7 +244,7 @@ where
     /// NB: `std::fs` does not have this, just drops at end of scope.
     pub fn close(
         self,
-        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, Storage, mount_state::Mounted>,
         storage: &mut Storage,
     ) ->
         Result<()>
@@ -238,7 +261,7 @@ where
     /// Synchronize file contents to storage.
     pub fn sync(
         &mut self,
-        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, Storage, mount_state::Mounted>,
         storage: &mut Storage,
     ) ->
         Result<()>
@@ -254,7 +277,7 @@ where
 
     pub fn len(
         &mut self,
-        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, Storage, mount_state::Mounted>,
     ) ->
         Result<usize>
     {
@@ -274,7 +297,7 @@ where
 {
     fn read(
         &mut self,
-        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, Storage, mount_state::Mounted>,
         _storage: &mut Storage,
         buf: &mut [u8],
     ) ->
@@ -298,7 +321,7 @@ where
 {
     fn write(
         &mut self,
-        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, Storage, mount_state::Mounted>,
         _storage: &mut Storage,
         buf: &[u8],
     ) ->
@@ -322,7 +345,7 @@ where
 {
     fn seek(
         &mut self,
-        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, Storage, mount_state::Mounted>,
         _storage: &mut Storage,
         pos: SeekFrom,
     ) ->

@@ -38,7 +38,7 @@ where
 }
 
 // #[derive(Debug)]
-pub struct LittleFsAllocation<Storage>
+pub struct FilesystemAllocation<Storage>
 where
     Storage: traits::Storage,
     <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
@@ -50,20 +50,20 @@ where
 }
 
 // #[derive(Debug)]
-pub struct LittleFs<'alloc, Storage, MountState = mount_state::NotMounted>
+pub struct Filesystem<'alloc, Storage, MountState = mount_state::NotMounted>
 where
     Storage: traits::Storage,
     <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     MountState: mount_state::MountState,
 {
-    pub(crate) alloc: &'alloc mut LittleFsAllocation<Storage>,
+    pub(crate) alloc: &'alloc mut FilesystemAllocation<Storage>,
     #[allow(dead_code)]
     mount_state: MountState,
 }
 
 
-impl<'alloc, Storage> LittleFs<'alloc, Storage>
+impl<'alloc, Storage> Filesystem<'alloc, Storage>
 where
     Storage: traits::Storage,
     Storage: 'alloc,
@@ -72,7 +72,7 @@ where
     <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     <Storage as traits::Storage>::FILENAME_MAX: ArrayLength<u8>,
 {
-    pub fn allocate() -> LittleFsAllocation<Storage> {
+    pub fn allocate() -> FilesystemAllocation<Storage> {
         let read_size: u32 = Storage::READ_SIZE as _;
         let write_size: u32 = Storage::WRITE_SIZE as _;
         let block_size: u32 = <Storage as traits::Storage>::BLOCK_SIZE::to_u32();
@@ -116,10 +116,10 @@ where
 
         let config = ll::lfs_config {
             context: core::ptr::null_mut(),
-            read: Some(<LittleFs<'alloc, Storage, mount_state::Mounted>>::lfs_config_read),
-            prog: Some(<LittleFs<'alloc, Storage, mount_state::Mounted>>::lfs_config_prog),
-            erase: Some(<LittleFs<'alloc, Storage, mount_state::Mounted>>::lfs_config_erase),
-            sync: Some(<LittleFs<'alloc, Storage, mount_state::Mounted>>::lfs_config_sync),
+            read: Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_read),
+            prog: Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_prog),
+            erase: Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_erase),
+            sync: Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_sync),
             // read: None,
             // prog: None,
             // erase: None,
@@ -141,7 +141,7 @@ where
             attr_max: Storage::ATTRBYTES_MAX as u32,
         };
 
-        let alloc = LittleFsAllocation {
+        let alloc = FilesystemAllocation {
             buffers,
             state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
             config,
@@ -153,10 +153,10 @@ where
     // TODO: make this an internal method,
     // expose just `mount` and `format`.
     fn placement_new(
-        alloc: &'alloc mut LittleFsAllocation<Storage>,
+        alloc: &'alloc mut FilesystemAllocation<Storage>,
         storage: &mut Storage
     ) ->
-        LittleFs<'alloc, Storage, mount_state::NotMounted>
+        Filesystem<'alloc, Storage, mount_state::NotMounted>
     {
         alloc.config.context = storage as *mut _ as *mut cty::c_void;
 
@@ -168,11 +168,11 @@ where
             alloc.buffers.lookahead.as_mut_slice() as *mut _ as *mut cty::c_void;
 
         // alloc.config.read =
-        //     Some(<LittleFs<'alloc, Storage, mount_state::Mounted>>::lfs_config_read);
+        //     Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_read);
 
         // alloc.state.lfs_config = alloc.config;
 
-        let littlefs = LittleFs {
+        let littlefs = Filesystem {
             alloc,
             mount_state: mount_state::NotMounted,
         };
@@ -182,16 +182,16 @@ where
     }
 
     pub fn mount(
-        alloc: &'alloc mut LittleFsAllocation<Storage>,
+        alloc: &'alloc mut FilesystemAllocation<Storage>,
         storage: &mut Storage,
     ) -> MountResult<'alloc, Storage> {
 
-        let fs = LittleFs::placement_new(alloc, storage);
+        let fs = Filesystem::placement_new(alloc, storage);
         debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         let return_code = unsafe { ll::lfs_mount(&mut fs.alloc.state, &fs.alloc.config) };
         match Error::empty_from(return_code) {
             Ok(_) => {
-                let mounted = LittleFs {
+                let mounted = Filesystem {
                     alloc: fs.alloc,
                     mount_state: mount_state::Mounted,
                 };
@@ -204,12 +204,12 @@ where
     }
 
     pub fn format(
-        alloc: &'alloc mut LittleFsAllocation<Storage>,
+        alloc: &'alloc mut FilesystemAllocation<Storage>,
         storage: &mut Storage,
     ) ->
         Result<()>
     {
-        let fs = LittleFs::placement_new(alloc, storage);
+        let fs = Filesystem::placement_new(alloc, storage);
         debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         let return_code = unsafe { ll::lfs_format(&mut fs.alloc.state, &fs.alloc.config) };
         Error::empty_from(return_code)?;
@@ -217,7 +217,7 @@ where
     }
 }
 
-impl<'alloc, Storage> LittleFs<'alloc, Storage, mount_state::Mounted>
+impl<'alloc, Storage> Filesystem<'alloc, Storage, mount_state::Mounted>
 where
     Storage: traits::Storage,
     Storage: 'alloc,
@@ -227,12 +227,12 @@ where
     <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     <Storage as traits::Storage>::FILENAME_MAX: ArrayLength<u8>,
 {
-    pub fn unmount(self, storage: &mut Storage) -> Result<LittleFs<'alloc, Storage, mount_state::NotMounted>> {
+    pub fn unmount(self, storage: &mut Storage) -> Result<Filesystem<'alloc, Storage, mount_state::NotMounted>> {
         debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         let return_code = unsafe { ll::lfs_unmount(&mut self.alloc.state) };
         Error::empty_from(return_code)?;
         Ok(
-            LittleFs {
+            Filesystem {
                 alloc: self.alloc,
                 mount_state: mount_state::NotMounted,
             }
@@ -279,7 +279,7 @@ where
 
 }
 
-impl<'alloc, Storage, MountState> LittleFs<'alloc, Storage, MountState>
+impl<'alloc, Storage, MountState> Filesystem<'alloc, Storage, MountState>
 where
     Storage: traits::Storage,
     Storage: 'alloc,
@@ -338,7 +338,7 @@ where
         block: ll::lfs_block_t,
     ) -> cty::c_int {
         // println!("in lfs_config_erase");
-        // let littlefs: &mut LittleFs<Storage> = unsafe { mem::transmute((*c).context) };
+        // let littlefs: &mut Filesystem<Storage> = unsafe { mem::transmute((*c).context) };
         let storage: &mut Storage = unsafe { mem::transmute((*c).context) };
         let off = block as usize * <Storage as traits::Storage>::BLOCK_SIZE::to_usize();
 

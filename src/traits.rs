@@ -2,7 +2,8 @@ use littlefs2_sys as lfs;
 use generic_array::ArrayLength;
 use crate::{
     error::Result,
-    LittleFs,
+    file::SeekFrom,
+    Filesystem,
     mount_state,
 };
 
@@ -84,7 +85,7 @@ where
 {
     fn read(
         &mut self,
-        fs: &mut LittleFs<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
         storage: &mut S,
         buf: &mut [u8],
     ) -> Result<usize>;
@@ -98,35 +99,10 @@ where
 {
     fn write(
         &mut self,
-        fs: &mut LittleFs<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
         storage: &mut S,
         buf: &[u8],
     ) -> Result<usize>;
-}
-
-#[derive(Clone,Copy,Debug,Eq,PartialEq)]
-pub enum SeekFrom {
-    Start(u32),
-    End(i32),
-    Current(i32),
-}
-
-impl SeekFrom {
-    pub(crate) fn off(self) -> i32 {
-        match self {
-            SeekFrom::Start(u) => u as i32,
-            SeekFrom::End(i) => i,
-            SeekFrom::Current(i) => i,
-        }
-    }
-
-    pub(crate) fn whence(self) -> i32 {
-        match self {
-            SeekFrom::Start(_) => 0,
-            SeekFrom::End(_) => 2,
-            SeekFrom::Current(_) => 1,
-        }
-    }
 }
 
 pub trait Seek<'alloc, S>
@@ -137,7 +113,7 @@ where
 {
     fn seek(
         &mut self,
-        fs: &mut LittleFs<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
         storage: &mut S,
         pos: SeekFrom,
     ) -> Result<usize>;

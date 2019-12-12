@@ -6,7 +6,7 @@ use crate::{
         File,
         OpenOptions,
     },
-    LittleFs,
+    Filesystem,
     SeekFrom,
     traits::{
         self,
@@ -47,14 +47,14 @@ ram_storage!(
 #[test]
 fn test_format() {
     let mut storage = RamStorage::default();
-    let mut alloc = LittleFs::allocate();
+    let mut alloc = Filesystem::allocate();
 
     // should fail: FS is not formatted
-    assert!(LittleFs::mount(&mut alloc, &mut storage).is_err());
+    assert!(Filesystem::mount(&mut alloc, &mut storage).is_err());
     // should succeed
-    assert!(LittleFs::format(&mut alloc, &mut storage).is_ok());
+    assert!(Filesystem::format(&mut alloc, &mut storage).is_ok());
     // should succeed now that storage is formatted
-    let fs = LittleFs::mount(&mut alloc, &mut storage).unwrap();
+    let fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
     // check there are no segfaults
     fs.unmount(&mut storage).unwrap();
 }
@@ -62,9 +62,9 @@ fn test_format() {
 #[test]
 fn test_create() {
     let mut storage = RamStorage::default();
-    let mut alloc = LittleFs::allocate();
-    LittleFs::format(&mut alloc, &mut storage).unwrap();
-    let mut fs = LittleFs::mount(&mut alloc, &mut storage).unwrap();
+    let mut alloc = Filesystem::allocate();
+    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
     // file does not exist yet, can't open for reading
@@ -106,9 +106,9 @@ fn test_create() {
 #[test]
 fn test_seek() {
     let mut storage = RamStorage::default();
-    let mut alloc = LittleFs::allocate();
-    LittleFs::format(&mut alloc, &mut storage).unwrap();
-    let mut fs = LittleFs::mount(&mut alloc, &mut storage).unwrap();
+    let mut alloc = Filesystem::allocate();
+    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
     let mut file = File::create(
@@ -139,9 +139,9 @@ fn test_seek() {
 #[test]
 fn test_fancy_open() {
     let mut storage = RamStorage::default();
-    let mut alloc = LittleFs::allocate();
-    LittleFs::format(&mut alloc, &mut storage).unwrap();
-    let mut fs = LittleFs::mount(&mut alloc, &mut storage).unwrap();
+    let mut alloc = Filesystem::allocate();
+    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
     let mut file = OpenOptions::new()

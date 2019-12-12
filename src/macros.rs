@@ -1,4 +1,4 @@
-/// An implementation of the Storage trait in memory.
+/// A configurable implementation of the Storage trait in memory.
 #[macro_export]
 macro_rules! ram_storage { (
 

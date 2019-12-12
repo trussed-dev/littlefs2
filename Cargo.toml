@@ -9,9 +9,6 @@ readme = "README.md"
 categories = ["embedded", "filesystem", "no-std"]
 repository = "https://github.com/nickray/littlefs2"
 
-[lib]
-path = "src/littlefs2.rs"
-
 [dependencies]
 bitflags = "1.0.4"
 cty = "0.2.1"
