@@ -4,6 +4,7 @@ use generic_array::{
 use littlefs2_sys as ll;
 use crate::{
     LittleFs,
+    mount_state,
     traits,
 };
 
@@ -43,7 +44,7 @@ pub enum Error {
 // NB: core::convert::From does not work here due to coherence rules
 // #[derive(Debug)]
 pub struct MountError<'alloc, Storage> (
-    pub(crate) LittleFs<'alloc, Storage, super::mount_state::NotMounted>,
+    pub(crate) LittleFs<'alloc, Storage, mount_state::NotMounted>,
     pub(crate) Error,
 )
 where
@@ -61,7 +62,7 @@ where
     <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
-    Ok(LittleFs<'alloc, Storage, super::mount_state::Mounted>),
+    Ok(LittleFs<'alloc, Storage, mount_state::Mounted>),
     Err(MountError<'alloc, Storage>),
 }
 
@@ -71,7 +72,7 @@ where
     <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
-    pub fn unwrap(self) -> LittleFs<'alloc, Storage, super::mount_state::Mounted> {
+    pub fn unwrap(self) -> LittleFs<'alloc, Storage, mount_state::Mounted> {
         match self {
             MountResult::Ok(fs) => fs,
             MountResult::Err(error) => Err(error.1).unwrap(),
@@ -85,9 +86,24 @@ where
         }
     }
 
+    pub fn ok(self) -> Option<LittleFs<'alloc, Storage, mount_state::Mounted>> {
+        match self {
+            MountResult::Ok(fs) => Some(fs),
+            MountResult::Err(_) => None,
+        }
+    }
+
     pub fn is_err(&self) -> bool {
         !self.is_ok()
     }
+
+    pub fn err(self) -> Option<MountError<'alloc, Storage>> {
+        match self {
+            MountResult::Ok(_) => None,
+            MountResult::Err(error) => Some(error),
+        }
+    }
+
 }
 
 impl Error {
