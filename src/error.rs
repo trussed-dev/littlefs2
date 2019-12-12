@@ -2,7 +2,10 @@ use generic_array::{
     ArrayLength,
 };
 use littlefs2_sys as ll;
-use crate::traits;
+use crate::{
+    LittleFs,
+    traits,
+};
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -39,14 +42,52 @@ pub enum Error {
 
 // NB: core::convert::From does not work here due to coherence rules
 // #[derive(Debug)]
-pub struct MountError<'alloc, Storage>
+pub struct MountError<'alloc, Storage> (
+    pub(crate) LittleFs<'alloc, Storage, super::mount_state::NotMounted>,
+    pub(crate) Error,
+)
+where
+    Storage: traits::Storage,
+    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+;
+
+/// This gets its own implementation of `.unwrap()`, `.is_ok()`,
+/// `.is_err()` etc., as normal unwrap on a Result would need the
+/// error value to be `fmt::Debug`.
+pub enum MountResult<'alloc, Storage>
 where
     Storage: traits::Storage,
     <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
-    pub not_mounted: super::LittleFs<'alloc, Storage, super::mount_state::NotMounted>,
-    pub error: Error,
+    Ok(LittleFs<'alloc, Storage, super::mount_state::Mounted>),
+    Err(MountError<'alloc, Storage>),
+}
+
+impl<'alloc, Storage> MountResult<'alloc, Storage>
+where
+    Storage: traits::Storage,
+    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    pub fn unwrap(self) -> LittleFs<'alloc, Storage, super::mount_state::Mounted> {
+        match self {
+            MountResult::Ok(fs) => fs,
+            MountResult::Err(error) => Err(error.1).unwrap(),
+        }
+    }
+
+    pub fn is_ok(&self) -> bool {
+        match self {
+            MountResult::Ok(_) => true,
+            MountResult::Err(_) => false,
+        }
+    }
+
+    pub fn is_err(&self) -> bool {
+        !self.is_ok()
+    }
 }
 
 impl Error {

@@ -44,40 +44,46 @@ fn test_format() {
     let mut storage = RamStorage::default();
     let mut alloc = LittleFs::allocate();
 
+    // should fail: FS is not formatted
     assert!(LittleFs::mount(&mut alloc, &mut storage).is_err());
+    // should succeed
     assert!(LittleFs::format(&mut alloc, &mut storage).is_ok());
-
-    let fs = match LittleFs::mount(&mut alloc, &mut storage) {
-        Ok(fs) => fs,
-        Err(_) => unreachable!("this is not supposed to happen!"),
-    };
-
+    // should succeed now that storage is formatted
+    let fs = LittleFs::mount(&mut alloc, &mut storage).unwrap();
+    // check there are no segfaults
     fs.unmount(&mut storage).unwrap();
 }
 
 #[test]
 fn test_create() {
     let mut storage = RamStorage::default();
-
     let mut alloc = LittleFs::allocate();
     LittleFs::format(&mut alloc, &mut storage).unwrap();
-
-    let mut fs = match LittleFs::mount(&mut alloc, &mut storage) {
-        Ok(fs) => fs,
-        Err(_) => unreachable!("this is not supposed to happen!"),
-    };
+    let mut fs = LittleFs::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
+    // file does not exist yet, can't open for reading
+    assert!(File::open(
+        "/test_open.txt",
+        &mut alloc, &mut fs, &mut storage,
+    ).is_err());
+
+    // TODO: make previous allocation reusable
+    let mut alloc = File::allocate();
+    // can create new files
     let mut file = File::create(
         "/test_open.txt",
         &mut alloc, &mut fs, &mut storage,
     ).unwrap();
+    // can write to files
     assert!(file.write(&mut fs, &mut storage, &[0u8, 1, 2]).unwrap() == 3);
     file.sync(&mut fs, &mut storage).unwrap();
     file.close(&mut fs, &mut storage).unwrap();
 
+    // can rename files
     fs.rename("test_open.txt", "moved.txt", &mut storage).unwrap();
 
+    // can read from existing files
     let mut alloc = File::allocate();
     let mut file = File::open(
         "moved.txt",

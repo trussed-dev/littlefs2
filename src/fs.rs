@@ -8,6 +8,8 @@ use crate::{
     error::{
         Error,
         Result,
+        MountError,
+        MountResult,
     },
     mount_state,
     traits,
@@ -182,12 +184,8 @@ where
     pub fn mount(
         alloc: &'alloc mut LittleFsAllocation<Storage>,
         storage: &mut Storage,
-    ) ->
-        core::result::Result<
-            LittleFs<'alloc, Storage, mount_state::Mounted>,
-            (LittleFs<'alloc, Storage, mount_state::NotMounted>, Error)
-        >
-    {
+    ) -> MountResult<'alloc, Storage> {
+
         let fs = LittleFs::placement_new(alloc, storage);
         debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         let return_code = unsafe { ll::lfs_mount(&mut fs.alloc.state, &fs.alloc.config) };
@@ -197,10 +195,10 @@ where
                     alloc: fs.alloc,
                     mount_state: mount_state::Mounted,
                 };
-                Ok(mounted)
+                MountResult::Ok(mounted)
             },
             Err(error) => {
-                Err((fs, error))
+                MountResult::Err(MountError(fs, error))
             }
         }
     }
