@@ -17,6 +17,7 @@ pub mod file;
 pub use file::{
     FileAllocation,
     File,
+    OpenOptions,
 };
 
 /// The `LittleFs` abstraction.

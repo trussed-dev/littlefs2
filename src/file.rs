@@ -27,6 +27,97 @@ use core::{
     // slice,
 };
 
+pub struct OpenOptions (FileOpenFlags);
+
+impl OpenOptions {
+    pub fn new() -> Self {
+        OpenOptions(FileOpenFlags::empty())
+    }
+    pub fn read(&mut self, read: bool) -> &mut Self {
+        if read {
+            self.0.insert(FileOpenFlags::RDONLY)
+        } else {
+            self.0.remove(FileOpenFlags::RDONLY)
+        }; self
+    }
+    pub fn write(&mut self, write: bool) -> &mut Self {
+        if write {
+            self.0.insert(FileOpenFlags::WRONLY)
+        } else {
+            self.0.remove(FileOpenFlags::WRONLY)
+        }; self
+    }
+    pub fn append(&mut self, append: bool) -> &mut Self {
+        if append {
+            self.0.insert(FileOpenFlags::APPEND)
+        } else {
+            self.0.remove(FileOpenFlags::APPEND)
+        }; self
+    }
+    pub fn create(&mut self, create: bool) -> &mut Self {
+        if create {
+            self.0.insert(FileOpenFlags::CREAT)
+        } else {
+            self.0.remove(FileOpenFlags::CREAT)
+        }; self
+    }
+    pub fn create_new(&mut self, create_new: bool) -> &mut Self {
+        if create_new {
+            self.0.insert(FileOpenFlags::EXCL);
+            self.0.insert(FileOpenFlags::CREAT);
+        } else {
+            self.0.remove(FileOpenFlags::EXCL);
+            self.0.remove(FileOpenFlags::CREAT);
+        }; self
+    }
+
+    pub fn truncate(&mut self, truncate: bool) -> &mut Self {
+        if truncate {
+            self.0.insert(FileOpenFlags::TRUNC)
+        } else {
+            self.0.remove(FileOpenFlags::TRUNC)
+        }; self
+    }
+
+    pub fn open<'alloc, Storage>(
+        &self,
+        path: &str,
+        alloc: &'alloc mut FileAllocation<Storage>,
+        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        storage: &mut Storage,
+    ) ->
+        Result<File<'alloc, Storage>>
+    where
+        Storage: traits::Storage,
+        <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+        <Storage as traits::Storage>::FILENAME_MAX: ArrayLength<u8>,
+        <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    {
+        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
+
+        let file = File { alloc };
+
+        let mut cstr_path: GenericArray<u8, Storage::FILENAME_MAX> = Default::default();
+        let name_max = <Storage as traits::Storage>::FILENAME_MAX::to_usize();
+        let len = cmp::min(name_max - 1, path.len());
+        cstr_path[..len].copy_from_slice(&path.as_bytes()[..len]);
+
+        let return_code = unsafe { ll::lfs_file_opencfg(
+                &mut fs.alloc.state,
+                &mut file.alloc.state,
+                cstr_path.as_ptr() as *const cty::c_char,
+                self.0.bits() as i32,
+                &file.alloc.config,
+        ) };
+
+        Error::empty_from(return_code)?;
+
+        Ok(file)
+    }
+
+}
+
 pub struct FileAllocation<Storage>
 where
     Storage: traits::Storage,
@@ -101,81 +192,43 @@ where
     pub fn open(
         path: &str,
         alloc: &'alloc mut FileAllocation<Storage>,
-        littlefs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
         storage: &mut Storage,
     ) ->
         Result<Self>
     {
-        debug_assert!(littlefs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
-        alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
-
-        let file = File {
-            alloc,
-        };
-
-        // let mut cstr_path = [0u8; Storage::FILENAME_MAX];
-        let mut cstr_path: GenericArray<u8, Storage::FILENAME_MAX> = Default::default();
-        let name_max = <Storage as traits::Storage>::FILENAME_MAX::to_usize();
-        let len = cmp::min(name_max - 1, path.len());
-        cstr_path[..len].copy_from_slice(&path.as_bytes()[..len]);
-
-        let return_code = unsafe { ll::lfs_file_opencfg(
-                &mut littlefs.alloc.state,
-                &mut file.alloc.state,
-                cstr_path.as_ptr() as *const cty::c_char,
-                (FileOpenFlags::RDONLY).bits() as i32,
-                &file.alloc.config,
-        ) };
-
-        Error::empty_from(return_code)?;
-
-        Ok(file)
+        OpenOptions::new()
+            .read(true)
+            .open(path, alloc, fs, storage)
     }
 
     pub fn create(
         path: &str,
         alloc: &'alloc mut FileAllocation<Storage>,
-        littlefs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
         storage: &mut Storage,
     ) ->
         Result<Self>
     {
-        debug_assert!(littlefs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
-        alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
-
-        let file = File {
-            alloc,
-        };
-
-        let mut cstr_path: GenericArray<u8, Storage::FILENAME_MAX> = Default::default();
-        let name_max = <Storage as traits::Storage>::FILENAME_MAX::to_usize();
-        let len = cmp::min(name_max - 1, path.len());
-        cstr_path[..len].copy_from_slice(&path.as_bytes()[..len]);
-
-        let return_code = unsafe { ll::lfs_file_opencfg(
-                &mut littlefs.alloc.state,
-                &mut file.alloc.state,
-                cstr_path.as_ptr() as *const cty::c_char,
-                (FileOpenFlags::WRONLY | FileOpenFlags::TRUNC | FileOpenFlags::CREAT).bits() as i32,
-                &file.alloc.config,
-        ) };
-
-        Error::empty_from(return_code)?;
-        Ok(file)
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path, alloc, fs, storage)
     }
 
     /// Sync the file and drop it.
     /// NB: `std::fs` does not have this, just drops at end of scope.
     pub fn close(
         self,
-        littlefs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
         storage: &mut Storage,
     ) ->
         Result<()>
     {
-        debug_assert!(littlefs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         let return_code = unsafe { ll::lfs_file_close(
-            &mut littlefs.alloc.state,
+            &mut fs.alloc.state,
             &mut self.alloc.state,
         ) };
         Error::empty_from(return_code)?;
@@ -185,14 +238,14 @@ where
     /// Synchronize file contents to storage.
     pub fn sync(
         &mut self,
-        littlefs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
         storage: &mut Storage,
     ) ->
         Result<()>
     {
-        debug_assert!(littlefs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         let return_code = unsafe { ll::lfs_file_sync(
-            &mut littlefs.alloc.state,
+            &mut fs.alloc.state,
             &mut self.alloc.state,
         ) };
         Error::empty_from(return_code)?;

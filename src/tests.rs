@@ -2,7 +2,10 @@ use generic_array::typenum::consts;
 
 use crate::{
     error::Result,
-    file::File,
+    file::{
+        File,
+        OpenOptions,
+    },
     LittleFs,
     SeekFrom,
     traits::{
@@ -132,3 +135,35 @@ fn test_seek() {
 
     assert_eq!(&buf, b"world");
 }
+
+#[test]
+fn test_fancy_open() {
+    let mut storage = RamStorage::default();
+    let mut alloc = LittleFs::allocate();
+    LittleFs::format(&mut alloc, &mut storage).unwrap();
+    let mut fs = LittleFs::mount(&mut alloc, &mut storage).unwrap();
+
+    let mut alloc = File::allocate();
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open("test_fancy_open.txt", &mut alloc, &mut fs, &mut storage)
+        .unwrap();
+
+    file.write(&mut fs, &mut storage, b"hello world").unwrap();
+    assert_eq!(file.len(&mut fs).unwrap(), 11);
+
+    // don't need to sync in this case
+    // file.sync(&mut fs, &mut storage).unwrap();
+
+    file.seek(&mut fs, &mut storage, SeekFrom::Start(6)).unwrap();
+
+    let mut buf = [0u8; 5];
+    file.read(&mut fs, &mut storage, &mut buf).unwrap();
+    file.close(&mut fs, &mut storage).unwrap();
+    fs.unmount(&mut storage).unwrap();
+
+    assert_eq!(&buf, b"world");
+}
+
