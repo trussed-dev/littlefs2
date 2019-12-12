@@ -104,3 +104,42 @@ where
     ) -> Result<usize>;
 }
 
+#[derive(Clone,Copy,Debug,Eq,PartialEq)]
+pub enum SeekFrom {
+    Start(u32),
+    End(i32),
+    Current(i32),
+}
+
+impl SeekFrom {
+    pub(crate) fn off(self) -> i32 {
+        match self {
+            SeekFrom::Start(u) => u as i32,
+            SeekFrom::End(i) => i,
+            SeekFrom::Current(i) => i,
+        }
+    }
+
+    pub(crate) fn whence(self) -> i32 {
+        match self {
+            SeekFrom::Start(_) => 0,
+            SeekFrom::End(_) => 2,
+            SeekFrom::Current(_) => 1,
+        }
+    }
+}
+
+pub trait Seek<'alloc, S>
+where
+    S: Storage,
+    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn seek(
+        &mut self,
+        fs: &mut LittleFs<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
+        pos: SeekFrom,
+    ) -> Result<usize>;
+}
+

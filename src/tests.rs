@@ -4,10 +4,12 @@ use crate::{
     error::Result,
     file::File,
     LittleFs,
+    SeekFrom,
     traits::{
         self,
         Read,
         Write,
+        Seek,
     },
 };
 
@@ -95,6 +97,38 @@ fn test_create() {
     assert!(file.read(&mut fs, &mut storage, &mut contents).unwrap() == 3);
     assert_eq!(contents, [0u8, 1, 2]);
 
-
     fs.unmount(&mut storage).unwrap();
+}
+
+#[test]
+fn test_seek() {
+    let mut storage = RamStorage::default();
+    let mut alloc = LittleFs::allocate();
+    LittleFs::format(&mut alloc, &mut storage).unwrap();
+    let mut fs = LittleFs::mount(&mut alloc, &mut storage).unwrap();
+
+    let mut alloc = File::allocate();
+    let mut file = File::create(
+        "test_seek.txt",
+        &mut alloc, &mut fs, &mut storage,
+    ).unwrap();
+    file.write(&mut fs, &mut storage, b"hello world").unwrap();
+    assert_eq!(file.len(&mut fs).unwrap(), 11);
+    // w/o sync, won't see data below
+    file.sync(&mut fs, &mut storage).unwrap();
+
+    let mut alloc = File::allocate();
+    let mut file = File::open(
+        "test_seek.txt",
+        &mut alloc, &mut fs, &mut storage,
+    ).unwrap();
+    file.seek(&mut fs, &mut storage, SeekFrom::End(-5)).unwrap();
+
+    let mut buf = [0u8; 5];
+    assert_eq!(file.len(&mut fs).unwrap(), 11);
+    file.read(&mut fs, &mut storage, &mut buf).unwrap();
+    file.close(&mut fs, &mut storage).unwrap();
+    fs.unmount(&mut storage).unwrap();
+
+    assert_eq!(&buf, b"world");
 }

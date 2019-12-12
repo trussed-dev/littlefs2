@@ -21,8 +21,11 @@ generic-array = "0.13.2"
 # trybuild = "1.0"
 
 [dependencies.littlefs2-sys]
-# version = "0.1.0"
+version = "0.1.1"
+# git = "https://github.com/nickray/littlefs2-sys"
+# branch = "main"
 # path = "../littlefs2-sys"
-git = "https://github.com/nickray/littlefs2-sys"
-branch = "main"
-# features = ["assertions", "trace"]
+
+[features]
+ll-assertions = ["littlefs2-sys/assertions"]
+ll-trace = ["littlefs2-sys/trace"]

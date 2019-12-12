@@ -45,6 +45,7 @@ Currently, release v2.1.4 is exposed.
 #### License
 
 <sup>LittleFS licensed under [BSD-3-Clause](https://github.com/ARMmbed/littlefs/blob/master/LICENSE.md).</sup>
+<sup>Previous bindings were created in the [rust-littlefs](https://github.com/brandonedens/rust-littlefs) repository, and dual-licensed under Apache-2.0 and MIT.</sup>
 <sup>These bindings are licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT License](LICENSE-MIT) at your option.</sup>
 <br>
 <sub>Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.</sub>

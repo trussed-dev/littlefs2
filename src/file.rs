@@ -8,7 +8,10 @@ use crate::{
     },
     LittleFs,
     mount_state,
-    traits,
+    traits::{
+        self,
+        SeekFrom,
+    },
 };
 
 use generic_array::{
@@ -253,6 +256,30 @@ where
             &mut self.alloc.state,
             buf.as_ptr() as *const cty::c_void,
             buf.len() as u32,
+        ) };
+        Error::usize_from(return_code)
+    }
+}
+
+impl<'alloc, Storage> traits::Seek<'alloc, Storage> for File<'alloc, Storage>
+where
+    Storage: traits::Storage,
+    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn seek(
+        &mut self,
+        fs: &mut LittleFs<'alloc, Storage, mount_state::Mounted>,
+        _storage: &mut Storage,
+        pos: SeekFrom,
+    ) ->
+        Result<usize>
+    {
+        let return_code = unsafe { ll::lfs_file_seek(
+            &mut fs.alloc.state,
+            &mut self.alloc.state,
+            pos.off(),
+            pos.whence(),
         ) };
         Error::usize_from(return_code)
     }

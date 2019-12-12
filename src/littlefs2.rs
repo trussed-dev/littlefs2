@@ -30,6 +30,7 @@ pub use fs::{
 pub mod traits;
 pub use traits::{
     Storage,
+    SeekFrom,
 };
 
 #[derive(Copy,Clone,Debug)]
