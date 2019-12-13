@@ -8,7 +8,7 @@ use crate::{
         mount_state,
         SeekFrom,
     },
-    traits::Storage,
+    driver::Storage,
 };
 
 /// The `Read` trait allows for reading bytes from a file.

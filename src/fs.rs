@@ -18,7 +18,7 @@ use crate::{
         Filename,
         Path,
     },
-    traits,
+    driver,
 };
 
 use bitflags::bitflags;
@@ -44,9 +44,9 @@ pub mod mount_state {
 // #[derive(Debug)]
 pub struct Buffers<Storage>
 where
-    Storage: traits::Storage,
-    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    Storage: driver::Storage,
+    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     read: GenericArray<u8, Storage::CACHE_SIZE>,
     write: GenericArray<u8, Storage::CACHE_SIZE>,
@@ -57,9 +57,9 @@ where
 // #[derive(Debug)]
 pub struct FilesystemAllocation<Storage>
 where
-    Storage: traits::Storage,
-    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    Storage: driver::Storage,
+    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     buffers: Buffers<Storage>,
     pub(crate) state: ll::lfs_t,
@@ -69,9 +69,9 @@ where
 // #[derive(Debug)]
 pub struct Filesystem<'alloc, Storage, MountState = mount_state::NotMounted>
 where
-    Storage: traits::Storage,
-    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    Storage: driver::Storage,
+    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     MountState: mount_state::MountState,
 {
     pub(crate) alloc: &'alloc mut FilesystemAllocation<Storage>,
@@ -81,21 +81,21 @@ where
 
 impl<'alloc, Storage> Filesystem<'alloc, Storage>
 where
-    Storage: traits::Storage,
+    Storage: driver::Storage,
     Storage: 'alloc,
-    <Storage as traits::Storage>::BLOCK_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-    <Storage as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <Storage as traits::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as driver::Storage>::BLOCK_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     pub fn allocate() -> FilesystemAllocation<Storage> {
         let read_size: u32 = Storage::READ_SIZE as _;
         let write_size: u32 = Storage::WRITE_SIZE as _;
-        let block_size: u32 = <Storage as traits::Storage>::BLOCK_SIZE::to_u32();
-        let cache_size: u32 = <Storage as traits::Storage>::CACHE_SIZE::to_u32();
+        let block_size: u32 = <Storage as driver::Storage>::BLOCK_SIZE::to_u32();
+        let cache_size: u32 = <Storage as driver::Storage>::CACHE_SIZE::to_u32();
         let lookahead_size: u32 =
-            32 * <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE::to_u32();
+            32 * <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE::to_u32();
         let block_cycles: i32 = Storage::BLOCK_CYCLES as _;
         let block_count: u32 = Storage::BLOCK_COUNT as _;
 
@@ -129,9 +129,9 @@ where
             lookahead: Default::default(),
         };
 
-        let filename_max: u32 = <Storage as traits::Storage>::FILENAME_MAX_PLUS_ONE::to_u32();
+        let filename_max: u32 = <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE::to_u32();
         debug_assert!(filename_max > 0);
-        let path_max: u32 = <Storage as traits::Storage>::PATH_MAX_PLUS_ONE::to_u32();
+        let path_max: u32 = <Storage as driver::Storage>::PATH_MAX_PLUS_ONE::to_u32();
         debug_assert!(path_max >= filename_max);
         let file_max = Storage::FILEBYTES_MAX as u32;
         assert!(file_max > 0);
@@ -245,14 +245,14 @@ where
 
 impl<'alloc, Storage> Filesystem<'alloc, Storage, mount_state::Mounted>
 where
-    Storage: traits::Storage,
+    Storage: driver::Storage,
     Storage: 'alloc,
     // MountState: mount_state::MountState,
-    <Storage as traits::Storage>::BLOCK_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-    <Storage as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <Storage as traits::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as driver::Storage>::BLOCK_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     pub fn unmount(self, storage: &mut Storage)
         -> Result<Filesystem<'alloc, Storage, mount_state::NotMounted>>
@@ -364,8 +364,8 @@ where
 
 pub struct DirEntry<S>
 where
-    S: traits::Storage,
-    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    S: driver::Storage,
+    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     file_name: Filename<S>,
     metadata: Metadata,
@@ -373,8 +373,8 @@ where
 
 impl<S> DirEntry<S>
 where
-    S: traits::Storage,
-    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    S: driver::Storage,
+    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     // // Returns the full path to the file that this entry represents.
     // pub fn path(&self) -> Path {}
@@ -398,7 +398,7 @@ where
 
 pub struct ReadDir<S>
 where
-    S: traits::Storage,
+    S: driver::Storage,
 {
     state: ll::lfs_dir_t,
     _storage: PhantomData<S>,
@@ -406,10 +406,10 @@ where
 
 impl<S> ReadDir<S>
 where
-    S: traits::Storage,
-    <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     pub fn next<'alloc>(
         &mut self,
@@ -455,8 +455,8 @@ where
 pub struct Metadata
 // pub struct Metadata<S>
 // where
-//     S: traits::Storage,
-//     <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+//     S: driver::Storage,
+//     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     file_type: FileType,
     size: usize,
@@ -467,8 +467,8 @@ pub struct Metadata
 impl From<ll::lfs_info> for Metadata
 // impl<S> From<ll::lfs_info> for Metadata<S>
 // where
-//     S: traits::Storage,
-//     <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+//     S: driver::Storage,
+//     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     fn from(info: ll::lfs_info) -> Self {
         let file_type = match info.type_ as u32 {
@@ -487,12 +487,12 @@ impl From<ll::lfs_info> for Metadata
 
 impl<'alloc, Storage, MountState> Filesystem<'alloc, Storage, MountState>
 where
-    Storage: traits::Storage,
+    Storage: driver::Storage,
     Storage: 'alloc,
     MountState: mount_state::MountState,
-    <Storage as traits::Storage>::BLOCK_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    <Storage as driver::Storage>::BLOCK_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     /// C callback interface used by LittleFS to read data with the lower level system below the
     /// filesystem.
@@ -528,7 +528,7 @@ where
         let storage: &mut Storage = unsafe { mem::transmute((*c).context) };
         debug_assert!(!c.is_null());
         // let block_size = unsafe { c.read().block_size };
-        let block_size = <Storage as traits::Storage>::BLOCK_SIZE::to_u32();
+        let block_size = <Storage as driver::Storage>::BLOCK_SIZE::to_u32();
         let off = (block * block_size + off) as usize;
         let buf: &[u8] = unsafe { slice::from_raw_parts(buffer as *const u8, size as usize) };
 
@@ -546,10 +546,10 @@ where
         // println!("in lfs_config_erase");
         // let littlefs: &mut Filesystem<Storage> = unsafe { mem::transmute((*c).context) };
         let storage: &mut Storage = unsafe { mem::transmute((*c).context) };
-        let off = block as usize * <Storage as traits::Storage>::BLOCK_SIZE::to_usize();
+        let off = block as usize * <Storage as driver::Storage>::BLOCK_SIZE::to_usize();
 
         // TODO
-        storage.erase(off, <Storage as traits::Storage>::BLOCK_SIZE::to_usize()).unwrap();
+        storage.erase(off, <Storage as driver::Storage>::BLOCK_SIZE::to_usize()).unwrap();
         0
     }
 
@@ -628,10 +628,10 @@ impl OpenOptions {
     ) ->
         Result<File<'alloc, S>>
     where
-        S: traits::Storage,
-        <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-        <S as traits::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-        <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+        S: driver::Storage,
+        <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+        <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+        <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     {
         fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
@@ -689,7 +689,7 @@ impl SeekFrom {
 
 // pub struct Dir<'alloc, S>
 // where
-//     S: traits::Storage,
+//     S: driver::Storage,
 //     S: 'alloc,
 // {
 //     alloc: &'alloc mut DirAllocation,
@@ -698,8 +698,8 @@ impl SeekFrom {
 /// The state of a `File`. Must be pre-allocated via `File::allocate()`.
 pub struct FileAllocation<S>
 where
-    S: traits::Storage,
-    <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
 {
     cache: GenericArray<u8, S::CACHE_SIZE>,
     state: ll::lfs_file_t,
@@ -715,9 +715,9 @@ available options how to open files.
 */
 pub struct File<'alloc, S>
 where
-    S: traits::Storage,
+    S: driver::Storage,
     S: 'alloc,
-    <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
 {
     alloc: &'alloc mut FileAllocation<S>,
 }
@@ -745,15 +745,15 @@ bitflags! {
 
 impl<'alloc, S> File<'alloc, S>
 where
-    S: traits::Storage,
+    S: driver::Storage,
     S: 'alloc,
-    <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as traits::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-    <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     pub fn allocate() -> FileAllocation<S> {
         // TODO: more checks
-        let cache_size: u32 = <S as traits::Storage>::CACHE_SIZE::to_u32();
+        let cache_size: u32 = <S as driver::Storage>::CACHE_SIZE::to_u32();
         debug_assert!(cache_size > 0);
 
         let config = ll::lfs_file_config {
@@ -891,8 +891,8 @@ impl FileType {
 impl Metadata
 // impl<S> Metadata<S>
 // where
-//     S: traits::Storage,
-//     <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+//     S: driver::Storage,
+//     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     pub fn file_type(&self) -> FileType {
         self.file_type
@@ -917,9 +917,9 @@ impl Metadata
 
 impl<'alloc, S> io::Read<'alloc, S> for File<'alloc, S>
 where
-    S: traits::Storage,
-    <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn read(
         &mut self,
@@ -942,9 +942,9 @@ where
 
 impl<'alloc, S> io::Write<'alloc, S> for File<'alloc, S>
 where
-    S: traits::Storage,
-    <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn write(
         &mut self,
@@ -977,9 +977,9 @@ where
 
 impl<'alloc, S> io::Seek<'alloc, S> for File<'alloc, S>
 where
-    S: traits::Storage,
-    <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn seek(
         &mut self,

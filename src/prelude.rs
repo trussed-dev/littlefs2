@@ -1,4 +1,4 @@
-/*! Export of the Read, Seek and Write traits for ease of use.
+/*! Export of the Read, Seek and Write driver for ease of use.
 
 */
 

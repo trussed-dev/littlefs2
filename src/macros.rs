@@ -15,6 +15,7 @@ macro_rules! ram_storage { (
     lookaheadwords_size_ty=$lookaheadwords_size:path,
     filename_max_plus_one_ty=$filename_max_plus_one:path,
     path_max_plus_one_ty=$path_max_plus_one:path,
+    result=$Result:ident,
 
 ) => {
         struct $Backend {
@@ -50,7 +51,7 @@ macro_rules! ram_storage { (
             type FILENAME_MAX_PLUS_ONE = $filename_max_plus_one;
             type PATH_MAX_PLUS_ONE = $path_max_plus_one;
 
-            fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+            fn read(&self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
                 debug_assert!(buf.len() % Self::READ_SIZE == 0);
                 for (from, to) in self.backend.buf[offset..].iter().zip(buf.iter_mut()) {
                     *to = *from;
@@ -58,7 +59,7 @@ macro_rules! ram_storage { (
                 Ok(buf.len())
             }
 
-            fn write(&mut self, offset: usize, data: &[u8]) -> Result<usize> {
+            fn write(&mut self, offset: usize, data: &[u8]) -> $Result<usize> {
                 debug_assert!(data.len() % Self::WRITE_SIZE == 0);
                 for (from, to) in data.iter().zip(self.backend.buf[offset..].iter_mut()) {
                     *to = *from;
@@ -66,7 +67,7 @@ macro_rules! ram_storage { (
                 Ok(data.len())
             }
 
-            fn erase(&mut self, offset: usize, len: usize) -> Result<usize> {
+            fn erase(&mut self, offset: usize, len: usize) -> $Result<usize> {
                 use generic_array::typenum::marker_traits::Unsigned as _;
                 let block_size: usize = Self::BLOCK_SIZE::to_usize();
                 debug_assert!(offset % block_size == 0);

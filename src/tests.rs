@@ -15,13 +15,13 @@ use crate::{
         Seek,
     },
     path::Filename,
-    traits,
+    driver,
 };
 
 ram_storage!(
     name=OtherRamStorage,
     backend=OtherRam,
-    trait=traits::Storage,
+    trait=driver::Storage,
     erase_value=0xff,
     read_size=1,
     write_size=32,
@@ -32,12 +32,13 @@ ram_storage!(
     lookaheadwords_size_ty=consts::U1,
     filename_max_plus_one_ty=consts::U256,
     path_max_plus_one_ty=consts::U256,
+    result=Result,
 );
 
 ram_storage!(
     name=RamStorage,
     backend=Ram,
-    trait=traits::Storage,
+    trait=driver::Storage,
     erase_value=0xff,
     read_size=20*5,
     write_size=20*7,
@@ -48,6 +49,7 @@ ram_storage!(
     lookaheadwords_size_ty=consts::U1,
     filename_max_plus_one_ty=consts::U256,
     path_max_plus_one_ty=consts::U256,
+    result=Result,
 );
 
 #[test]

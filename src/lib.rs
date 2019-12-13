@@ -17,11 +17,11 @@ It builds on the low-level library [`littlefs2-sys`](https://lib.rs/littlefs2-sy
 
 Some complications arise due to the lack of const generics in Rust, we work around these
 with the [`generic-array`](https://lib.rs/generic-array) library, and long for the day when
-constants associated to traits will be treated as constants by the compiler.
+constants associated to driver will be treated as constants by the compiler.
 
 ## Usage
 
-This library requires an implementation of `littlefs2::traits::Storage`.
+This library requires an implementation of `littlefs2::driver::Storage`.
 
 Roughly speaking, such an implementation defines a block device in terms of actual and
 `typenum` constants, and supplies methods to read, erase and write.
@@ -40,12 +40,12 @@ at different locations.
 use littlefs2::fs::{Filesystem, File, OpenOptions, SeekFrom};
 use littlefs2::prelude::*;
 #
-# use littlefs2::{consts, ram_storage, traits, io::Result};
+# use littlefs2::{consts, ram_storage, driver, io::Result};
 #
 # ram_storage!(
 #     name=RamStorage,
 #     backend=Ram,
-#     trait=traits::Storage,
+#     trait=driver::Storage,
 #     erase_value=0xff,
 #     read_size=32,
 #     write_size=32,
@@ -56,6 +56,7 @@ use littlefs2::prelude::*;
 #     lookaheadwords_size_ty=consts::U1,
 #     filename_max_plus_one_ty=consts::U256,
 #     path_max_plus_one_ty=consts::U256,
+#     result=Result,
 # );
 
 // example storage backend
@@ -113,8 +114,8 @@ pub mod io;
 
 pub mod path;
 
-/// The `Storage`, `Read`, `Write` and `Seek` traits.
-pub mod traits;
+/// The `Storage`, `Read`, `Write` and `Seek` driver.
+pub mod driver;
 
 /// get information about the C backend
 pub fn version() -> Version {
