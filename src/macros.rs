@@ -3,6 +3,7 @@
 macro_rules! ram_storage { (
 
     name=$Name:ident,
+    backend=$Backend:ident,
     trait=$StorageTrait:path,
     erase_value=$erase_value:expr,
     read_size=$read_size:expr,
@@ -16,23 +17,30 @@ macro_rules! ram_storage { (
     path_max_plus_one_ty=$path_max_plus_one:path,
 
 ) => {
-        struct $Name {
+        struct $Backend {
             buf: [u8; $block_size_num * $block_count],
         }
 
-        impl Default for $Name {
+        impl Default for $Backend {
             fn default() -> Self {
-                $Name {
+                $Backend {
                     buf: [$erase_value; $block_size_num * $block_count],
                 }
             }
         }
 
-        impl $Name {
-            const ERASE_VALUE: u8 = $erase_value;
+        struct $Name<'backend> {
+            backend: &'backend mut $Backend,
         }
 
-        impl $StorageTrait for $Name {
+        impl<'backend> $Name<'backend> {
+            const ERASE_VALUE: u8 = $erase_value;
+            pub fn new(backend: &'backend mut $Backend) -> Self {
+                $Name { backend }
+            }
+        }
+
+        impl<'backend> $StorageTrait for $Name<'backend> {
             const READ_SIZE: usize = $read_size;
             const WRITE_SIZE: usize = $write_size;
             type CACHE_SIZE = $cache_size;
@@ -44,7 +52,7 @@ macro_rules! ram_storage { (
 
             fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
                 debug_assert!(buf.len() % Self::READ_SIZE == 0);
-                for (from, to) in self.buf[offset..].iter().zip(buf.iter_mut()) {
+                for (from, to) in self.backend.buf[offset..].iter().zip(buf.iter_mut()) {
                     *to = *from;
                 }
                 Ok(buf.len())
@@ -52,7 +60,7 @@ macro_rules! ram_storage { (
 
             fn write(&mut self, offset: usize, data: &[u8]) -> Result<usize> {
                 debug_assert!(data.len() % Self::WRITE_SIZE == 0);
-                for (from, to) in data.iter().zip(self.buf[offset..].iter_mut()) {
+                for (from, to) in data.iter().zip(self.backend.buf[offset..].iter_mut()) {
                     *to = *from;
                 }
                 Ok(data.len())
@@ -63,7 +71,7 @@ macro_rules! ram_storage { (
                 let block_size: usize = Self::BLOCK_SIZE::to_usize();
                 debug_assert!(offset % block_size == 0);
                 debug_assert!(len % block_size == 0);
-                for byte in self.buf[offset..offset + len].iter_mut() {
+                for byte in self.backend.buf[offset..offset + len].iter_mut() {
                     *byte = Self::ERASE_VALUE;
                 }
                 Ok(len)

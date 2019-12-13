@@ -44,6 +44,7 @@ use littlefs2::prelude::*;
 #
 # ram_storage!(
 #     name=RamStorage,
+#     backend=Ram,
 #     trait=traits::Storage,
 #     erase_value=0xff,
 #     read_size=32,
@@ -58,7 +59,8 @@ use littlefs2::prelude::*;
 # );
 
 // example storage backend
-let mut storage = RamStorage::default();
+let mut ram = Ram::default();
+let mut storage = RamStorage::new(&mut ram);
 
 // must allocate state statically before use, must format before first mount
 let mut alloc = Filesystem::allocate();

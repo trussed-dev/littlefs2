@@ -634,6 +634,7 @@ impl OpenOptions {
         <S as traits::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
         <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     {
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
 

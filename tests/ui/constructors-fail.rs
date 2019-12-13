@@ -7,6 +7,7 @@ use littlefs2::{
 
 ram_storage!(
     name=OtherRamStorage,
+    backend=OtherRam,
     trait=traits::Storage,
     erase_value=0xff,
     read_size=1,
@@ -22,6 +23,7 @@ ram_storage!(
 
 ram_storage!(
     name=RamStorage,
+    backend=Ram,
     trait=traits::Storage,
     erase_value=0xff,
     read_size=20*5,
@@ -36,12 +38,14 @@ ram_storage!(
 );
 
 fn main() {
-    let mut other_storage = OtherRamStorage::default();
+    let mut other_ram = OtherRam::default();
+    let mut other_storage = OtherRamStorage::new(&mut other_ram);
     let mut alloc = Filesystem::allocate();
     assert!(Filesystem::format(&mut alloc, &mut other_storage).is_ok());
     let other_fs = Filesystem::mount(&mut alloc, &mut other_storage).unwrap();
 
-    let mut storage = RamStorage::default();
+    let mut ram = Ram::default();
+    let mut storage = RamStorage::new(&mut ram);
     let mut alloc = Filesystem::allocate();
     Filesystem::format(&mut alloc, &mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();

@@ -20,6 +20,7 @@ use crate::{
 
 ram_storage!(
     name=OtherRamStorage,
+    backend=OtherRam,
     trait=traits::Storage,
     erase_value=0xff,
     read_size=1,
@@ -35,6 +36,7 @@ ram_storage!(
 
 ram_storage!(
     name=RamStorage,
+    backend=Ram,
     trait=traits::Storage,
     erase_value=0xff,
     read_size=20*5,
@@ -50,7 +52,8 @@ ram_storage!(
 
 #[test]
 fn test_format() {
-    let mut storage = OtherRamStorage::default();
+    let mut backend = OtherRam::default();
+    let mut storage = OtherRamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
 
     // should fail: FS is not formatted
@@ -65,17 +68,18 @@ fn test_format() {
 
 #[test]
 fn test_create() {
-    let mut storage = RamStorage::default();
-    let mut alloc = Filesystem::allocate();
-    Filesystem::format(&mut alloc, &mut storage).unwrap();
-    let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
+    let mut backend = OtherRam::default();
+    let mut storage = OtherRamStorage::new(&mut backend);
+    let mut alloc_fs = Filesystem::allocate();
+    Filesystem::format(&mut alloc_fs, &mut storage).unwrap();
+    let mut fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
 
-    let mut alloc = File::allocate();
+    let mut alloc_file = File::allocate();
     // file does not exist yet, can't open for reading
     assert_eq!(
         File::open(
             "/test_open.txt",
-            &mut alloc, &mut fs, &mut storage
+            &mut alloc_file, &mut fs, &mut storage
         ).map(drop).unwrap_err(), // "real" contains_err is experimental
         Error::NoSuchEntry
     );
@@ -83,11 +87,11 @@ fn test_create() {
     fs.create_dir("/tmp", &mut storage).unwrap();
 
     // TODO: make previous allocation reusable
-    let mut alloc = File::allocate();
+    let mut alloc_another_file = File::allocate();
     // can create new files
     let mut file = File::create(
         "/tmp/test_open.txt",
-        &mut alloc, &mut fs, &mut storage,
+        &mut alloc_another_file, &mut fs, &mut storage,
     ).unwrap();
     // can write to files
     assert!(file.write(&mut fs, &mut storage, &[0u8, 1, 2]).unwrap() == 3);
@@ -99,14 +103,16 @@ fn test_create() {
 
     let metadata = fs.metadata("/tmp", &mut storage).unwrap();
     assert!(metadata.is_dir());
-    assert_eq!(0, metadata.len());
+    // assert_eq!(0, metadata.len());  // HUH?!!?! why does this cause `unwrap_failed`?
+    assert!(metadata.len() == 0);
 
     // can move files
     fs.rename("/tmp/test_open.txt", "moved.txt", &mut storage).unwrap();
 
     let metadata = fs.metadata("/moved.txt", &mut storage).unwrap();
     assert!(metadata.is_file());
-    assert_eq!(3, metadata.len());
+    // assert_eq!(3, metadata.len());  // <-- again, `unwrap_failed`, u wot m8?
+    assert!(metadata.len() == 3);
 
     fs.remove("/tmp/../tmp/.", &mut storage).unwrap();
 
@@ -126,8 +132,42 @@ fn test_create() {
 }
 
 #[test]
+fn test_unbind() {
+    let mut backend = Ram::default();
+    {
+        let mut storage = RamStorage::new(&mut backend);
+        let mut alloc = Filesystem::allocate();
+        Filesystem::format(&mut alloc, &mut storage).unwrap();
+        let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
+
+        let mut alloc = File::allocate();
+        let mut file = File::create(
+            "test_unbind.txt",
+            &mut alloc, &mut fs, &mut storage,
+        ).unwrap();
+        file.write(&mut fs, &mut storage, b"hello world").unwrap();
+        assert_eq!(file.len(&mut fs).unwrap(), 11);
+        // w/o sync, won't see data below
+        file.sync(&mut fs, &mut storage).unwrap();
+    }
+
+    let mut storage = RamStorage::new(&mut backend);
+    let mut alloc = Filesystem::allocate();
+    let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
+    let mut alloc = File::allocate();
+    let mut file = File::open(
+        "test_unbind.txt",
+        &mut alloc, &mut fs, &mut storage,
+    ).unwrap();
+    let mut buf = <[u8; 11]>::default();
+    file.read(&mut fs, &mut storage, &mut buf).unwrap();
+    assert_eq!(&buf, b"hello world");
+}
+
+#[test]
 fn test_seek() {
-    let mut storage = RamStorage::default();
+    let mut backend = Ram::default();
+    let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
     Filesystem::format(&mut alloc, &mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
@@ -160,7 +200,8 @@ fn test_seek() {
 
 #[test]
 fn test_file_set_len() {
-    let mut storage = RamStorage::default();
+    let mut backend = Ram::default();
+    let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
     Filesystem::format(&mut alloc, &mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
@@ -184,7 +225,8 @@ fn test_file_set_len() {
 
 #[test]
 fn test_fancy_open() {
-    let mut storage = RamStorage::default();
+    let mut backend = Ram::default();
+    let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
     Filesystem::format(&mut alloc, &mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
@@ -215,7 +257,8 @@ fn test_fancy_open() {
 
 #[test]
 fn test_iter_dirs() {
-    let mut storage = RamStorage::default();
+    let mut backend = Ram::default();
+    let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
     Filesystem::format(&mut alloc, &mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
