@@ -18,7 +18,7 @@ use crate::{
 };
 
 ram_storage!(
-    name=RamStorageNormal,
+    name=OtherRamStorage,
     trait=traits::Storage,
     erase_value=0xff,
     read_size=1,
@@ -49,7 +49,7 @@ ram_storage!(
 
 #[test]
 fn test_format() {
-    let mut storage = RamStorage::default();
+    let mut storage = OtherRamStorage::default();
     let mut alloc = Filesystem::allocate();
 
     // should fail: FS is not formatted
@@ -188,3 +188,14 @@ fn test_fancy_open() {
     assert_eq!(&buf, b"world");
 }
 
+// These are some tests that ensure our type constructions
+// actually do what we intend them to do.
+// Since dev-features cannot be optional, trybuild is not `no_std`,
+// and we want to actually test `no_std`...
+#[test]
+#[cfg(feature = "ui-tests")]
+fn test_api_safety() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/ui/*-fail.rs");
+    t.pass("tests/ui/*-pass.rs");
+}

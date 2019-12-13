@@ -15,8 +15,12 @@ bitflags = "1.0.4"
 cty = "0.2.1"
 generic-array = "0.13.2"
 
-# [dev-dependencies]
-# trybuild = "1.0"
+# Listed as regular dependency behind feature flag,
+# since dev-dependencies cannot be optional, and we
+# actually want to both keep our dependencies minimal
+# and test the `no_std` situation mainly.
+# Run UI tests with `cargo test --features ui-tests`.
+trybuild = { version = "1.0", optional = true }
 
 [dependencies.littlefs2-sys]
 version = "0.1.1"
@@ -25,5 +29,9 @@ version = "0.1.1"
 # path = "../littlefs2-sys"
 
 [features]
+# enable assertions in backend C code
 ll-assertions = ["littlefs2-sys/assertions"]
+# enable trace in backend C code
 ll-trace = ["littlefs2-sys/trace"]
+# enable to run UI tests
+ui-tests = ["trybuild"]

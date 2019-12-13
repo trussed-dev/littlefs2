@@ -35,4 +35,6 @@ tasks:
     cd littlefs2
     source $HOME/.cargo/env
     cargo test
+    cargo test --features ui-tests
     cargo test --release
+    cargo test --release --features ui-tests

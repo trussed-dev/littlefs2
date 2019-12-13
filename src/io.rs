@@ -107,8 +107,8 @@ pub enum Error {
 // NB: core::convert::From does not work here due to coherence rules
 // #[derive(Debug)]
 pub struct MountError<'alloc, S> (
-    pub(crate) Filesystem<'alloc, S, mount_state::NotMounted>,
-    pub(crate) Error,
+    pub Filesystem<'alloc, S, mount_state::NotMounted>,
+    pub Error,
 )
 where
     S: Storage,
