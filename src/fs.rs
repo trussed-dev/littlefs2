@@ -213,7 +213,7 @@ where
     ) -> MountResult<'alloc, Storage> {
 
         let fs = Filesystem::placement_new(alloc, storage);
-        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_mount(&mut fs.alloc.state, &fs.alloc.config) };
         match Error::empty_from(return_code) {
             Ok(_) => {
@@ -236,7 +236,7 @@ where
         Result<()>
     {
         let fs = Filesystem::placement_new(alloc, storage);
-        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_format(&mut fs.alloc.state, &fs.alloc.config) };
         Error::empty_from(return_code)?;
         Ok(())
@@ -257,7 +257,7 @@ where
     pub fn unmount(self, storage: &mut Storage)
         -> Result<Filesystem<'alloc, Storage, mount_state::NotMounted>>
     {
-        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_unmount(&mut self.alloc.state) };
         Error::empty_from(return_code)?;
         Ok(
@@ -270,7 +270,7 @@ where
 
     /// Creates a new, empty directory at the provided path.
     pub fn create_dir<P: Into<Path<Storage>>>(&mut self, path: P, storage: &mut Storage) -> Result<()> {
-        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_mkdir(
             &mut self.alloc.state,
             &path.into() as *const _ as *const cty::c_char,
@@ -281,7 +281,7 @@ where
 
     /// Remove a file or directory.
     pub fn remove<P: Into<Path<Storage>>>(&mut self, path: P, storage: &mut Storage) -> Result<()> {
-        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_remove(
             &mut self.alloc.state,
             &path.into() as *const _ as *const cty::c_char,
@@ -299,7 +299,7 @@ where
         P: Into<Path<Storage>>,
         Q: Into<Path<Storage>>,
     {
-        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_rename(
             &mut self.alloc.state,
             &from.into() as *const _ as *const cty::c_char,
@@ -318,7 +318,7 @@ where
         Result<Metadata>
         // Result<Metadata<Storage>>
     {
-        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         // do *not* not call assume_init here and pass into the unsafe block.
         // strange things happen ;)
         let mut info: ll::lfs_info = unsafe { mem::MaybeUninit::zeroed().assume_init() };
@@ -343,7 +343,7 @@ where
     ) ->
         Result<ReadDir<Storage>>
     {
-        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
 
         let mut read_dir = ReadDir {
             state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
@@ -415,11 +415,10 @@ where
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
         storage: &mut S,
-    )
-    ->
+    ) ->
         Option<Result<DirEntry<S>>>
     {
-        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
 
         let mut info: ll::lfs_info = unsafe { mem::MaybeUninit::zeroed().assume_init() };
 
@@ -635,7 +634,6 @@ impl OpenOptions {
         <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     {
         fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
-        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
 
         let file = File { alloc };
@@ -809,7 +807,7 @@ where
     ) ->
         Result<()>
     {
-        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_file_close(
             &mut fs.alloc.state,
             &mut self.alloc.state,
@@ -826,7 +824,7 @@ where
     ) ->
         Result<()>
     {
-        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_file_sync(
             &mut fs.alloc.state,
             &mut self.alloc.state,
@@ -838,9 +836,11 @@ where
     pub fn len(
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
     ) ->
         Result<usize>
     {
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_file_size(
             &mut fs.alloc.state, &mut self.alloc.state
         ) };
@@ -860,7 +860,7 @@ where
     ) ->
         Result<()>
     {
-        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_file_truncate(
             &mut fs.alloc.state,
             &mut self.alloc.state,
@@ -924,11 +924,12 @@ where
     fn read(
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
-        _storage: &mut S,
+        storage: &mut S,
         buf: &mut [u8],
     ) ->
         Result<usize>
     {
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_file_read(
             &mut fs.alloc.state,
             &mut self.alloc.state,
@@ -948,11 +949,12 @@ where
     fn write(
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
-        _storage: &mut S,
+        storage: &mut S,
         buf: &[u8],
     ) ->
         Result<usize>
     {
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_file_write(
             &mut fs.alloc.state,
             &mut self.alloc.state,
@@ -982,11 +984,12 @@ where
     fn seek(
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
-        _storage: &mut S,
+        storage: &mut S,
         pos: SeekFrom,
     ) ->
         Result<usize>
     {
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_file_seek(
             &mut fs.alloc.state,
             &mut self.alloc.state,

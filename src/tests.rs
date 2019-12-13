@@ -123,7 +123,7 @@ fn test_create() {
         &mut alloc, &mut fs, &mut storage,
     ).unwrap();
 
-    assert!(file.len(&mut fs).unwrap() == 3);
+    assert!(file.len(&mut fs, &mut storage).unwrap() == 3);
     let mut contents: [u8; 3] = Default::default();
     assert!(file.read(&mut fs, &mut storage, &mut contents).unwrap() == 3);
     assert_eq!(contents, [0u8, 1, 2]);
@@ -146,7 +146,7 @@ fn test_unbind() {
             &mut alloc, &mut fs, &mut storage,
         ).unwrap();
         file.write(&mut fs, &mut storage, b"hello world").unwrap();
-        assert_eq!(file.len(&mut fs).unwrap(), 11);
+        assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 11);
         // w/o sync, won't see data below
         file.sync(&mut fs, &mut storage).unwrap();
     }
@@ -178,7 +178,7 @@ fn test_seek() {
         &mut alloc, &mut fs, &mut storage,
     ).unwrap();
     file.write(&mut fs, &mut storage, b"hello world").unwrap();
-    assert_eq!(file.len(&mut fs).unwrap(), 11);
+    assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 11);
     // w/o sync, won't see data below
     file.sync(&mut fs, &mut storage).unwrap();
 
@@ -190,7 +190,7 @@ fn test_seek() {
     file.seek(&mut fs, &mut storage, SeekFrom::End(-5)).unwrap();
 
     let mut buf = [0u8; 5];
-    assert_eq!(file.len(&mut fs).unwrap(), 11);
+    assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 11);
     file.read(&mut fs, &mut storage, &mut buf).unwrap();
     file.close(&mut fs, &mut storage).unwrap();
     fs.unmount(&mut storage).unwrap();
@@ -212,10 +212,10 @@ fn test_file_set_len() {
         &mut alloc, &mut fs, &mut storage,
     ).unwrap();
     file.write(&mut fs, &mut storage, b"hello littlefs").unwrap();
-    assert_eq!(file.len(&mut fs).unwrap(), 14);
+    assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 14);
 
     file.set_len(&mut fs, &mut storage, 10).unwrap();
-    assert_eq!(file.len(&mut fs).unwrap(), 10);
+    assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 10);
 
     // note that:
     // a) "tell" can be implemented as follows,
@@ -240,7 +240,7 @@ fn test_fancy_open() {
         .unwrap();
 
     file.write(&mut fs, &mut storage, b"hello world").unwrap();
-    assert_eq!(file.len(&mut fs).unwrap(), 11);
+    assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 11);
 
     // don't need to sync in this case
     // file.sync(&mut fs, &mut storage).unwrap();
