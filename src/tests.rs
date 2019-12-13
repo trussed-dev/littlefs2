@@ -8,6 +8,7 @@ use crate::{
         SeekFrom,
     },
     io::{
+        Error,
         Result,
         Read,
         Write,
@@ -27,7 +28,8 @@ ram_storage!(
     block_size=256,
     block_count=512,
     lookaheadwords_size_ty=consts::U1,
-    filename_max_ty=consts::U255,
+    filename_max_plus_one_ty=consts::U256,
+    path_max_plus_one_ty=consts::U256,
 );
 
 ram_storage!(
@@ -41,7 +43,8 @@ ram_storage!(
     block_size=20*35,
     block_count=32,
     lookaheadwords_size_ty=consts::U1,
-    filename_max_ty=consts::U255,
+    filename_max_plus_one_ty=consts::U256,
+    path_max_plus_one_ty=consts::U256,
 );
 
 #[test]
@@ -50,7 +53,7 @@ fn test_format() {
     let mut alloc = Filesystem::allocate();
 
     // should fail: FS is not formatted
-    assert!(Filesystem::mount(&mut alloc, &mut storage).is_err());
+    assert!(Filesystem::mount(&mut alloc, &mut storage).contains_err(&Error::CorruptFile));
     // should succeed
     assert!(Filesystem::format(&mut alloc, &mut storage).is_ok());
     // should succeed now that storage is formatted
@@ -68,16 +71,21 @@ fn test_create() {
 
     let mut alloc = File::allocate();
     // file does not exist yet, can't open for reading
-    assert!(File::open(
-        "/test_open.txt",
-        &mut alloc, &mut fs, &mut storage,
-    ).is_err());
+    assert_eq!(
+        File::open(
+            "/test_open.txt",
+            &mut alloc, &mut fs, &mut storage
+        ).map(drop).unwrap_err(), // "real" contains_err is experimental
+        Error::NoSuchEntry
+    );
+
+    fs.create_dir("/tmp", &mut storage).unwrap();
 
     // TODO: make previous allocation reusable
     let mut alloc = File::allocate();
     // can create new files
     let mut file = File::create(
-        "/test_open.txt",
+        "/tmp/test_open.txt",
         &mut alloc, &mut fs, &mut storage,
     ).unwrap();
     // can write to files
@@ -85,13 +93,26 @@ fn test_create() {
     file.sync(&mut fs, &mut storage).unwrap();
     file.close(&mut fs, &mut storage).unwrap();
 
-    // can rename files
-    fs.rename("test_open.txt", "moved.txt", &mut storage).unwrap();
+    // directory is `DirNotEmpty`
+    assert_eq!(fs.remove("/tmp", &mut storage).unwrap_err(), Error::DirNotEmpty);
+
+    let metadata = fs.metadata("/tmp", &mut storage).unwrap();
+    assert!(metadata.is_dir());
+    assert_eq!(0, metadata.len());
+
+    // can move files
+    fs.rename("/tmp/test_open.txt", "moved.txt", &mut storage).unwrap();
+
+    let metadata = fs.metadata("/moved.txt", &mut storage).unwrap();
+    assert!(metadata.is_file());
+    assert_eq!(3, metadata.len());
+
+    fs.remove("/tmp/../tmp/.", &mut storage).unwrap();
 
     // can read from existing files
     let mut alloc = File::allocate();
     let mut file = File::open(
-        "moved.txt",
+        "/moved.txt",
         &mut alloc, &mut fs, &mut storage,
     ).unwrap();
 

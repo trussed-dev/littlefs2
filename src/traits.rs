@@ -26,11 +26,11 @@ pub trait Storage {
     const WRITE_SIZE: usize;
 
     /// Size of an erasable block in bytes, as unsigned typenum.
-    /// Must be a multiple of READ_SIZE and WRITE_SIZE.
-    /// At least 128.
+    /// Must be a multiple of `READ_SIZE` and `WRITE_SIZE`.
+    /// At least 128. Stored in superblock.
     type BLOCK_SIZE;
     /// Number of erasable blocks.
-    /// Hence storage capacity is BLOCK_COUNT * BLOCK_SIZE
+    /// Hence storage capacity is `BLOCK_COUNT` * `BLOCK_SIZE`
     const BLOCK_COUNT: usize;
 
     /// Suggested values are 100-1000, higher is more performant and less wear-leveled.
@@ -38,21 +38,26 @@ pub trait Storage {
     const BLOCK_CYCLES: isize = -1;
 
     /// littlefs uses a read cache, a write cache, and one cache per per file.
-    /// Must be a multiple of READ_SIZE and WRITE_SIZE.
-    /// Must be a factor of BLOCK_SIZE.
+    /// Must be a multiple of `READ_SIZE` and `WRITE_SIZE`.
+    /// Must be a factor of `BLOCK_SIZE`.
     type CACHE_SIZE;
 
-    /// littlefs itself has a LOOKAHEAD_SIZE, which must be a multiple of 8,
+    /// littlefs itself has a `LOOKAHEAD_SIZE`, which must be a multiple of 8,
     /// as it stores data in a bitmap. It also asks for 4-byte aligned buffers.
-    /// Hence, we further restrict LOOKAHEAD_SIZE to be a multiple of 32.
+    /// Hence, we further restrict `LOOKAHEAD_SIZE` to be a multiple of 32.
     /// Our LOOKAHEADWORDS_SIZE is this multiple.
     type LOOKAHEADWORDS_SIZE;
 
-
     /// Maximum length of a filename. Stored in superblock.
-    /// Defaults to 255. At most 1_022.
-    // const PATH_MAX: usize = ll::LFS_NAME_MAX as _;
-    type PATH_MAX;
+    /// Should default to 255, but associated type defaults don't exist currently.
+    /// At most 1_022.
+    // const FILENAME_MAX_PLUS_ONE: usize = ll::LFS_NAME_MAX as _;
+    type FILENAME_MAX_PLUS_ONE;
+    /// Maximum length of a path. Necessary to convert Rust string slices
+    /// to C strings, which requires an allocation for the terminating
+    /// zero-byte. If in doubt, set to `FILENAME_MAX_PLUS_ONE`.
+    /// Must be larger than `FILENAME_MAX_PLUS_ONE`.
+    type PATH_MAX_PLUS_ONE;
 
     /// Maximum size of file. Stored in superblock.
     /// Defaults to 2_147_483_647. At most 2_147_483_647.

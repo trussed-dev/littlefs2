@@ -12,7 +12,8 @@ macro_rules! ram_storage { (
     block_size=$block_size_num:expr,
     block_count=$block_count:expr,
     lookaheadwords_size_ty=$lookaheadwords_size:path,
-    filename_max_ty=$filename_max:path,
+    filename_max_plus_one_ty=$filename_max_plus_one:path,
+    path_max_plus_one_ty=$path_max_plus_one:path,
 
 ) => {
         struct $Name {
@@ -38,7 +39,8 @@ macro_rules! ram_storage { (
             type BLOCK_SIZE = $block_size_ty;
             const BLOCK_COUNT: usize = $block_count;
             type LOOKAHEADWORDS_SIZE = $lookaheadwords_size;
-            type PATH_MAX = $filename_max;
+            type FILENAME_MAX_PLUS_ONE = $filename_max_plus_one;
+            type PATH_MAX_PLUS_ONE = $path_max_plus_one;
 
             fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
                 debug_assert!(buf.len() % Self::READ_SIZE == 0);

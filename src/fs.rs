@@ -82,7 +82,8 @@ where
     <Storage as traits::Storage>::BLOCK_SIZE: ArrayLength<u8>,
     <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-    <Storage as traits::Storage>::PATH_MAX: ArrayLength<u8>,
+    <Storage as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as traits::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     pub fn allocate() -> FilesystemAllocation<Storage> {
         let read_size: u32 = Storage::READ_SIZE as _;
@@ -124,7 +125,16 @@ where
             lookahead: Default::default(),
         };
 
-        let name_max: u32 = <Storage as traits::Storage>::PATH_MAX::to_u32();
+        let filename_max: u32 = <Storage as traits::Storage>::FILENAME_MAX_PLUS_ONE::to_u32();
+        debug_assert!(filename_max > 0);
+        let path_max: u32 = <Storage as traits::Storage>::PATH_MAX_PLUS_ONE::to_u32();
+        debug_assert!(path_max >= filename_max);
+        let file_max = Storage::FILEBYTES_MAX as u32;
+        assert!(file_max > 0);
+        assert!(file_max <= 2_147_483_647);
+        let attr_max = Storage::ATTRBYTES_MAX as u32;
+        assert!(attr_max > 0);
+        assert!(attr_max <= 1_022);
 
         let config = ll::lfs_config {
             context: core::ptr::null_mut(),
@@ -148,9 +158,9 @@ where
             prog_buffer: core::ptr::null_mut(),
             lookahead_buffer: core::ptr::null_mut(),
 
-            name_max,
-            file_max: Storage::FILEBYTES_MAX as u32,
-            attr_max: Storage::ATTRBYTES_MAX as u32,
+            name_max: filename_max,
+            file_max,
+            attr_max,
         };
 
         let alloc = FilesystemAllocation {
@@ -237,9 +247,12 @@ where
     <Storage as traits::Storage>::BLOCK_SIZE: ArrayLength<u8>,
     <Storage as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-    <Storage as traits::Storage>::PATH_MAX: ArrayLength<u8>,
+    <Storage as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as traits::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
-    pub fn unmount(self, storage: &mut Storage) -> Result<Filesystem<'alloc, Storage, mount_state::NotMounted>> {
+    pub fn unmount(self, storage: &mut Storage)
+        -> Result<Filesystem<'alloc, Storage, mount_state::NotMounted>>
+    {
         debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
         let return_code = unsafe { ll::lfs_unmount(&mut self.alloc.state) };
         Error::empty_from(return_code)?;
@@ -249,6 +262,17 @@ where
                 _mount_state: mount_state::NotMounted,
             }
         )
+    }
+
+    /// Creates a new, empty directory at the provided path.
+    pub fn create_dir<P: Into<Path<Storage>>>(&mut self, path: P, storage: &mut Storage) -> Result<()> {
+        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        let return_code = unsafe { ll::lfs_mkdir(
+            &mut self.alloc.state,
+            &path.into() as *const _ as *const cty::c_char,
+        ) };
+        Error::empty_from(return_code)?;
+        Ok(())
     }
 
     /// Remove a file or directory.
@@ -281,6 +305,64 @@ where
         Ok(())
     }
 
+    /// Given a path, query the file system to get information about a file or directory.
+    pub fn metadata<P: Into<Path<Storage>>>(
+        &mut self,
+        path: P,
+        storage: &mut Storage,
+    ) ->
+        Result<Metadata>
+        // Result<Metadata<Storage>>
+    {
+        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        let mut info: ll::lfs_info = unsafe { mem::MaybeUninit::zeroed().assume_init() };
+        let return_code = unsafe {
+            ll::lfs_stat(
+                &mut self.alloc.state,
+                &path.into() as *const _ as *const cty::c_char,
+                &mut info,
+            )
+        };
+
+        Error::empty_from(return_code)?;
+        let metadata = info.into();
+        Ok(metadata)
+    }
+
+}
+
+#[derive(Clone,Debug)]
+pub struct Metadata
+// pub struct Metadata<S>
+// where
+//     S: traits::Storage,
+//     <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    file_type: FileType,
+    size: usize,
+    // This belongs in `path::Path`, really!
+    // name: Filename<S>,
+}
+
+impl From<ll::lfs_info> for Metadata
+// impl<S> From<ll::lfs_info> for Metadata<S>
+// where
+//     S: traits::Storage,
+//     <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    fn from(info: ll::lfs_info) -> Self {
+        let file_type = match info.type_ as u32 {
+            ll::lfs_type_LFS_TYPE_DIR => FileType::Dir,
+            ll::lfs_type_LFS_TYPE_REG => FileType::File,
+            _ => { unreachable!(); }
+        };
+
+        Metadata {
+            file_type,
+            size: info.size as usize,
+            // name: Filename::from_c_char_array(info.name.as_ptr()),
+        }
+    }
 }
 
 impl<'alloc, Storage, MountState> Filesystem<'alloc, Storage, MountState>
@@ -428,7 +510,7 @@ impl OpenOptions {
     where
         S: traits::Storage,
         <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-        <S as traits::Storage>::PATH_MAX: ArrayLength<u8>,
+        <S as traits::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
         <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     {
         debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
@@ -478,6 +560,20 @@ impl SeekFrom {
     }
 }
 
+
+// /// The state of a `Dir`. Must be pre-allocated via `File::allocate()`.
+// pub struct DirAllocation
+// {
+//     state: ll::lfs_dir_t,
+// }
+
+// pub struct Dir<'alloc, S>
+// where
+//     S: traits::Storage,
+//     S: 'alloc,
+// {
+//     alloc: &'alloc mut DirAllocation,
+// }
 
 /// The state of a `File`. Must be pre-allocated via `File::allocate()`.
 pub struct FileAllocation<S>
@@ -532,7 +628,7 @@ where
     S: traits::Storage,
     S: 'alloc,
     <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as traits::Storage>::PATH_MAX: ArrayLength<u8>,
+    <S as traits::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
     <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     pub fn allocate() -> FileAllocation<S> {
@@ -629,54 +725,50 @@ where
         Error::usize_from(return_code)
     }
 
-    // pub fn metadata(
-    //     &mut self,
-    //     fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
-    // ) ->
-    //     Result<Metadata>
-    // {
-    //     // let return_code = unsafe { ll::lfs_file_size(
-    //     //     &mut fs.alloc.state, &mut self.alloc.state
-    //     // ) };
-    //     // Error::usize_from(return_code)
-
-    //     let cstr = self.pad_path_to_cstr(path)
-    //     let mut cstr = [0u8; NAME_MAX_LEN + 1];
-    //     let len = cmp::min(NAME_MAX_LEN, path.len());
-    //     cstr[..len].copy_from_slice(&path.as_bytes()[..len]);
-
-    //     let mut info: lfs::lfs_info = unsafe { mem::uninitialized() };
-    //     let res = unsafe {
-    //         lfs::lfs_stat(
-    //             &mut self.lfs,
-    //             cstr.as_ptr() as *const cty::c_char,
-    //             &mut lfs_info,
-    //         )
-    //     };
-
-    //     *info = Info::from_lfs_info(lfs_info);
-    //     lfs_to_fserror(res)
-    // }
-
 }
 
-// #[derive(Clone,Debug)]
-// pub struct Metadata {
-//     pub fn file_type(&self) -> FileType {
+#[derive(Clone,Copy,Debug,Eq,Hash,PartialEq)]
+pub enum FileType {
+    File,
+    Dir,
+}
 
-//     }
+impl FileType {
+    pub fn is_dir(&self) -> bool {
+        *self == FileType::Dir
+    }
 
-//     pub fn is_dir(&self) -> bool {
-//         self.file_type().is_dir()
-//     }
+    pub fn is_file(&self) -> bool {
+        *self == FileType::File
+    }
+}
 
-//     pub fn is_file(&self) -> bool {
-//         self.file_type().is_dir()
-//     }
-// }
+impl Metadata
+// impl<S> Metadata<S>
+// where
+//     S: traits::Storage,
+//     <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    pub fn file_type(&self) -> FileType {
+        self.file_type
+    }
 
-// impl Metadata {
-// }
+    pub fn is_dir(&self) -> bool {
+        self.file_type().is_dir()
+    }
+
+    pub fn is_file(&self) -> bool {
+        self.file_type().is_file()
+    }
+
+    pub fn len(&self) -> usize {
+        self.size
+    }
+
+    // pub fn name(&self) -> Path<S> {
+    //     self.name.clone()
+    // }
+}
 
 impl<'alloc, S> io::Read<'alloc, S> for File<'alloc, S>
 where

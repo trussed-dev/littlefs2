@@ -74,7 +74,7 @@ where
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Definition of errors that might be returned by filesystem functionality.
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub enum Error {
     /// Input / output error occurred.
     Io,
@@ -149,6 +149,15 @@ where
         }
     }
 
+    // pub fn contains<U>(&self, x: &U) -> bool
+    // where U: PartialEq<MountError<'alloc, S>>
+    // {
+    //     match self {
+    //         MountResult::Ok(value) => value == x,
+    //         _ => false,
+    //     }
+    // }
+
     pub fn ok(self) -> Option<Filesystem<'alloc, S, mount_state::Mounted>> {
         match self {
             MountResult::Ok(fs) => Some(fs),
@@ -164,6 +173,15 @@ where
         match self {
             MountResult::Ok(_) => None,
             MountResult::Err(error) => Some(error),
+        }
+    }
+
+    pub fn contains_err<F>(&self, f: &F) -> bool
+    where F: PartialEq<Error>
+    {
+        match self {
+            MountResult::Err(MountError(_, error)) => f == error,
+            _ => false,
         }
     }
 
@@ -202,25 +220,3 @@ impl Error {
     }
 }
 
-#[derive(Clone,Copy,Debug,Eq,Hash,PartialEq)]
-pub enum FileType {
-    File,
-    Directory,
-}
-
-impl FileType {
-    pub fn is_dir(&self) -> bool {
-        match *self {
-            FileType::File => false,
-            FileType::Directory => true,
-        }
-    }
-
-    pub fn is_file(&self) -> bool {
-        match *self {
-            FileType::File => true,
-            FileType::Directory => false,
-        }
-    }
-
-}

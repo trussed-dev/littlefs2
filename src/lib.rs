@@ -53,7 +53,8 @@ use littlefs2::prelude::*;
 #     block_size=256,
 #     block_count=512,
 #     lookaheadwords_size_ty=consts::U1,
-#     filename_max_ty=consts::U255,
+#     filename_max_plus_one_ty=consts::U256,
+#     path_max_plus_one_ty=consts::U256,
 # );
 
 // example storage backend
