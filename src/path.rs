@@ -16,6 +16,66 @@ use crate::{
     traits,
 };
 
+pub struct Filename<S> (GenericArray<u8, S::FILENAME_MAX_PLUS_ONE>)
+where
+    S: traits::Storage,
+    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+;
+
+// to compare filename
+impl<S> cmp::PartialEq for Filename<S>
+where
+    S: traits::Storage,
+    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+// to make `DirEntry` Clone
+impl<S> Clone for Filename<S>
+where
+    S: traits::Storage,
+    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    fn clone(&self) -> Self {
+        let mut cloned: GenericArray<u8, S::FILENAME_MAX_PLUS_ONE> = Default::default();
+        cloned.copy_from_slice(&self.0);
+        Filename(cloned)
+    }
+}
+
+// to make `Metadata` Debug
+impl<S> fmt::Debug for Filename<S>
+where
+    S: traits::Storage,
+    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<S> Filename<S>
+where
+    S: traits::Storage,
+    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>
+{
+    /// Silently truncates to maximum configured path length
+    // pub fn new<F: AsRef<[u8]> + ?Sized>(f: &F) -> Self {
+    pub fn new(f: &[u8]) -> Self {
+        let mut padded_filename: GenericArray<u8, S::FILENAME_MAX_PLUS_ONE> = Default::default();
+        let name_max = <S as traits::Storage>::FILENAME_MAX_PLUS_ONE::to_usize();
+        // let len = cmp::min(name_max - 1, f.as_ref().len());
+        // padded_filename[..len].copy_from_slice(&f.as_ref()[..len]);
+        let len = cmp::min(name_max - 1, f.len());
+        padded_filename[..len].copy_from_slice(&f[..len]);
+        Filename(padded_filename)
+    }
+}
+
+
 pub struct Path<S> (GenericArray<u8, S::PATH_MAX_PLUS_ONE>)
 where
     S: traits::Storage,

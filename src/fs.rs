@@ -1,6 +1,7 @@
 /*! Filesystem manipulation operations.
 */
 use core::{
+    marker::PhantomData,
     mem,
     slice,
 };
@@ -13,7 +14,10 @@ use crate::{
         MountError,
         MountResult,
     },
-    path::Path,
+    path::{
+        Filename,
+        Path,
+    },
     traits,
 };
 
@@ -315,6 +319,8 @@ where
         // Result<Metadata<Storage>>
     {
         debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        // do *not* not call assume_init here and pass into the unsafe block.
+        // strange things happen ;)
         let mut info: ll::lfs_info = unsafe { mem::MaybeUninit::zeroed().assume_init() };
         let return_code = unsafe {
             ll::lfs_stat(
@@ -329,7 +335,122 @@ where
         Ok(metadata)
     }
 
+	/// Returns an iterator over the entries within a directory.
+	pub fn read_dir<P: Into<Path<Storage>>>(
+        &mut self,
+        path: P,
+        storage: &mut Storage,
+    ) ->
+        Result<ReadDir<Storage>>
+    {
+        debug_assert!(self.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+
+        let mut read_dir = ReadDir {
+            state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
+            _storage: PhantomData,
+        };
+
+        let return_code = unsafe {
+            ll::lfs_dir_open(
+                &mut self.alloc.state,
+                &mut read_dir.state,
+                &path.into() as *const _ as *const cty::c_char,
+            )
+        };
+
+        Error::empty_from(return_code).map(|_| read_dir)
+    }
 }
+
+pub struct DirEntry<S>
+where
+    S: traits::Storage,
+    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    file_name: Filename<S>,
+    metadata: Metadata,
+}
+
+impl<S> DirEntry<S>
+where
+    S: traits::Storage,
+    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    // // Returns the full path to the file that this entry represents.
+    // pub fn path(&self) -> Path {}
+
+    // Returns the metadata for the file that this entry points at.
+    pub fn metadata(&self) -> Metadata {
+        self.metadata.clone()
+    }
+
+    // Returns the file type for the file that this entry points at.
+    pub fn file_type(&self) -> FileType {
+        self.metadata.file_type
+    }
+
+    // Returns the bare file name of this directory entry without any other leading path component.
+    pub fn file_name(&self) -> Filename<S> {
+        self.file_name.clone()
+    }
+
+}
+
+pub struct ReadDir<S>
+where
+    S: traits::Storage,
+{
+    state: ll::lfs_dir_t,
+    _storage: PhantomData<S>,
+}
+
+impl<S> ReadDir<S>
+where
+    S: traits::Storage,
+    <S as traits::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as traits::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <S as traits::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    pub fn next<'alloc>(
+        &mut self,
+        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
+    )
+    ->
+        Option<Result<DirEntry<S>>>
+    {
+        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+
+        let mut info: ll::lfs_info = unsafe { mem::MaybeUninit::zeroed().assume_init() };
+
+        let return_code = unsafe {
+            ll::lfs_dir_read(
+                &mut fs.alloc.state,
+                &mut self.state,
+                &mut info,
+            )
+        };
+
+        if return_code > 0 {
+            // well here we have it: nasty C strings!
+            // actually... nasty C arrays with static lengths! o.O
+            let file_name = Filename::new(& unsafe { mem::transmute::<[i8; 256], [u8; 256]>(info.name) } );
+            // let buf: &mut [u8] = unsafe { slice::from_raw_parts_mut(buffer as *mut u8, size as usize) };
+
+            let metadata = info.into();
+            let dir_entry = DirEntry { file_name, metadata };
+            return Some(Ok(dir_entry));
+        }
+
+        if return_code == 0 {
+            return None
+        }
+
+        Some(Err(Error::empty_from(return_code).unwrap_err()))
+
+    }
+}
+
 
 #[derive(Clone,Debug)]
 pub struct Metadata
@@ -723,6 +844,29 @@ where
             &mut fs.alloc.state, &mut self.alloc.state
         ) };
         Error::usize_from(return_code)
+    }
+
+    /// Truncates or extends the underlying file, updating the size of this file to become size.
+    ///
+    /// If the size is less than the current file's size, then the file will be shrunk. If it is
+    /// greater than the current file's size, then the file will be extended to size and have all
+    /// of the intermediate data filled in with 0s.
+    pub fn set_len(
+        &mut self,
+        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        storage: &mut S,
+        size: usize,
+    ) ->
+        Result<()>
+    {
+        debug_assert!(fs.alloc.config.context == storage as *mut _ as *mut cty::c_void);
+        let return_code = unsafe { ll::lfs_file_truncate(
+            &mut fs.alloc.state,
+            &mut self.alloc.state,
+            size as u32,
+        ) };
+        Error::empty_from(return_code)?;
+        Ok(())
     }
 
 }

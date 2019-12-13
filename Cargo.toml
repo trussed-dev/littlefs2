@@ -35,3 +35,9 @@ ll-assertions = ["littlefs2-sys/assertions"]
 ll-trace = ["littlefs2-sys/trace"]
 # enable to run UI tests
 ui-tests = ["trybuild"]
+
+# TODO: LFS_NAME_MAX (and maybe other sizes) are baked into the
+# compiled C library. For instance, the `lfs_info` struct has a
+# member `char name[LFS_NAME_MAX+1]`.
+# This means that if we change `traits::Storage::FILENAME_MAX_PLUS_ONE`,
+# we need to pass this on!

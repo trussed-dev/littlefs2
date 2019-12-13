@@ -14,6 +14,7 @@ use crate::{
         Write,
         Seek,
     },
+    path::Filename,
     traits,
 };
 
@@ -158,6 +159,30 @@ fn test_seek() {
 }
 
 #[test]
+fn test_file_set_len() {
+    let mut storage = RamStorage::default();
+    let mut alloc = Filesystem::allocate();
+    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
+
+    let mut alloc = File::allocate();
+    let mut file = File::create(
+        "test_set_len.txt",
+        &mut alloc, &mut fs, &mut storage,
+    ).unwrap();
+    file.write(&mut fs, &mut storage, b"hello littlefs").unwrap();
+    assert_eq!(file.len(&mut fs).unwrap(), 14);
+
+    file.set_len(&mut fs, &mut storage, 10).unwrap();
+    assert_eq!(file.len(&mut fs).unwrap(), 10);
+
+    // note that:
+    // a) "tell" can be implemented as follows,
+    // b) truncating a file does not change the cursor position
+    assert_eq!(file.seek(&mut fs, &mut storage, SeekFrom::Current(0)).unwrap(), 14);
+}
+
+#[test]
 fn test_fancy_open() {
     let mut storage = RamStorage::default();
     let mut alloc = Filesystem::allocate();
@@ -186,6 +211,66 @@ fn test_fancy_open() {
     fs.unmount(&mut storage).unwrap();
 
     assert_eq!(&buf, b"world");
+}
+
+#[test]
+fn test_iter_dirs() {
+    let mut storage = RamStorage::default();
+    let mut alloc = Filesystem::allocate();
+    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
+
+    fs.create_dir("/tmp", &mut storage).unwrap();
+
+    let mut alloc_a = File::allocate();
+    let mut file_a = File::create(
+        "/tmp/file.a",
+        &mut alloc_a, &mut fs, &mut storage,
+    ).unwrap();
+    file_a.set_len(&mut fs, &mut storage, 37).unwrap();
+    file_a.sync(&mut fs, &mut storage).unwrap();
+
+    let mut alloc_b = File::allocate();
+    let mut file_b = File::create(
+        "/tmp/file.b",
+        &mut alloc_b, &mut fs, &mut storage,
+    ).unwrap();
+    file_b.set_len(&mut fs, &mut storage, 42).unwrap();
+    file_b.sync(&mut fs, &mut storage).unwrap();
+
+    let mut read_dir = fs.read_dir("/tmp", &mut storage).unwrap();
+
+    let mut found_files: usize = 0;
+    let mut sizes = [0usize; 4];
+
+    // de-sugared `for` loop
+    // NB: iterating first gives the special directories `.` and `..` :'-)
+    loop {
+        match read_dir.next(&mut fs, &mut storage) {
+            Some(x) => {
+                let x = x.unwrap();
+                let i = found_files;
+                if i == 0 {
+                    assert_eq!(x.file_name(), Filename::<RamStorage>::new(b"."));
+                }
+                if i == 1 {
+                    assert_eq!(x.file_name(), Filename::<RamStorage>::new(b".."));
+                }
+                if i == 2 {
+                    assert_eq!(x.file_name(), Filename::<RamStorage>::new(b"file.a"));
+                }
+                if i == 3 {
+                    assert_eq!(x.file_name(), Filename::<RamStorage>::new(b"file.b"));
+                }
+                sizes[found_files] = x.metadata().len();
+                found_files += 1;
+            },
+            None => break,
+        }
+    }
+    assert_eq!(sizes, [0, 0, 37, 42]);
+    assert_eq!(found_files, 4);
+
 }
 
 // These are some tests that ensure our type constructions
