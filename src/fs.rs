@@ -433,7 +433,7 @@ where
         if return_code > 0 {
             // well here we have it: nasty C strings!
             // actually... nasty C arrays with static lengths! o.O
-            let file_name = Filename::new(& unsafe { mem::transmute::<[i8; 256], [u8; 256]>(info.name) } );
+            let file_name = Filename::new(& unsafe { mem::transmute::<[cty::c_char; 256], [u8; 256]>(info.name) } );
             // let buf: &mut [u8] = unsafe { slice::from_raw_parts_mut(buffer as *mut u8, size as usize) };
 
             let metadata = info.into();
