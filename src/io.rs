@@ -7,7 +7,6 @@ use generic_array::ArrayLength;
 use crate::{
     fs::{
         Filesystem,
-        mount_state,
         SeekFrom,
     },
     driver::Storage,
@@ -24,7 +23,7 @@ where
     /// Upon success, return how many bytes were read.
     fn read(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, S>,
         storage: &mut S,
         buf: &mut [u8],
     ) -> Result<usize>;
@@ -48,7 +47,7 @@ where
     /// Upon success, return how many bytes were written.
     fn write(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, S>,
         storage: &mut S,
         data: &[u8],
     ) -> Result<usize>;
@@ -56,7 +55,7 @@ where
     /// Write out all pending writes to storage.
     fn flush(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, S>,
         storage: &mut S,
     ) -> Result<()>;
 
@@ -76,7 +75,7 @@ where
     /// If successful, returns the new position from start of file.
     fn seek(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, S>,
         storage: &mut S,
         pos: SeekFrom,
     ) -> Result<usize>;
@@ -117,90 +116,6 @@ pub enum Error {
     FilenameTooLong,
     /// Unknown error occurred, integer code specified.
     Unknown(i32),
-}
-
-// NB: core::convert::From does not work here due to coherence rules
-// #[derive(Debug)]
-pub struct MountError<'alloc, S> (
-    pub Filesystem<'alloc, S, mount_state::NotMounted>,
-    pub Error,
-)
-where
-    S: Storage,
-    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-;
-
-/// This gets its own implementation of `.unwrap()`, `.is_ok()`,
-/// `.is_err()` etc., as normal unwrap on a Result would need the
-/// error value to be `fmt::Debug`.
-pub enum MountResult<'alloc, S>
-where
-    S: Storage,
-    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
-    Ok(Filesystem<'alloc, S, mount_state::Mounted>),
-    Err(MountError<'alloc, S>),
-}
-
-impl<'alloc, S> MountResult<'alloc, S>
-where
-    S: Storage,
-    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
-    pub fn unwrap(self) -> Filesystem<'alloc, S, mount_state::Mounted> {
-        match self {
-            MountResult::Ok(fs) => fs,
-            MountResult::Err(error) => Err(error.1).unwrap(),
-        }
-    }
-
-    pub fn is_ok(&self) -> bool {
-        match self {
-            MountResult::Ok(_) => true,
-            MountResult::Err(_) => false,
-        }
-    }
-
-    // // haven't implemented PartialEq for MountError
-    // pub fn contains<U>(&self, x: &U) -> bool
-    // where U: PartialEq<MountError<'alloc, S>>
-    // {
-    //     match self {
-    //         MountResult::Ok(value) => value == x,
-    //         _ => false,
-    //     }
-    // }
-
-    pub fn ok(self) -> Option<Filesystem<'alloc, S, mount_state::Mounted>> {
-        match self {
-            MountResult::Ok(fs) => Some(fs),
-            MountResult::Err(_) => None,
-        }
-    }
-
-    pub fn is_err(&self) -> bool {
-        !self.is_ok()
-    }
-
-    pub fn err(self) -> Option<MountError<'alloc, S>> {
-        match self {
-            MountResult::Ok(_) => None,
-            MountResult::Err(error) => Some(error),
-        }
-    }
-
-    pub fn contains_err<F>(&self, f: &F) -> bool
-    where F: PartialEq<Error>
-    {
-        match self {
-            MountResult::Err(MountError(_, error)) => f == error,
-            _ => false,
-        }
-    }
-
 }
 
 // TODO: Should this return an enum ErrorCode { Result<()>, usize } ?

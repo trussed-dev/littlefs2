@@ -12,8 +12,6 @@ use crate::{
         self,
         Error,
         Result,
-        MountError,
-        MountResult,
     },
     path::{
         Filename,
@@ -30,16 +28,6 @@ use generic_array::{
     GenericArray,
     typenum::marker_traits::Unsigned as _,
 };
-
-/// Typestates to distinguish mounted from not mounted filesystems
-pub mod mount_state {
-    pub trait MountState {}
-    pub struct Mounted;
-    impl MountState for Mounted {}
-    pub struct NotMounted;
-    impl MountState for NotMounted {}
-
-}
 
 /// The three global buffers used by LittleFS
 // #[derive(Debug)]
@@ -68,15 +56,13 @@ where
 }
 
 // #[derive(Debug)]
-pub struct Filesystem<'alloc, Storage, MountState = mount_state::NotMounted>
+pub struct Filesystem<'alloc, Storage>
 where
     Storage: driver::Storage,
     <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-    MountState: mount_state::MountState,
 {
     pub(crate) alloc: &'alloc mut FilesystemAllocation<Storage>,
-    _mount_state: MountState,
 }
 
 
@@ -153,10 +139,10 @@ where
 
         let config = ll::lfs_config {
             context: core::ptr::null_mut(),
-            read: Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_read),
-            prog: Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_prog),
-            erase: Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_erase),
-            sync: Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_sync),
+            read: Some(<Filesystem<'alloc, Storage>>::lfs_config_read),
+            prog: Some(<Filesystem<'alloc, Storage>>::lfs_config_prog),
+            erase: Some(<Filesystem<'alloc, Storage>>::lfs_config_erase),
+            sync: Some(<Filesystem<'alloc, Storage>>::lfs_config_sync),
             // read: None,
             // prog: None,
             // erase: None,
@@ -193,7 +179,7 @@ where
         alloc: &'alloc mut FilesystemAllocation<Storage>,
         storage: &mut Storage
     ) ->
-        Filesystem<'alloc, Storage, mount_state::NotMounted>
+        Filesystem<'alloc, Storage>
     {
         alloc.config.context = storage as *mut _ as *mut cty::c_void;
 
@@ -205,36 +191,24 @@ where
             alloc.buffers.lookahead.as_mut_slice() as *mut _ as *mut cty::c_void;
 
         // alloc.config.read =
-        //     Some(<Filesystem<'alloc, Storage, mount_state::Mounted>>::lfs_config_read);
+        //     Some(<Filesystem<'alloc, Storage>::lfs_config_read);
 
         // alloc.state.lfs_config = alloc.config;
 
-        Filesystem {
-            alloc,
-            _mount_state: mount_state::NotMounted,
-        }
+        Filesystem { alloc }
     }
 
     pub fn mount(
         alloc: &'alloc mut FilesystemAllocation<Storage>,
         storage: &mut Storage,
-    ) -> MountResult<'alloc, Storage> {
+    ) -> Result<Filesystem<'alloc, Storage>> {
 
         let fs = Filesystem::placement_new(alloc, storage);
         fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_mount(&mut fs.alloc.state, &fs.alloc.config) };
-        match Error::result_from(return_code) {
-            Ok(_) => {
-                let mounted = Filesystem {
-                    alloc: fs.alloc,
-                    _mount_state: mount_state::Mounted,
-                };
-                MountResult::Ok(mounted)
-            },
-            Err(error) => {
-                MountResult::Err(MountError(fs, error))
-            }
-        }
+        Error::result_from(return_code).map(move |_| {
+            Filesystem { alloc: fs.alloc }
+        })
     }
 
     pub fn format(
@@ -250,11 +224,10 @@ where
     }
 }
 
-impl<'alloc, Storage> Filesystem<'alloc, Storage, mount_state::Mounted>
+impl<'alloc, Storage> Filesystem<'alloc, Storage>
 where
     Storage: driver::Storage,
     Storage: 'alloc,
-    // MountState: mount_state::MountState,
     <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
@@ -262,16 +235,11 @@ where
     <Storage as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
 {
     pub fn unmount(self, storage: &mut Storage)
-        -> Result<Filesystem<'alloc, Storage, mount_state::NotMounted>>
+        -> Result<()>
     {
         self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_unmount(&mut self.alloc.state) };
-        Error::result_from(return_code).map(move |_|
-            Filesystem {
-                alloc: self.alloc,
-                _mount_state: mount_state::NotMounted,
-            }
-        )
+        Error::result_from(return_code)
     }
 
     /// Creates a new, empty directory at the provided path.
@@ -540,7 +508,7 @@ where
     <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     read_dir: &'read_dir mut ReadDir<S>,
-    fs: &'fs mut Filesystem<'alloc, S, mount_state::Mounted>,
+    fs: &'fs mut Filesystem<'alloc, S>,
     storage: &'storage mut S,
 }
 
@@ -587,7 +555,7 @@ where
     /// Temporarily bind `fs` and `storage`, to get a real `Iterator`.
     pub fn with<'alloc, 'fs, 'read_dir, 'storage>(
         &'read_dir mut self,
-        fs: &'fs mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &'fs mut Filesystem<'alloc, S>,
         storage: &'storage mut S,
     ) ->
         ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
@@ -602,7 +570,7 @@ where
     /// State-free pseudo-Iterator. Use `with` to get a real iterator.
     pub fn next<'alloc>(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'alloc, S>,
         storage: &mut S,
     ) ->
         Option<Result<DirEntry<S>>>
@@ -674,11 +642,10 @@ impl From<ll::lfs_info> for Metadata
     }
 }
 
-impl<'alloc, Storage, MountState> Filesystem<'alloc, Storage, MountState>
+impl<'alloc, Storage> Filesystem<'alloc, Storage>
 where
     Storage: driver::Storage,
     Storage: 'alloc,
-    MountState: mount_state::MountState,
     <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
@@ -818,7 +785,7 @@ impl OpenOptions {
         path: P,
         // attributes: Option<&mut [Attribute<S>]>,
         alloc: &'falloc mut FileAllocation<S>,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
     ) ->
         Result<File<'falloc, S>>
@@ -969,7 +936,7 @@ where
     pub fn open<'fsalloc, P>(
         path: P,
         alloc: &'falloc mut FileAllocation<S>,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
     ) ->
         Result<Self>
@@ -985,7 +952,7 @@ where
     pub fn create<'fsalloc, P>(
         path: P,
         alloc: &'falloc mut FileAllocation<S>,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
     ) ->
         Result<Self>
@@ -1004,7 +971,7 @@ where
     /// NB: `std::fs` does not have this, just drops at end of scope.
     pub fn close<'fsalloc: 'falloc>(
         self,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
     ) ->
         Result<()>
@@ -1021,7 +988,7 @@ where
     /// Synchronize file contents to storage.
     pub fn sync<'fsalloc: 'falloc>(
         &mut self,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
     ) ->
         Result<()>
@@ -1037,7 +1004,7 @@ where
 
     pub fn len<'fsalloc: 'falloc>(
         &mut self,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
     ) ->
         Result<usize>
@@ -1056,7 +1023,7 @@ where
     /// of the intermediate data filled in with 0s.
     pub fn set_len<'fsalloc: 'falloc>(
         &mut self,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
         size: usize,
     ) ->
@@ -1132,7 +1099,7 @@ where
 {
     fn read(
         &mut self,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
         buf: &mut [u8],
     ) ->
@@ -1158,7 +1125,7 @@ where
 {
     fn write(
         &mut self,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
         buf: &[u8],
     ) ->
@@ -1176,7 +1143,7 @@ where
 
     fn flush(
         &mut self,
-        _fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        _fs: &mut Filesystem<'fsalloc, S>,
         _storage: &mut S,
     ) ->
         Result<()>
@@ -1194,7 +1161,7 @@ where
 {
     fn seek(
         &mut self,
-        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
         pos: SeekFrom,
     ) ->

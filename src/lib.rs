@@ -17,7 +17,7 @@ It builds on the low-level library [`littlefs2-sys`](https://lib.rs/littlefs2-sy
 
 Some complications arise due to the lack of const generics in Rust, we work around these
 with the [`generic-array`](https://lib.rs/generic-array) library, and long for the day when
-constants associated to driver will be treated as constants by the compiler.
+constants associated to traits will be treated as constants by the compiler.
 
 ## Usage
 

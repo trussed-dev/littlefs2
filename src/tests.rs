@@ -64,7 +64,11 @@ fn test_format() {
     let mut alloc = Filesystem::allocate();
 
     // should fail: FS is not formatted
-    assert!(Filesystem::mount(&mut alloc, &mut storage).contains_err(&Error::CorruptFile));
+    assert_eq!(
+        Filesystem::mount(&mut alloc, &mut storage)
+            .map(drop).unwrap_err(),
+        Error::CorruptFile
+    );
     // should succeed
     assert!(Filesystem::format(&mut alloc, &mut storage).is_ok());
     // should succeed now that storage is formatted
@@ -288,7 +292,7 @@ fn test_fancy_open() {
 }
 
 #[test]
-fn test_attributes() {
+fn attributes() {
     let mut backend = Ram::default();
     let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
@@ -320,6 +324,17 @@ fn test_attributes() {
 
     fs.remove_attribute("some.file", 37, &mut storage).unwrap();
     assert!(fs.attribute("some.file", 37, &mut storage).unwrap().is_none());
+
+    // Directories can have attributes too
+    attribute.set_data(b"temporary directory");
+    fs.create_dir("/tmp", &mut storage).unwrap();
+    fs.set_attribute("/tmp", &attribute, &mut storage).unwrap();
+    assert_eq!(
+        b"temporary directory",
+        fs.attribute("/tmp", 37, &mut storage).unwrap().unwrap().data()
+    );
+    fs.remove_attribute("/tmp", 37, &mut storage).unwrap();
+    assert!(fs.attribute("/tmp", 37, &mut storage).unwrap().is_none());
 }
 
 #[test]
