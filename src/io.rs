@@ -100,6 +100,10 @@ pub enum Error {
     NoSpace,
     /// No memory available for completing request.
     NoMemory,
+    /// No attribute or data available
+    NoAttribute,
+    /// Filename too long
+    FilenameTooLong,
     /// Unknown error occurred, integer code specified.
     Unknown(i32),
 }
@@ -203,6 +207,8 @@ impl Error {
             ll::lfs_error_LFS_ERR_INVAL => Err(Error::Invalid),
             ll::lfs_error_LFS_ERR_NOSPC => Err(Error::NoSpace),
             ll::lfs_error_LFS_ERR_NOMEM => Err(Error::NoMemory),
+            ll::lfs_error_LFS_ERR_NOATTR => Err(Error::NoAttribute),
+            ll::lfs_error_LFS_ERR_NAMETOOLONG => Err(Error::FilenameTooLong),
             ll::lfs_error_LFS_ERR_OK => Ok(()),
             // positive codes, the suer should see these only in usize results
             _ => Err(Error::Unknown(error_code)),

@@ -2,6 +2,7 @@ use generic_array::typenum::consts;
 
 use crate::{
     fs::{
+        Attribute,
         File,
         Filesystem,
         OpenOptions,
@@ -258,6 +259,41 @@ fn test_fancy_open() {
 }
 
 #[test]
+fn test_attributes() {
+    let mut backend = Ram::default();
+    let mut storage = RamStorage::new(&mut backend);
+    let mut alloc = Filesystem::allocate();
+    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
+
+    let mut alloc = File::allocate();
+    let mut file = File::create(
+        "some.file",
+        &mut alloc, &mut fs, &mut storage,
+    ).unwrap();
+    file.sync(&mut fs, &mut storage).unwrap();
+
+    assert!(fs.attribute("some.file", 37, &mut storage).unwrap().is_none());
+
+    let mut attribute = Attribute::<RamStorage>::new(37);
+    attribute.set_data(b"top secret");
+
+    fs.set_attribute("some.file", &attribute, &mut storage).unwrap();
+    assert_eq!(
+        b"top secret",
+        fs.attribute("some.file", 37, &mut storage).unwrap().unwrap().data()
+    );
+
+    // // not sure if we should have this method (may be quite expensive)
+    // let attributes = unsafe { fs.attributes("some.file", &mut storage).unwrap() };
+    // assert!(attributes[37]);
+    // assert_eq!(attributes.iter().fold(0, |sum, i| sum + (*i as u8)), 1);
+
+    fs.remove_attribute("some.file", 37, &mut storage).unwrap();
+    assert!(fs.attribute("some.file", 37, &mut storage).unwrap().is_none());
+}
+
+#[test]
 fn test_iter_dirs() {
     let mut backend = Ram::default();
     let mut storage = RamStorage::new(&mut backend);
@@ -296,16 +332,16 @@ fn test_iter_dirs() {
                 let x = x.unwrap();
                 let i = found_files;
                 if i == 0 {
-                    assert_eq!(x.file_name(), Filename::<RamStorage>::new(b"."));
+                    assert_eq!(x.file_name(), Filename::new(b"."));
                 }
                 if i == 1 {
-                    assert_eq!(x.file_name(), Filename::<RamStorage>::new(b".."));
+                    assert_eq!(x.file_name(), Filename::new(b".."));
                 }
                 if i == 2 {
-                    assert_eq!(x.file_name(), Filename::<RamStorage>::new(b"file.a"));
+                    assert_eq!(x.file_name(), Filename::new(b"file.a"));
                 }
                 if i == 3 {
-                    assert_eq!(x.file_name(), Filename::<RamStorage>::new(b"file.b"));
+                    assert_eq!(x.file_name(), Filename::new(b"file.b"));
                 }
                 sizes[found_files] = x.metadata().len();
                 found_files += 1;

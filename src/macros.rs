@@ -50,6 +50,7 @@ macro_rules! ram_storage { (
             type LOOKAHEADWORDS_SIZE = $lookaheadwords_size;
             type FILENAME_MAX_PLUS_ONE = $filename_max_plus_one;
             type PATH_MAX_PLUS_ONE = $path_max_plus_one;
+            type ATTRBYTES_MAX = consts::U1022;
 
             fn read(&self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
                 debug_assert!(buf.len() % Self::READ_SIZE == 0);

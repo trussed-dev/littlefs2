@@ -1,6 +1,7 @@
 /*! Filesystem manipulation operations.
 */
 use core::{
+    cmp,
     marker::PhantomData,
     mem,
     slice,
@@ -88,6 +89,7 @@ where
     <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
     <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
 {
     pub fn allocate() -> FilesystemAllocation<Storage> {
         let read_size: u32 = Storage::READ_SIZE as _;
@@ -129,16 +131,25 @@ where
             lookahead: Default::default(),
         };
 
-        let filename_max: u32 = <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE::to_u32();
-        debug_assert!(filename_max > 0);
-        let path_max: u32 = <Storage as driver::Storage>::PATH_MAX_PLUS_ONE::to_u32();
-        debug_assert!(path_max >= filename_max);
+        let filename_max_plus_one: u32 =
+            <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE::to_u32();
+        debug_assert!(filename_max_plus_one > 1);
+        debug_assert!(filename_max_plus_one <= 1_022+1);
+        // limitation of ll-bindings
+        debug_assert!(filename_max_plus_one == 255+1);
+        let path_max_plus_one: u32 = <Storage as driver::Storage>::PATH_MAX_PLUS_ONE::to_u32();
+        // TODO: any upper limit?
+        debug_assert!(path_max_plus_one >= filename_max_plus_one);
         let file_max = Storage::FILEBYTES_MAX as u32;
         assert!(file_max > 0);
         assert!(file_max <= 2_147_483_647);
-        let attr_max = Storage::ATTRBYTES_MAX as u32;
+        // limitation of ll-bindings
+        assert!(file_max == 2_147_483_647);
+        let attr_max: u32 = <Storage as driver::Storage>::ATTRBYTES_MAX::to_u32();
         assert!(attr_max > 0);
         assert!(attr_max <= 1_022);
+        // limitation of ll-bindings
+        assert!(attr_max == 1_022);
 
         let config = ll::lfs_config {
             context: core::ptr::null_mut(),
@@ -162,9 +173,9 @@ where
             prog_buffer: core::ptr::null_mut(),
             lookahead_buffer: core::ptr::null_mut(),
 
-            name_max: filename_max,
+            name_max: filename_max_plus_one - 1,
             file_max,
-            attr_max,
+            attr_max: attr_max,
         };
 
         let alloc = FilesystemAllocation {
@@ -253,6 +264,7 @@ where
     <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
     <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
 {
     pub fn unmount(self, storage: &mut Storage)
         -> Result<Filesystem<'alloc, Storage, mount_state::NotMounted>>
@@ -359,6 +371,138 @@ where
         };
 
         Error::empty_from(return_code).map(|_| read_dir)
+    }
+
+    // /// List existing attribute ids
+    // pub unsafe fn attributes<P: Into<Path<Storage>>>(
+    //     &mut self,
+    //     path: P,
+    //     storage: &mut Storage,
+    // ) ->
+    //     Result<[bool; 256]>
+    // {
+    //     let mut attributes = [false; 256];
+    //     let path = path.into();
+    //     for (id, attribute_id) in attributes.iter_mut().enumerate() {
+    //         *attribute_id = self.attribute(path.clone(), id as u8, storage)?.is_some();
+    //     }
+    //     Ok(attributes)
+    // }
+
+    /// Read attribute
+    pub fn attribute<P: Into<Path<Storage>>>(
+        &mut self,
+        path: P,
+        id: u8,
+        storage: &mut Storage,
+    ) ->
+        Result<Option<Attribute<Storage>>>
+    {
+        self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let mut attribute = Attribute::new(id);
+        let attr_max = <Storage as driver::Storage>::ATTRBYTES_MAX::to_u32();
+
+        let return_code = unsafe { ll::lfs_getattr(
+            &mut self.alloc.state,
+            &path.into() as *const _ as *const cty::c_char,
+            id,
+            &mut attribute.data as *mut _ as *mut cty::c_void,
+            attr_max,
+        ) };
+
+        if return_code >= 0 {
+            attribute.size = cmp::min(attr_max, return_code as u32) as usize;
+            return Ok(Some(attribute));
+        }
+        if return_code == ll::lfs_error_LFS_ERR_NOATTR {
+            return Ok(None)
+        }
+
+        Error::empty_from(return_code)?;
+        unreachable!();
+    }
+
+    /// Remove attribute
+    pub fn remove_attribute<P: Into<Path<Storage>>>(
+        &mut self,
+        path: P,
+        id: u8,
+        storage: &mut Storage,
+    ) -> Result<()> {
+        self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+
+        let return_code = unsafe { ll::lfs_removeattr(
+            &mut self.alloc.state,
+            &path.into() as *const _ as *const cty::c_char,
+            id,
+        ) };
+        Error::empty_from(return_code)
+    }
+
+    /// Set attribute
+    pub fn set_attribute<P: Into<Path<Storage>>>(
+        &mut self,
+        path: P,
+        attribute: &Attribute<Storage>, storage: &mut Storage,
+    ) ->
+        Result<()>
+    {
+        self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+
+        let return_code = unsafe { ll::lfs_setattr(
+            &mut self.alloc.state,
+            &path.into() as *const _ as *const cty::c_char,
+            attribute.id,
+            &attribute.data as *const _ as *const cty::c_void,
+            attribute.size as u32,
+        ) };
+
+        Error::empty_from(return_code)
+    }
+
+}
+
+pub struct Attribute<S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
+{
+    id: u8,
+    data: GenericArray<u8, S::ATTRBYTES_MAX>,
+    size: usize,
+}
+
+impl<S> Attribute<S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
+{
+    pub fn new(id: u8) -> Self {
+        Attribute {
+            id,
+            data: Default::default(),
+            size: 0,
+        }
+    }
+
+    pub fn id(&self) -> u8 {
+        self.id
+    }
+
+    pub fn data(&self) -> &[u8] {
+        let attr_max = <S as driver::Storage>::ATTRBYTES_MAX::to_usize();
+        let len = cmp::min(attr_max, self.size);
+        &self.data[..len]
+    }
+
+    pub fn set_data(&mut self, data: &[u8]) {
+        let attr_max = <S as driver::Storage>::ATTRBYTES_MAX::to_usize();
+        let len = cmp::min(attr_max, data.len());
+        self.data[..len].copy_from_slice(&data[..len]);
+        self.size = len;
+        for entry in self.data[len..].iter_mut() {
+            *entry = 0;
+        }
     }
 }
 
@@ -622,6 +766,7 @@ impl OpenOptions {
     pub fn open<'alloc, S, P: Into<Path<S>>>(
         &self,
         path: P,
+        // attributes: Option<&mut [Attribute<S>]>,
         alloc: &'alloc mut FileAllocation<S>,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
         storage: &mut S,
@@ -631,6 +776,7 @@ impl OpenOptions {
         S: driver::Storage,
         <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
         <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+        // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
         <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     {
         fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
@@ -749,6 +895,7 @@ where
     S: 'alloc,
     <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+    // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
     <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     pub fn allocate() -> FileAllocation<S> {
@@ -772,6 +919,7 @@ where
 
     pub fn open<P: Into<Path<S>>>(
         path: P,
+        // attributes: Option<&mut [Attribute<S>]>,
         alloc: &'alloc mut FileAllocation<S>,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
         storage: &mut S,

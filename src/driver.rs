@@ -76,11 +76,13 @@ pub trait Storage {
     /// to the C backend.
     const FILEBYTES_MAX: usize = ll::LFS_FILE_MAX as _;
     /// Maximum size of custom attributes.
-    /// Defaults to 1_022. At most 1_022.
+    /// Should default to 1_022, but associated type defaults don't exists currently.
+    /// At most 1_022.
     ///
     /// TODO: We can't actually change this - need to pass on as compile flag
     /// to the C backend.
-    const ATTRBYTES_MAX: usize = ll::LFS_ATTR_MAX as _;
+    // const ATTRBYTES_MAX: usize = ll::LFS_ATTR_MAX as _;
+    type ATTRBYTES_MAX;
 
     /// Read data from the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of READ_SIZE.
