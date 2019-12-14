@@ -37,4 +37,4 @@ tasks:
     cargo test
     cargo test --features ui-tests
     cargo test --release
-    cargo test --release --features ui-tests
+    cargo test --features ui-tests --release

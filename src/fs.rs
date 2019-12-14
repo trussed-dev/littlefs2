@@ -91,6 +91,7 @@ where
     <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
     <Storage as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
 {
+    #[allow(clippy::all)] // yes should simplify this
     pub fn allocate() -> FilesystemAllocation<Storage> {
         let read_size: u32 = Storage::READ_SIZE as _;
         let write_size: u32 = Storage::WRITE_SIZE as _;
@@ -209,13 +210,10 @@ where
 
         // alloc.state.lfs_config = alloc.config;
 
-        let littlefs = Filesystem {
+        Filesystem {
             alloc,
             _mount_state: mount_state::NotMounted,
-        };
-
-        littlefs
-
+        }
     }
 
     pub fn mount(
@@ -648,7 +646,7 @@ where
         size: ll::lfs_size_t,
     ) -> cty::c_int {
         // println!("in lfs_config_read for {} bytes", size);
-        let storage: &mut Storage = unsafe { mem::transmute((*c).context) };
+        let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
         let block_size = unsafe { c.read().block_size };
         let off = (block * block_size + off) as usize;
@@ -669,7 +667,7 @@ where
         size: ll::lfs_size_t,
     ) -> cty::c_int {
         // println!("in lfs_config_prog");
-        let storage: &mut Storage = unsafe { mem::transmute((*c).context) };
+        let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
         // let block_size = unsafe { c.read().block_size };
         let block_size = <Storage as driver::Storage>::BLOCK_SIZE::to_u32();
@@ -688,8 +686,7 @@ where
         block: ll::lfs_block_t,
     ) -> cty::c_int {
         // println!("in lfs_config_erase");
-        // let littlefs: &mut Filesystem<Storage> = unsafe { mem::transmute((*c).context) };
-        let storage: &mut Storage = unsafe { mem::transmute((*c).context) };
+        let storage = unsafe { &mut *((*c).context as *mut Storage) };
         let off = block as usize * <Storage as driver::Storage>::BLOCK_SIZE::to_usize();
 
         // TODO
@@ -712,6 +709,12 @@ Starting with an empty set of flags, add options and finally
 call `open`. This avoids fiddling with the actual [`FileOpenFlags`](struct.FileOpenFlags.html).
 */
 pub struct OpenOptions (FileOpenFlags);
+
+impl Default for OpenOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl OpenOptions {
     pub fn new() -> Self {
@@ -909,12 +912,11 @@ where
             attr_count: 0,
         };
 
-        let alloc = FileAllocation {
+        FileAllocation {
             cache: Default::default(),
             state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
             config,
-        };
-        alloc
+        }
     }
 
     pub fn open<P: Into<Path<S>>>(
@@ -1027,10 +1029,12 @@ pub enum FileType {
 }
 
 impl FileType {
+    #[allow(clippy::all)] // following `std::fs`
     pub fn is_dir(&self) -> bool {
         *self == FileType::Dir
     }
 
+    #[allow(clippy::all)] // following `std::fs`
     pub fn is_file(&self) -> bool {
         *self == FileType::File
     }
@@ -1056,6 +1060,10 @@ impl Metadata
 
     pub fn len(&self) -> usize {
         self.size
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
     }
 
     // pub fn name(&self) -> Path<S> {
