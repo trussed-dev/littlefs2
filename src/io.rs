@@ -18,6 +18,8 @@ where
     <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
     <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
+    /// Read at most buf.len() bytes.
+    /// Upon success, return how many bytes were read.
     fn read(
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
@@ -38,13 +40,18 @@ where
     <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
     <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
+    /// Write at most data.len() bytes.
+    /// The file will not necessarily be updated unless
+    /// flush is called as there is a cache.
+    /// Upon success, return how many bytes were written.
     fn write(
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
         storage: &mut S,
-        buf: &[u8],
+        data: &[u8],
     ) -> Result<usize>;
 
+    /// Write out all pending writes to storage.
     fn flush(
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
@@ -63,6 +70,8 @@ where
     <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
     <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
+    /// Seek to an offset in bytes.
+    /// If successful, returns the new position from start of file.
     fn seek(
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
@@ -74,7 +83,7 @@ where
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Definition of errors that might be returned by filesystem functionality.
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Clone,Copy,Debug,PartialEq)]
 pub enum Error {
     /// Input / output error occurred.
     Io,
@@ -153,6 +162,7 @@ where
         }
     }
 
+    // // haven't implemented PartialEq for MountError
     // pub fn contains<U>(&self, x: &U) -> bool
     // where U: PartialEq<MountError<'alloc, S>>
     // {
@@ -191,8 +201,9 @@ where
 
 }
 
+// TODO: Should this return an enum ErrorCode { Result<()>, usize } ?
 impl Error {
-    pub(crate) fn empty_from(error_code: ll::lfs_error) -> Result<()> {
+    pub(crate) fn result_from(error_code: ll::lfs_error) -> Result<()> {
         match error_code {
             // negative codes
             ll::lfs_error_LFS_ERR_IO => Err(Error::Io),
@@ -210,14 +221,14 @@ impl Error {
             ll::lfs_error_LFS_ERR_NOATTR => Err(Error::NoAttribute),
             ll::lfs_error_LFS_ERR_NAMETOOLONG => Err(Error::FilenameTooLong),
             ll::lfs_error_LFS_ERR_OK => Ok(()),
-            // positive codes, the suer should see these only in usize results
+            // positive codes should always indicate success
             _ => Err(Error::Unknown(error_code)),
         }
     }
 
     #[allow(dead_code)]
-    pub(crate) fn usize_from(error_code: ll::lfs_error) -> Result<usize> {
-        let result = Error::empty_from(error_code);
+    pub(crate) fn usize_result_from(error_code: ll::lfs_error) -> Result<usize> {
+        let result = Error::result_from(error_code);
         match result {
             Ok(()) => Ok(0),
             Err(Error::Unknown(value)) => Ok(value as usize),

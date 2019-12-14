@@ -47,11 +47,17 @@ ram_storage!(
     block_size_ty=consts::U700,
     block_size=20*35,
     block_count=32,
-    lookaheadwords_size_ty=consts::U1,
+    lookaheadwords_size_ty=consts::U16,
     filename_max_plus_one_ty=consts::U256,
     path_max_plus_one_ty=consts::U256,
     result=Result,
 );
+
+#[test]
+fn version() {
+    assert_eq!(crate::version().format, (2, 0));
+    assert_eq!(crate::version().backend, (2, 1));
+}
 
 #[test]
 fn test_format() {
@@ -67,6 +73,34 @@ fn test_format() {
     let fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
     // check there are no segfaults
     fs.unmount(&mut storage).unwrap();
+}
+
+// #[macro_use]
+// macro_rules! setup_fs {
+//     () => {
+//         let mut backend = OtherRam::default();
+//         let mut storage = OtherRamStorage::new(&mut backend);
+//         let mut alloc_fs = Filesystem::allocate();
+//         Filesystem::format(&mut alloc_fs, &mut storage).unwrap();
+//         let mut fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
+//     }
+// }
+
+#[test]
+fn borrow_fs_allocation() {
+    let mut backend = OtherRam::default();
+
+    let mut storage = OtherRamStorage::new(&mut backend);
+    let mut alloc_fs = Filesystem::allocate();
+    Filesystem::format(&mut alloc_fs, &mut storage).unwrap();
+    let _fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
+    // previous `_fs` is fine as it's masked, due to NLL
+    let mut fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
+
+    let mut alloc_file = File::allocate();
+    let _file = File::create("data.bin", &mut alloc_file, &mut fs, &mut storage).unwrap();
+    File::create("data.bin", &mut alloc_file, &mut fs, &mut storage).unwrap();
+
 }
 
 #[test]
@@ -89,12 +123,10 @@ fn test_create() {
 
     fs.create_dir("/tmp", &mut storage).unwrap();
 
-    // TODO: make previous allocation reusable
-    let mut alloc_another_file = File::allocate();
     // can create new files
     let mut file = File::create(
         "/tmp/test_open.txt",
-        &mut alloc_another_file, &mut fs, &mut storage,
+        &mut alloc_file, &mut fs, &mut storage,
     ).unwrap();
     // can write to files
     assert!(file.write(&mut fs, &mut storage, &[0u8, 1, 2]).unwrap() == 3);
@@ -106,16 +138,14 @@ fn test_create() {
 
     let metadata = fs.metadata("/tmp", &mut storage).unwrap();
     assert!(metadata.is_dir());
-    // assert_eq!(0, metadata.len());  // HUH?!!?! why does this cause `unwrap_failed`?
-    assert!(metadata.len() == 0);
+    assert_eq!(metadata.len(), 0);
 
     // can move files
     fs.rename("/tmp/test_open.txt", "moved.txt", &mut storage).unwrap();
 
     let metadata = fs.metadata("/moved.txt", &mut storage).unwrap();
     assert!(metadata.is_file());
-    // assert_eq!(3, metadata.len());  // <-- again, `unwrap_failed`, u wot m8?
-    assert!(metadata.len() == 3);
+    assert_eq!(metadata.len(), 3);
 
     fs.remove("/tmp/../tmp/.", &mut storage).unwrap();
 
@@ -137,6 +167,7 @@ fn test_create() {
 #[test]
 fn test_unbind() {
     let mut backend = Ram::default();
+
     {
         let mut storage = RamStorage::new(&mut backend);
         let mut alloc = Filesystem::allocate();
@@ -351,6 +382,17 @@ fn test_iter_dirs() {
     }
     assert_eq!(sizes, [0, 0, 37, 42]);
     assert_eq!(found_files, 4);
+
+    // version dealing with an actual iterator
+    // TODO: does not release the references properly (can't do this before the above version)
+    let mut read_dir = fs.read_dir("/tmp", &mut storage).unwrap();
+    for (i, entry) in read_dir.with(&mut fs, &mut storage).enumerate() {
+        let x = entry.unwrap();
+        if i == 0 { assert_eq!(x.file_name(), Filename::new(b".")); }
+        if i == 1 { assert_eq!(x.file_name(), Filename::new(b"..")); }
+        if i == 2 { assert_eq!(x.file_name(), Filename::new(b"file.a")); }
+        if i == 3 { assert_eq!(x.file_name(), Filename::new(b"file.b")); }
+    }
 
 }
 

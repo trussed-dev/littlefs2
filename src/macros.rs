@@ -79,5 +79,23 @@ macro_rules! ram_storage { (
                 Ok(len)
             }
         }
-    }
+    };
+    () => {
+        ram_storage!(
+            name=RamStorage,
+            backend=Ram,
+            trait=driver::Storage,
+            erase_value=0xff,
+            read_size=32,
+            write_size=32,
+            cache_size_ty=consts::U32,
+            block_size_ty=consts::U256,
+            block_size=256,
+            block_count=512,
+            lookaheadwords_size_ty=consts::U4,
+            filename_max_plus_one_ty=consts::U256,
+            path_max_plus_one_ty=consts::U256,
+            result=Result,
+        );
+    };
 }

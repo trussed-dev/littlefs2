@@ -224,7 +224,7 @@ where
         let fs = Filesystem::placement_new(alloc, storage);
         fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_mount(&mut fs.alloc.state, &fs.alloc.config) };
-        match Error::empty_from(return_code) {
+        match Error::result_from(return_code) {
             Ok(_) => {
                 let mounted = Filesystem {
                     alloc: fs.alloc,
@@ -247,8 +247,7 @@ where
         let fs = Filesystem::placement_new(alloc, storage);
         fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_format(&mut fs.alloc.state, &fs.alloc.config) };
-        Error::empty_from(return_code)?;
-        Ok(())
+        Error::result_from(return_code)
     }
 }
 
@@ -269,8 +268,7 @@ where
     {
         self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_unmount(&mut self.alloc.state) };
-        Error::empty_from(return_code)?;
-        Ok(
+        Error::result_from(return_code).map(move |_|
             Filesystem {
                 alloc: self.alloc,
                 _mount_state: mount_state::NotMounted,
@@ -285,8 +283,7 @@ where
             &mut self.alloc.state,
             &path.into() as *const _ as *const cty::c_char,
         ) };
-        Error::empty_from(return_code)?;
-        Ok(())
+        Error::result_from(return_code)
     }
 
     /// Remove a file or directory.
@@ -296,8 +293,7 @@ where
             &mut self.alloc.state,
             &path.into() as *const _ as *const cty::c_char,
         ) };
-        Error::empty_from(return_code)?;
-        Ok(())
+        Error::result_from(return_code)
     }
 
     /// Rename or move a file or directory.
@@ -315,8 +311,7 @@ where
             &from.into() as *const _ as *const cty::c_char,
             &to.into() as *const _ as *const cty::c_char,
         ) };
-        Error::empty_from(return_code)?;
-        Ok(())
+        Error::result_from(return_code)
     }
 
     /// Given a path, query the file system to get information about a file or directory.
@@ -340,9 +335,7 @@ where
             )
         };
 
-        Error::empty_from(return_code)?;
-        let metadata = info.into();
-        Ok(metadata)
+        Error::result_from(return_code).map(|_| info.into())
     }
 
 	/// Returns an iterator over the entries within a directory.
@@ -368,7 +361,7 @@ where
             )
         };
 
-        Error::empty_from(return_code).map(|_| read_dir)
+        Error::result_from(return_code).map(|_| read_dir)
     }
 
     // /// List existing attribute ids
@@ -416,7 +409,8 @@ where
             return Ok(None)
         }
 
-        Error::empty_from(return_code)?;
+        Error::result_from(return_code)?;
+        // TODO: get rid of this
         unreachable!();
     }
 
@@ -434,7 +428,7 @@ where
             &path.into() as *const _ as *const cty::c_char,
             id,
         ) };
-        Error::empty_from(return_code)
+        Error::result_from(return_code)
     }
 
     /// Set attribute
@@ -455,11 +449,12 @@ where
             attribute.size as u32,
         ) };
 
-        Error::empty_from(return_code)
+        Error::result_from(return_code)
     }
 
 }
 
+#[derive(Clone,Debug,Eq,PartialEq)]
 pub struct Attribute<S>
 where
     S: driver::Storage,
@@ -504,6 +499,7 @@ where
     }
 }
 
+#[derive(Clone,Debug,PartialEq)]
 pub struct DirEntry<S>
 where
     S: driver::Storage,
@@ -538,6 +534,43 @@ where
 
 }
 
+pub struct ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    read_dir: &'read_dir mut ReadDir<S>,
+    fs: &'fs mut Filesystem<'alloc, S, mount_state::Mounted>,
+    storage: &'storage mut S,
+}
+
+impl<'alloc, 'fs, 'read_dir, 'storage, S> ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+}
+
+impl<'alloc, 'fs, 'read_dir, 'storage, S> Iterator
+for ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    type Item = Result<DirEntry<S>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.read_dir.next(self.fs, self.storage)
+    }
+}
+
+
 pub struct ReadDir<S>
 where
     S: driver::Storage,
@@ -553,6 +586,22 @@ where
     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
     <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
+    /// Temporarily bind `fs` and `storage`, to get a real `Iterator`.
+    pub fn with<'alloc, 'fs, 'read_dir, 'storage>(
+        &'read_dir mut self,
+        fs: &'fs mut Filesystem<'alloc, S, mount_state::Mounted>,
+        storage: &'storage mut S,
+    ) ->
+        ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
+    {
+        ReadDirWith {
+            read_dir: self,
+            fs,
+            storage,
+        }
+    }
+
+    /// State-free pseudo-Iterator. Use `with` to get a real iterator.
     pub fn next<'alloc>(
         &mut self,
         fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
@@ -587,13 +636,13 @@ where
             return None
         }
 
-        Some(Err(Error::empty_from(return_code).unwrap_err()))
+        Some(Err(Error::result_from(return_code).unwrap_err()))
 
     }
 }
 
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,Eq,PartialEq)]
 pub struct Metadata
 // pub struct Metadata<S>
 // where
@@ -708,6 +757,7 @@ where
 Starting with an empty set of flags, add options and finally
 call `open`. This avoids fiddling with the actual [`FileOpenFlags`](struct.FileOpenFlags.html).
 */
+#[derive(Clone,Debug,Eq,PartialEq)]
 pub struct OpenOptions (FileOpenFlags);
 
 impl Default for OpenOptions {
@@ -722,16 +772,16 @@ impl OpenOptions {
     }
     pub fn read(&mut self, read: bool) -> &mut Self {
         if read {
-            self.0.insert(FileOpenFlags::RDONLY)
+            self.0.insert(FileOpenFlags::READ)
         } else {
-            self.0.remove(FileOpenFlags::RDONLY)
+            self.0.remove(FileOpenFlags::READ)
         }; self
     }
     pub fn write(&mut self, write: bool) -> &mut Self {
         if write {
-            self.0.insert(FileOpenFlags::WRONLY)
+            self.0.insert(FileOpenFlags::WRITE)
         } else {
-            self.0.remove(FileOpenFlags::WRONLY)
+            self.0.remove(FileOpenFlags::WRITE)
         }; self
     }
     pub fn append(&mut self, append: bool) -> &mut Self {
@@ -743,39 +793,40 @@ impl OpenOptions {
     }
     pub fn create(&mut self, create: bool) -> &mut Self {
         if create {
-            self.0.insert(FileOpenFlags::CREAT)
+            self.0.insert(FileOpenFlags::CREATE)
         } else {
-            self.0.remove(FileOpenFlags::CREAT)
+            self.0.remove(FileOpenFlags::CREATE)
         }; self
     }
     pub fn create_new(&mut self, create_new: bool) -> &mut Self {
         if create_new {
             self.0.insert(FileOpenFlags::EXCL);
-            self.0.insert(FileOpenFlags::CREAT);
+            self.0.insert(FileOpenFlags::CREATE);
         } else {
             self.0.remove(FileOpenFlags::EXCL);
-            self.0.remove(FileOpenFlags::CREAT);
+            self.0.remove(FileOpenFlags::CREATE);
         }; self
     }
 
     pub fn truncate(&mut self, truncate: bool) -> &mut Self {
         if truncate {
-            self.0.insert(FileOpenFlags::TRUNC)
+            self.0.insert(FileOpenFlags::TRUNCATE)
         } else {
-            self.0.remove(FileOpenFlags::TRUNC)
+            self.0.remove(FileOpenFlags::TRUNCATE)
         }; self
     }
 
-    pub fn open<'alloc, S, P: Into<Path<S>>>(
+    pub fn open<'falloc, 'fsalloc, S, P>(
         &self,
         path: P,
         // attributes: Option<&mut [Attribute<S>]>,
-        alloc: &'alloc mut FileAllocation<S>,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        alloc: &'falloc mut FileAllocation<S>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
     ) ->
-        Result<File<'alloc, S>>
+        Result<File<'falloc, S>>
     where
+        P: Into<Path<S>>,
         S: driver::Storage,
         <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
         <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
@@ -795,7 +846,7 @@ impl OpenOptions {
                 &file.alloc.config,
         ) };
 
-        Error::empty_from(return_code)?;
+        Error::result_from(return_code)?;
         Ok(file)
     }
 }
@@ -862,13 +913,12 @@ open existing, or create new files. Generally, [`OpenOptions`](struct.OpenOption
 available options how to open files.
 
 */
-pub struct File<'alloc, S>
+pub struct File<'falloc, S>
 where
     S: driver::Storage,
-    S: 'alloc,
     <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
 {
-    alloc: &'alloc mut FileAllocation<S>,
+    alloc: &'falloc mut FileAllocation<S>,
 }
 
 bitflags! {
@@ -876,26 +926,26 @@ bitflags! {
     /// are reminiscent of the ones defined by POSIX.
     pub struct FileOpenFlags: u32 {
         /// Open file in read only mode.
-        const RDONLY = 0x1;
+        const READ = 0x1;
         /// Open file in write only mode.
-        const WRONLY = 0x2;
+        const WRITE = 0x2;
         /// Open file for reading and writing.
-        const RDWR = Self::RDONLY.bits | Self::WRONLY.bits;
+        const READWRITE = Self::READ.bits | Self::WRITE.bits;
         /// Create the file if it does not exist.
-        const CREAT = 0x0100;
+        const CREATE = 0x0100;
         /// Fail if creating a file that already exists.
+        /// TODO: Good name for this
         const EXCL = 0x0200;
         /// Truncate the file if it already exists.
-        const TRUNC = 0x0400;
+        const TRUNCATE = 0x0400;
         /// Open the file in append only mode.
         const APPEND = 0x0800;
     }
 }
 
-impl<'alloc, S> File<'alloc, S>
+impl<'falloc, S> File<'falloc, S>
 where
     S: driver::Storage,
-    S: 'alloc,
     <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
     // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
@@ -919,27 +969,32 @@ where
         }
     }
 
-    pub fn open<P: Into<Path<S>>>(
+    pub fn open<'fsalloc, P>(
         path: P,
-        // attributes: Option<&mut [Attribute<S>]>,
-        alloc: &'alloc mut FileAllocation<S>,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        alloc: &'falloc mut FileAllocation<S>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
     ) ->
         Result<Self>
+    where
+        P: Into<Path<S>>,
+        'fsalloc: 'falloc,
     {
         OpenOptions::new()
             .read(true)
             .open(path, alloc, fs, storage)
     }
 
-    pub fn create<P: Into<Path<S>>>(
+    pub fn create<'fsalloc, P>(
         path: P,
-        alloc: &'alloc mut FileAllocation<S>,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        alloc: &'falloc mut FileAllocation<S>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
     ) ->
         Result<Self>
+    where
+        P: Into<Path<S>>,
+        'fsalloc: 'falloc,
     {
         OpenOptions::new()
             .write(true)
@@ -950,9 +1005,9 @@ where
 
     /// Sync the file and drop it.
     /// NB: `std::fs` does not have this, just drops at end of scope.
-    pub fn close(
+    pub fn close<'fsalloc: 'falloc>(
         self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
     ) ->
         Result<()>
@@ -962,14 +1017,14 @@ where
             &mut fs.alloc.state,
             &mut self.alloc.state,
         ) };
-        Error::empty_from(return_code)?;
+        Error::result_from(return_code)?;
         Ok(())
     }
 
     /// Synchronize file contents to storage.
-    pub fn sync(
+    pub fn sync<'fsalloc: 'falloc>(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
     ) ->
         Result<()>
@@ -979,13 +1034,13 @@ where
             &mut fs.alloc.state,
             &mut self.alloc.state,
         ) };
-        Error::empty_from(return_code)?;
+        Error::result_from(return_code)?;
         Ok(())
     }
 
-    pub fn len(
+    pub fn len<'fsalloc: 'falloc>(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
     ) ->
         Result<usize>
@@ -994,7 +1049,7 @@ where
         let return_code = unsafe { ll::lfs_file_size(
             &mut fs.alloc.state, &mut self.alloc.state
         ) };
-        Error::usize_from(return_code)
+        Error::usize_result_from(return_code)
     }
 
     /// Truncates or extends the underlying file, updating the size of this file to become size.
@@ -1002,9 +1057,9 @@ where
     /// If the size is less than the current file's size, then the file will be shrunk. If it is
     /// greater than the current file's size, then the file will be extended to size and have all
     /// of the intermediate data filled in with 0s.
-    pub fn set_len(
+    pub fn set_len<'fsalloc: 'falloc>(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
         size: usize,
     ) ->
@@ -1016,7 +1071,7 @@ where
             &mut self.alloc.state,
             size as u32,
         ) };
-        Error::empty_from(return_code)?;
+        Error::result_from(return_code)?;
         Ok(())
     }
 
@@ -1071,15 +1126,16 @@ impl Metadata
     // }
 }
 
-impl<'alloc, S> io::Read<'alloc, S> for File<'alloc, S>
+impl<'falloc, 'fsalloc, S> io::Read<'fsalloc, S> for File<'falloc, S>
 where
     S: driver::Storage,
+    'fsalloc: 'falloc,
     <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn read(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
         buf: &mut [u8],
     ) ->
@@ -1092,19 +1148,20 @@ where
             buf.as_mut_ptr() as *mut cty::c_void,
             buf.len() as u32,
         ) };
-        Error::usize_from(return_code)
+        Error::usize_result_from(return_code)
     }
 }
 
-impl<'alloc, S> io::Write<'alloc, S> for File<'alloc, S>
+impl<'falloc, 'fsalloc, S> io::Write<'fsalloc, S> for File<'falloc, S>
 where
     S: driver::Storage,
+    'fsalloc: 'falloc,
     <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn write(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
         buf: &[u8],
     ) ->
@@ -1117,12 +1174,12 @@ where
             buf.as_ptr() as *const cty::c_void,
             buf.len() as u32,
         ) };
-        Error::usize_from(return_code)
+        Error::usize_result_from(return_code)
     }
 
     fn flush(
         &mut self,
-        _fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        _fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         _storage: &mut S,
     ) ->
         Result<()>
@@ -1131,15 +1188,16 @@ where
     }
 }
 
-impl<'alloc, S> io::Seek<'alloc, S> for File<'alloc, S>
+impl<'falloc, 'fsalloc, S> io::Seek<'fsalloc, S> for File<'falloc, S>
 where
     S: driver::Storage,
+    'fsalloc: 'falloc,
     <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn seek(
         &mut self,
-        fs: &mut Filesystem<'alloc, S, mount_state::Mounted>,
+        fs: &mut Filesystem<'fsalloc, S, mount_state::Mounted>,
         storage: &mut S,
         pos: SeekFrom,
     ) ->
@@ -1152,6 +1210,6 @@ where
             pos.off(),
             pos.whence(),
         ) };
-        Error::usize_from(return_code)
+        Error::usize_result_from(return_code)
     }
 }

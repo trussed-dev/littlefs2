@@ -42,22 +42,7 @@ use littlefs2::prelude::*;
 #
 # use littlefs2::{consts, ram_storage, driver, io::Result};
 #
-# ram_storage!(
-#     name=RamStorage,
-#     backend=Ram,
-#     trait=driver::Storage,
-#     erase_value=0xff,
-#     read_size=32,
-#     write_size=32,
-#     cache_size_ty=consts::U32,
-#     block_size_ty=consts::U256,
-#     block_size=256,
-#     block_count=512,
-#     lookaheadwords_size_ty=consts::U1,
-#     filename_max_plus_one_ty=consts::U256,
-#     path_max_plus_one_ty=consts::U256,
-#     result=Result,
-# );
+# ram_storage!();
 
 // example storage backend
 let mut ram = Ram::default();
@@ -126,7 +111,7 @@ pub fn version() -> Version {
 }
 
 /// Information about the C backend
-#[derive(Copy,Clone,Debug)]
+#[derive(Clone,Copy,Debug)]
 pub struct Version {
 	/// On-disk format (currently: 2.0)
     pub format: (u32, u32),
