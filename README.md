@@ -1,7 +1,7 @@
 <h1 align="center">littlefs2</h1>
 <div align="center">
  <strong>
-   Rust API for littlefs2
+   Idiomatic Rust API for littlefs
  </strong>
 </div>
 
@@ -29,19 +29,21 @@
 
 [![Build Status][build-image]][build-link]
 
-Idiomatic Rust API for the [littlefs][littlefs] microcontroller filesystem.
+Idiomatic Rust API for the [littlefs][littlefs] microcontroller filesystem by [Chris Haster][geky].
 
-The `2` refers to the on-disk format, which includes support for inline files and file attributes.
+Number `2` refers to the on-disk format version, [supporting inline files, custom attributes and dynamic wear-leveling][release-notes-2].
+
+We follow `std::fs` as much as reasonable.
 
 The low-level bindings are provided by the [littlefs2-sys][littlefs2-sys] library.
-
-We try to follow `std::fs` as much as reasonable.
 
 Upstream release: [v2.1.4][upstream-release]
 
 [build-image]: https://builds.sr.ht/~nickray/littlefs2.svg
 [build-link]: https://builds.sr.ht/~nickray/littlefs2
+[geky]: https://github.com/geky
 [littlefs]: https://github.com/ARMmbed/littlefs
+[release-notes-2]: https://github.com/ARMmbed/littlefs/releases/tag/v2.0.0
 [littlefs2-sys]: https://lib.rs/littlefs2-sys
 [upstream-release]: https://github.com/ARMmbed/littlefs/releases/tag/v2.1.4
 
