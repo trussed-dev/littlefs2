@@ -88,8 +88,8 @@ pub type Result<T> = core::result::Result<T, Error>;
 pub enum Error {
     /// Input / output error occurred.
     Io,
-    /// File was corrupt.
-    CorruptFile,
+    /// File or filesystem was corrupt.
+    Corruption,
     /// No entry found with that name.
     NoSuchEntry,
     /// File or directory already exists.
@@ -124,7 +124,7 @@ impl Error {
         match error_code {
             // negative codes
             ll::lfs_error_LFS_ERR_IO => Err(Error::Io),
-            ll::lfs_error_LFS_ERR_CORRUPT => Err(Error::CorruptFile),
+            ll::lfs_error_LFS_ERR_CORRUPT => Err(Error::Corruption),
             ll::lfs_error_LFS_ERR_NOENT => Err(Error::NoSuchEntry),
             ll::lfs_error_LFS_ERR_EXIST => Err(Error::EntryAlreadyExisted),
             ll::lfs_error_LFS_ERR_NOTDIR => Err(Error::PathNotDir),

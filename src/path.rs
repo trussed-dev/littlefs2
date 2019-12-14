@@ -75,7 +75,9 @@ where
     }
 }
 
-
+/// A slice of a specification of the location of a [`File`](../fs/struct.File.html).
+///
+/// This module is rather incomplete, compared to `std::path`.
 pub struct Path<S> (GenericArray<u8, S::PATH_MAX_PLUS_ONE>)
 where
     S: driver::Storage,

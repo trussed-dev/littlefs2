@@ -62,8 +62,8 @@ pub trait Storage {
     ///
     /// TODO: We can't actually change this - need to pass on as compile flag
     /// to the C backend.
-    // const FILENAME_MAX_PLUS_ONE: usize = ll::LFS_NAME_MAX as _;
     type FILENAME_MAX_PLUS_ONE;
+
     /// Maximum length of a path plus one. Necessary to convert Rust string slices
     /// to C strings, which requires an allocation for the terminating
     /// zero-byte. If in doubt, set to `FILENAME_MAX_PLUS_ONE`.
@@ -77,13 +77,13 @@ pub trait Storage {
     /// TODO: We can't actually change this - need to pass on as compile flag
     /// to the C backend.
     const FILEBYTES_MAX: usize = ll::LFS_FILE_MAX as _;
+
     /// Maximum size of custom attributes.
     /// Should default to 1_022, but associated type defaults don't exists currently.
     /// At most 1_022.
     ///
     /// TODO: We can't actually change this - need to pass on as compile flag
     /// to the C backend.
-    // const ATTRBYTES_MAX: usize = ll::LFS_ATTR_MAX as _;
     type ATTRBYTES_MAX;
 
     /// Read data from the storage device.
@@ -100,6 +100,7 @@ pub trait Storage {
 }
 
 // in the future, try to split the megatrait `Storage` into pieces
+// like this?
 mod future {
     // content of "superblock"
     pub trait DiskFormat {

@@ -82,7 +82,24 @@ macro_rules! ram_storage { (
             }
         }
     };
-    () => {
+    (tiny) => {
+        ram_storage!(
+            name=RamStorage,
+            backend=Ram,
+            trait=driver::Storage,
+            erase_value=0xff,
+            read_size=32,
+            write_size=32,
+            cache_size_ty=consts::U32,
+            block_size=128,
+            block_count=8,
+            lookaheadwords_size_ty=consts::U1,
+            filename_max_plus_one_ty=consts::U256,
+            path_max_plus_one_ty=consts::U256,
+            result=Result,
+        );
+    };
+    (large) => {
         ram_storage!(
             name=RamStorage,
             backend=Ram,

@@ -41,13 +41,13 @@ fn main() {
     let mut other_ram = OtherRam::default();
     let mut other_storage = OtherRamStorage::new(&mut other_ram);
     let mut alloc = Filesystem::allocate();
-    assert!(Filesystem::format(&mut alloc, &mut other_storage).is_ok());
+    assert!(Filesystem::format(&mut other_storage).is_ok());
     let other_fs = Filesystem::mount(&mut alloc, &mut other_storage).unwrap();
 
     let mut ram = Ram::default();
     let mut storage = RamStorage::new(&mut ram);
     let mut alloc = Filesystem::allocate();
-    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    Filesystem::format(&mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();

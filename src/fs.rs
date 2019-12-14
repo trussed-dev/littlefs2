@@ -1,4 +1,8 @@
 /*! Filesystem manipulation operations.
+
+Start with the documentation for [`File`](struct.File.html) and [`Filesystem`](struct.Filesystem.html).
+
+Then peek at [`ReadDirWith`](struct.ReadDirWith.html)'s example.
 */
 use core::{
     cmp,
@@ -31,7 +35,7 @@ use generic_array::{
 
 /// The three global buffers used by LittleFS
 // #[derive(Debug)]
-pub struct Buffers<Storage>
+struct Buffers<Storage>
 where
     Storage: driver::Storage,
     <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
@@ -43,6 +47,7 @@ where
     lookahead: GenericArray<u32, Storage::LOOKAHEADWORDS_SIZE>,
 }
 
+/// The state of a `Filesystem`. Pre-allocate with `Filesystem::allocate`.
 // #[derive(Debug)]
 pub struct FilesystemAllocation<Storage>
 where
@@ -55,6 +60,21 @@ where
     pub(crate) config: ll::lfs_config,
 }
 
+/** One of the main API entry points, manipulates files by [`Path`](../path/struct.Path.html)
+without opening the corresponding [`File`](struct.File.html).
+
+Use the constructors
+[`Filesystem::format`](struct.Filesystem.html#method.format) or
+[`Filesystem::mount`](struct.Filesystem.html#method.mount) to obtain an instance,
+given a [`FilesystemAllocation`](struct.FilesystemAllocation.html) from
+[`Filesystem::allocate`](struct.File.html#method.allocate).
+
+If a filesystem is not formatted or corrupt, `mount`ing will fail with
+[`Error::Corruption`](../io/enum.Error.html#variant.Corruption).
+
+To actually read and write files, use the methods of [`File`](struct.File.html).
+
+*/
 // #[derive(Debug)]
 pub struct Filesystem<'alloc, Storage>
 where
@@ -212,11 +232,12 @@ where
     }
 
     pub fn format(
-        alloc: &'alloc mut FilesystemAllocation<Storage>,
+        // alloc: &'alloc mut FilesystemAllocation<Storage>,
         storage: &mut Storage,
     ) ->
         Result<()>
     {
+        let alloc = &mut Self::allocate();
         let fs = Filesystem::placement_new(alloc, storage);
         fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_format(&mut fs.alloc.state, &fs.alloc.config) };
@@ -234,12 +255,49 @@ where
     <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
     <Storage as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
 {
-    pub fn unmount(self, storage: &mut Storage)
-        -> Result<()>
-    {
+    // According to documentation, does nothing besides releasing resources.
+    // We have drop for that!
+    // Further, having it might mislead into thinking that unmounting synchronizes
+    // all open buffers or something like that
+    // pub fn unmount(self, storage: &mut Storage)
+    //     -> Result<()>
+    // {
+    //     self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+    //     let return_code = unsafe { ll::lfs_unmount(&mut self.alloc.state) };
+    //     Error::result_from(return_code)
+    // }
+
+    /// Total number of blocks in the filesystem
+    pub fn total_blocks(&self) -> usize {
+        Storage::BLOCK_COUNT
+    }
+
+    /// Total number of bytes in the filesystem
+    pub fn total_space(&self) -> usize {
+        Storage::BLOCK_COUNT * Storage::BLOCK_SIZE
+    }
+
+    /// Available number of unused blocks in the filesystem
+    ///
+    /// Upstream littlefs documentation notes (on its "current size" function):
+    /// "Result is best effort.  If files share COW structures, the returned size may be larger
+    /// than the filesystem actually is."
+    ///
+    /// So it would seem that there are *at least* the number of blocks returned
+    /// by this method available, at any given time.
+    pub fn available_blocks(&mut self, storage: &mut Storage) -> Result<usize> {
         self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
-        let return_code = unsafe { ll::lfs_unmount(&mut self.alloc.state) };
-        Error::result_from(return_code)
+        let return_code = unsafe { ll::lfs_fs_size( &mut self.alloc.state) };
+        Error::usize_result_from(return_code).map(|blocks| self.total_blocks() - blocks)
+    }
+
+    /// Available number of unused bytes in the filesystem
+    ///
+    /// This is a lower bound, more may be available. First, more blocks may be available as
+    /// explained in [`available_blocks`](struct.Filesystem.html#method.available_blocks).
+    /// Second, files may be inlined.
+    pub fn available_space(&mut self, storage: &mut Storage) -> Result<usize> {
+        self.available_blocks(storage).map(|blocks| blocks * Storage::BLOCK_SIZE)
     }
 
     /// Creates a new, empty directory at the provided path.
@@ -281,6 +339,9 @@ where
     }
 
     /// Given a path, query the file system to get information about a file or directory.
+    ///
+    /// To read user attributes, use
+    /// [`Filesystem::attribute`](struct.Filesystem.html#method.attribute)
     pub fn metadata<P: Into<Path<Storage>>>(
         &mut self,
         path: P,
@@ -304,7 +365,7 @@ where
         Error::result_from(return_code).map(|_| info.into())
     }
 
-	/// Returns an iterator over the entries within a directory.
+	/// Returns a pseudo-iterator over the entries within a directory.
 	pub fn read_dir<P: Into<Path<Storage>>>(
         &mut self,
         path: P,
@@ -346,7 +407,7 @@ where
     //     Ok(attributes)
     // }
 
-    /// Read attribute
+    /// Read attribute.
     pub fn attribute<P: Into<Path<Storage>>>(
         &mut self,
         path: P,
@@ -380,7 +441,7 @@ where
         unreachable!();
     }
 
-    /// Remove attribute
+    /// Remove attribute.
     pub fn remove_attribute<P: Into<Path<Storage>>>(
         &mut self,
         path: P,
@@ -397,7 +458,7 @@ where
         Error::result_from(return_code)
     }
 
-    /// Set attribute
+    /// Set attribute.
     pub fn set_attribute<P: Into<Path<Storage>>>(
         &mut self,
         path: P,
@@ -421,6 +482,14 @@ where
 }
 
 #[derive(Clone,Debug,Eq,PartialEq)]
+/// Custom user attribute that can be set on files and directories.
+///
+/// Consists of an numerical identifier between 0 and 255, and arbitrary
+/// binary data up to size `ATTRBYTES_MAX`.
+///
+/// Use [`Filesystem::attribute`](struct.Filesystem.html#method.attribute),
+/// [`Filesystem::set_attribute`](struct.Filesystem.html#method.set_attribute), and
+/// [`Filesystem::clear_attribute`](struct.Filesystem.html#method.clear_attribute).
 pub struct Attribute<S>
 where
     S: driver::Storage,
@@ -465,6 +534,8 @@ where
     }
 }
 
+/// Item of the directory iterator on [`ReadDirWith`](struct.ReadDirWith.html) and directory
+/// pseudo-iterator on [`ReadDir`](struct.ReadDir.html).
 #[derive(Clone,Debug,PartialEq)]
 pub struct DirEntry<S>
 where
@@ -500,6 +571,64 @@ where
 
 }
 
+/** [`Iterator`](https://doc.rust-lang.org/core/iter/trait.Iterator.html) over files in a directory, returned by [`ReadDir::with`](struct.ReadDir.html#method.with).
+
+Call [`Filesystem::read_dir`](struct.Filesystem.html#method.read_dir) and then
+[`ReadDir::with`](struct.ReadDir.html#method.with) to get one.
+
+## Example
+```
+# use littlefs2::fs::{Filesystem, File};
+# use littlefs2::prelude::*;
+#
+# use littlefs2::{consts, ram_storage, driver, io::Result};
+#
+// setup
+ram_storage!(tiny);
+let mut ram = Ram::default();
+let mut storage = RamStorage::new(&mut ram);
+Filesystem::format(&mut storage).ok();
+let mut alloc = Filesystem::allocate();
+let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
+
+// create
+let mut alloc = File::allocate();
+let mut file = File::create("abc", &mut alloc, &mut fs, &mut storage).unwrap();
+file.set_len(&mut fs, &mut storage, 37);
+file.sync(&mut fs, &mut storage);
+
+let mut alloc = File::allocate();
+let mut file = File::create("xyz", &mut alloc, &mut fs, &mut storage).unwrap();
+file.set_len(&mut fs, &mut storage, 42);
+file.sync(&mut fs, &mut storage);
+
+// count
+let mut read_dir = fs.read_dir("/", &mut storage).unwrap();
+let it = read_dir.with(&mut fs, &mut storage);
+assert_eq!(it.count(), 4); // two directories (`.` and `..`) and two regular files
+
+// confirm
+let mut read_dir = fs.read_dir("/", &mut storage).unwrap();
+let it = read_dir.with(&mut fs, &mut storage);
+assert_eq!(
+    it
+        .map(|entry| entry.unwrap().metadata().is_dir() as usize)
+        .fold(0, |sum, l| sum + l),
+    2 // two directories, indeed!
+);
+
+// inspect
+let mut read_dir = fs.read_dir("/", &mut storage).unwrap();
+let it = read_dir.with(&mut fs, &mut storage);
+assert_eq!(
+    it
+        .map(|entry| entry.unwrap().metadata().len())
+        .fold(0, |sum, l| sum + l),
+    42 + 37
+);
+
+```
+*/
 pub struct ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
 where
     S: driver::Storage,
@@ -537,6 +666,11 @@ where
 }
 
 
+/// Pseudo-Iterator over files in a directory, returned by
+/// [`Filesystem::read_dir`](struct.Filesystem.html#method.read_dir).
+///
+/// Call [`with`](struct.ReadDir.html#method.with) to obtain a real iterator
+/// [`ReadDirWith`](struct.ReadDirWith.html), or write your own de-sugared for-loops.
 pub struct ReadDir<S>
 where
     S: driver::Storage,
@@ -552,7 +686,8 @@ where
     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
     <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
-    /// Temporarily bind `fs` and `storage`, to get a real `Iterator`.
+    /// Temporarily bind `fs` and `storage`, to get a real
+    /// [`Iterator`](https://doc.rust-lang.org/core/iter/trait.Iterator.html)
     pub fn with<'alloc, 'fs, 'read_dir, 'storage>(
         &'read_dir mut self,
         fs: &'fs mut Filesystem<'alloc, S>,
@@ -567,7 +702,7 @@ where
         }
     }
 
-    /// State-free pseudo-Iterator. Use `with` to get a real iterator.
+    /// Returns files and directories, starting with `.` and `..`.
     pub fn next<'alloc>(
         &mut self,
         fs: &mut Filesystem<'alloc, S>,
@@ -608,6 +743,7 @@ where
 }
 
 
+/// File type (regular vs directory) and size of a file.
 #[derive(Clone,Debug,Eq,PartialEq)]
 pub struct Metadata
 // pub struct Metadata<S>
@@ -718,7 +854,7 @@ where
 
 /** Builder approach to opening files.
 
-Starting with an empty set of flags, add options and finally
+Start with an empty set of flags by calling the constructor `new`, add options, and finally
 call `open`. This avoids fiddling with the actual [`FileOpenFlags`](struct.FileOpenFlags.html).
 */
 #[derive(Clone,Debug,Eq,PartialEq)]
@@ -780,6 +916,7 @@ impl OpenOptions {
         }; self
     }
 
+    /// Open the file with the options previously specified.
     pub fn open<'falloc, 'fsalloc, S, P>(
         &self,
         path: P,
@@ -845,7 +982,7 @@ impl SeekFrom {
 }
 
 
-// /// The state of a `Dir`. Must be pre-allocated via `File::allocate()`.
+// /// The state of a `Dir`. Pre-allocate with `File::allocate()`.
 // pub struct DirAllocation
 // {
 //     state: ll::lfs_dir_t,
@@ -859,7 +996,7 @@ impl SeekFrom {
 //     alloc: &'alloc mut DirAllocation,
 // }
 
-/// The state of a `File`. Must be pre-allocated via `File::allocate()`.
+/// The state of a `File`. Pre-allocate with `File::allocate`.
 pub struct FileAllocation<S>
 where
     S: driver::Storage,
@@ -870,11 +1007,21 @@ where
     config: ll::lfs_file_config,
 }
 
-/** The main abstraction. Use this to read and write binary data to the file system.
+/** One of the main API entry points, used to read and write binary non-attribute data to the file system.
 
-Given a [`FileAllocation`](struct.FileAllocation.html), use the shortcuts `File::open` or `File::create` to
-open existing, or create new files. Generally, [`OpenOptions`](struct.OpenOptions.html) exposes all the
-available options how to open files.
+Use the constructors
+[`File::open`](struct.File.html#method.open) or
+[`File::create`](struct.File.html#method.create)
+to read from existing or write to new files.
+
+More generally, [`OpenOptions`](struct.OpenOptions.html) exposes all the
+available options to open files, such as read/write non-truncating access.
+
+Each file has [`Metadata`](struct.Metadata.html) such as its [`FileType`](struct.FileType.html).
+Further, each file (including directories) can have [`Attribute`](struct.Attribute.html)s attached.
+
+To manipulate [`Path`](../path/struct.Path.html)s without opening the associated file, use the
+methods of [`Filesystem`](struct.Filesystem.html).
 
 */
 pub struct File<'falloc, S>
@@ -888,7 +1035,7 @@ where
 bitflags! {
     /// Definition of file open flags which can be mixed and matched as appropriate. These definitions
     /// are reminiscent of the ones defined by POSIX.
-    pub struct FileOpenFlags: u32 {
+    struct FileOpenFlags: u32 {
         /// Open file in read only mode.
         const READ = 0x1;
         /// Open file in write only mode.
@@ -1002,6 +1149,7 @@ where
         Ok(())
     }
 
+    /// Size of the file in bytes.
     pub fn len<'fsalloc: 'falloc>(
         &mut self,
         fs: &mut Filesystem<'fsalloc, S>,

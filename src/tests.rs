@@ -58,7 +58,7 @@ fn version() {
 }
 
 #[test]
-fn test_format() {
+fn format() {
     let mut backend = OtherRam::default();
     let mut storage = OtherRamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
@@ -67,14 +67,15 @@ fn test_format() {
     assert_eq!(
         Filesystem::mount(&mut alloc, &mut storage)
             .map(drop).unwrap_err(),
-        Error::CorruptFile
+        Error::Corruption
     );
     // should succeed
-    assert!(Filesystem::format(&mut alloc, &mut storage).is_ok());
+    assert!(Filesystem::format(&mut storage).is_ok());
     // should succeed now that storage is formatted
     let fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
     // check there are no segfaults
-    fs.unmount(&mut storage).unwrap();
+    drop(fs);
+    drop(storage);
 }
 
 // #[macro_use]
@@ -94,7 +95,7 @@ fn borrow_fs_allocation() {
 
     let mut storage = OtherRamStorage::new(&mut backend);
     let mut alloc_fs = Filesystem::allocate();
-    Filesystem::format(&mut alloc_fs, &mut storage).unwrap();
+    Filesystem::format(&mut storage).unwrap();
     let _fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
     // previous `_fs` is fine as it's masked, due to NLL
     let mut fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
@@ -110,8 +111,14 @@ fn test_create() {
     let mut backend = OtherRam::default();
     let mut storage = OtherRamStorage::new(&mut backend);
     let mut alloc_fs = Filesystem::allocate();
-    Filesystem::format(&mut alloc_fs, &mut storage).unwrap();
+    Filesystem::format(&mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
+
+    assert_eq!(fs.total_blocks(), 512);
+    assert_eq!(fs.total_space(), 256*512);
+    // superblock
+    assert_eq!(fs.available_blocks(&mut storage).unwrap(), 512 - 2);
+    assert_eq!(fs.available_space(&mut storage).unwrap(), 130_560);
 
     let mut alloc_file = File::allocate();
     // file does not exist yet, can't open for reading
@@ -124,6 +131,7 @@ fn test_create() {
     );
 
     fs.create_dir("/tmp", &mut storage).unwrap();
+    assert_eq!(fs.available_blocks(&mut storage).unwrap(), 512 - 2 - 2);
 
     // can create new files
     let mut file = File::create(
@@ -133,9 +141,11 @@ fn test_create() {
     // can write to files
     assert!(file.write(&mut fs, &mut storage, &[0u8, 1, 2]).unwrap() == 3);
     file.sync(&mut fs, &mut storage).unwrap();
+    // surprise surprise, inline files!
+    assert_eq!(fs.available_blocks(&mut storage).unwrap(), 512 - 2 - 2);
     file.close(&mut fs, &mut storage).unwrap();
 
-    // directory is `DirNotEmpty`
+    // cannot remove non-empty directories
     assert_eq!(fs.remove("/tmp", &mut storage).unwrap_err(), Error::DirNotEmpty);
 
     let metadata = fs.metadata("/tmp", &mut storage).unwrap();
@@ -144,12 +154,14 @@ fn test_create() {
 
     // can move files
     fs.rename("/tmp/test_open.txt", "moved.txt", &mut storage).unwrap();
+    assert_eq!(fs.available_blocks(&mut storage).unwrap(), 512 - 2 - 2);
 
     let metadata = fs.metadata("/moved.txt", &mut storage).unwrap();
     assert!(metadata.is_file());
     assert_eq!(metadata.len(), 3);
 
     fs.remove("/tmp/../tmp/.", &mut storage).unwrap();
+    assert_eq!(fs.available_blocks(&mut storage).unwrap(), 512 - 2);
 
     // can read from existing files
     let mut alloc = File::allocate();
@@ -162,8 +174,6 @@ fn test_create() {
     let mut contents: [u8; 3] = Default::default();
     assert!(file.read(&mut fs, &mut storage, &mut contents).unwrap() == 3);
     assert_eq!(contents, [0u8, 1, 2]);
-
-    fs.unmount(&mut storage).unwrap();
 }
 
 #[test]
@@ -173,7 +183,7 @@ fn test_unbind() {
     {
         let mut storage = RamStorage::new(&mut backend);
         let mut alloc = Filesystem::allocate();
-        Filesystem::format(&mut alloc, &mut storage).unwrap();
+        Filesystem::format(&mut storage).unwrap();
         let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
         let mut alloc = File::allocate();
@@ -205,7 +215,7 @@ fn test_seek() {
     let mut backend = Ram::default();
     let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
-    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    Filesystem::format(&mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
@@ -229,7 +239,7 @@ fn test_seek() {
     assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 11);
     file.read(&mut fs, &mut storage, &mut buf).unwrap();
     file.close(&mut fs, &mut storage).unwrap();
-    fs.unmount(&mut storage).unwrap();
+    drop(fs);
 
     assert_eq!(&buf, b"world");
 }
@@ -239,7 +249,7 @@ fn test_file_set_len() {
     let mut backend = Ram::default();
     let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
-    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    Filesystem::format(&mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
@@ -264,7 +274,7 @@ fn test_fancy_open() {
     let mut backend = Ram::default();
     let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
-    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    Filesystem::format(&mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
@@ -286,7 +296,7 @@ fn test_fancy_open() {
     let mut buf = [0u8; 5];
     file.read(&mut fs, &mut storage, &mut buf).unwrap();
     file.close(&mut fs, &mut storage).unwrap();
-    fs.unmount(&mut storage).unwrap();
+    drop(fs);
 
     assert_eq!(&buf, b"world");
 }
@@ -296,7 +306,7 @@ fn attributes() {
     let mut backend = Ram::default();
     let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
-    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    Filesystem::format(&mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
@@ -342,7 +352,7 @@ fn test_iter_dirs() {
     let mut backend = Ram::default();
     let mut storage = RamStorage::new(&mut backend);
     let mut alloc = Filesystem::allocate();
-    Filesystem::format(&mut alloc, &mut storage).unwrap();
+    Filesystem::format(&mut storage).unwrap();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     fs.create_dir("/tmp", &mut storage).unwrap();
