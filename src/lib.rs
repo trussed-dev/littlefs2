@@ -8,7 +8,7 @@ written in C, that claims to be "fail-safe":
 - dynamic wear-leveling, including detection of bad Flash blocks
 - bounded RAM/ROM, with stack-allocated buffers
 
-For more background, see its [design](https://github.com/ARMmbed/littlefs/blob/master/DESIGN.md)
+For more background, see its [design notes](https://github.com/ARMmbed/littlefs/blob/master/DESIGN.md)
 and the [specification](https://github.com/ARMmbed/littlefs/blob/master/SPEC.md) of its format.
 
 This library, `littlefs2`, offers an idiomatic Rust API around `littlefs`, following the design
@@ -33,8 +33,9 @@ beforehand and passed to constructors.
 Generally speaking, all operations on the filesystem require passing `&mut Storage`,
 whereas all operations with files require passing both a `&mut Filesystem` and its
 `&mut Storage` backend. This design choice was made to enable multiple filesystems
-at different locations.
-
+at different locations. In the future, we may add interface options, as is done
+currently for `ReadDirWith`, which takes `ReadDir` and temporarily binds the mutable
+references for convenience: in particular, it supports a normal iterator.
 
 ```
 use littlefs2::fs::{Filesystem, File, OpenOptions, SeekFrom};
@@ -74,10 +75,6 @@ fs.unmount(&mut storage).unwrap();
 
 ```
 
-## Limitations
-
-Directories and file attributes are not exposed yet.
-
 */
 
 /// Low-level bindings
@@ -88,19 +85,15 @@ pub use generic_array::typenum::consts;
 
 pub mod prelude;
 
-/// cf. Macros section below
+/// cf. Macros documentation
 #[macro_use]
 pub mod macros;
 
-pub mod fs;
-
-/// Traits and types for core I/O functionality.
-pub mod io;
-
-pub mod path;
-
-/// The `Storage`, `Read`, `Write` and `Seek` driver.
 pub mod driver;
+
+pub mod fs;
+pub mod io;
+pub mod path;
 
 /// get information about the C backend
 pub fn version() -> Version {

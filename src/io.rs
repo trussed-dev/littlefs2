@@ -1,3 +1,5 @@
+//! Traits and types for core I/O functionality.
+
 use littlefs2_sys as ll;
 
 use generic_array::ArrayLength;

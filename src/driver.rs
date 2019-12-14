@@ -1,3 +1,5 @@
+//! The `Storage`, `Read`, `Write` and `Seek` driver.
+
 use littlefs2_sys as ll;
 
 use crate::{
@@ -32,10 +34,10 @@ pub trait Storage {
     /// Size of an erasable block in bytes, as unsigned typenum.
     /// Must be a multiple of both `READ_SIZE` and `WRITE_SIZE`.
     /// At least 128 (https://git.io/JeHp9). Stored in superblock.
-    type BLOCK_SIZE;
+    const BLOCK_SIZE: usize;
 
     /// Number of erasable blocks.
-    /// Hence storage capacity is `BLOCK_COUNT` * `BLOCK_SIZE`
+    /// Hence storage capacity is `BLOCK_COUNT * BLOCK_SIZE`
     const BLOCK_COUNT: usize;
 
     /// Suggested values are 100-1000, higher is more performant but
@@ -97,3 +99,44 @@ pub trait Storage {
     // fn sync(&mut self) -> Result<usize>;
 }
 
+// in the future, try to split the megatrait `Storage` into pieces
+mod future {
+    // content of "superblock"
+    pub trait DiskFormat {
+        // version, upper/lower half-word contain major/minor
+        // const DISK_FORMAT_VERSION: u32,
+
+        // block_size, block_count
+        const BLOCK_SIZE: usize;
+        const BLOCK_COUNT: usize;
+
+        // name_max, file_max, attr_max
+        type FILENAME_MAX_PLUS_ONE;
+        const FILEBYTES_MAX: usize = super::ll::LFS_FILE_MAX as _;
+        type ATTRBYTES_MAX;
+    }
+
+    pub trait Driver {
+        const READ_SIZE: usize;
+        const WRITE_SIZE: usize;
+
+        const BLOCK_SIZE: usize;
+        const BLOCK_COUNT: usize;
+
+        // fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize>;
+        // fn write(&mut self, offset: usize, data: &[u8]) -> Result<usize>;
+        // fn erase(&mut self, offset: usize, len: usize) -> Result<usize>;
+    }
+
+    pub trait MemoryUsage {
+        // TODO: this supposedly influences whether files are inlined or not. Clarify
+        type CACHE_SIZE;
+        type LOOKAHEADWORDS_SIZE;
+        // not part of littlefs
+        type PATH_MAX_PLUS_ONE;
+    }
+
+    pub trait RuntimeParameters {
+        const BLOCK_CYCLES: isize = -1;
+    }
+}

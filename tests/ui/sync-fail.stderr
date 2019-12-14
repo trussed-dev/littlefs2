@@ -1,16 +1,16 @@
 error[E0308]: mismatched types
-  --> $DIR/sync-fail.rs:73:15
+  --> $DIR/sync-fail.rs:71:15
    |
-73 |     file.sync(&mut other_fs, &mut other_storage).unwrap();
+71 |     file.sync(&mut other_fs, &mut other_storage).unwrap();
    |               ^^^^^^^^^^^^^ expected struct `RamStorage`, found struct `OtherRamStorage`
    |
    = note: expected type `&mut littlefs2::fs::Filesystem<'_, RamStorage<'_>, littlefs2::fs::mount_state::Mounted>`
               found type `&mut littlefs2::fs::Filesystem<'_, OtherRamStorage<'_>, littlefs2::fs::mount_state::Mounted>`
 
 error[E0308]: mismatched types
-  --> $DIR/sync-fail.rs:73:30
+  --> $DIR/sync-fail.rs:71:30
    |
-73 |     file.sync(&mut other_fs, &mut other_storage).unwrap();
+71 |     file.sync(&mut other_fs, &mut other_storage).unwrap();
    |                              ^^^^^^^^^^^^^^^^^^ expected struct `RamStorage`, found struct `OtherRamStorage`
    |
    = note: expected type `&mut RamStorage<'_>`

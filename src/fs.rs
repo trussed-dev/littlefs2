@@ -84,7 +84,6 @@ impl<'alloc, Storage> Filesystem<'alloc, Storage>
 where
     Storage: driver::Storage,
     Storage: 'alloc,
-    <Storage as driver::Storage>::BLOCK_SIZE: ArrayLength<u8>,
     <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
@@ -95,7 +94,7 @@ where
     pub fn allocate() -> FilesystemAllocation<Storage> {
         let read_size: u32 = Storage::READ_SIZE as _;
         let write_size: u32 = Storage::WRITE_SIZE as _;
-        let block_size: u32 = <Storage as driver::Storage>::BLOCK_SIZE::to_u32();
+        let block_size: u32 = Storage::BLOCK_SIZE as _;
         let cache_size: u32 = <Storage as driver::Storage>::CACHE_SIZE::to_u32();
         let lookahead_size: u32 =
             32 * <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE::to_u32();
@@ -174,7 +173,7 @@ where
             prog_buffer: core::ptr::null_mut(),
             lookahead_buffer: core::ptr::null_mut(),
 
-            name_max: filename_max_plus_one - 1,
+            name_max: filename_max_plus_one.wrapping_sub(1),
             file_max,
             attr_max: attr_max,
         };
@@ -256,7 +255,6 @@ where
     Storage: driver::Storage,
     Storage: 'alloc,
     // MountState: mount_state::MountState,
-    <Storage as driver::Storage>::BLOCK_SIZE: ArrayLength<u8>,
     <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
@@ -681,7 +679,6 @@ where
     Storage: driver::Storage,
     Storage: 'alloc,
     MountState: mount_state::MountState,
-    <Storage as driver::Storage>::BLOCK_SIZE: ArrayLength<u8>,
     <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
@@ -719,7 +716,7 @@ where
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
         // let block_size = unsafe { c.read().block_size };
-        let block_size = <Storage as driver::Storage>::BLOCK_SIZE::to_u32();
+        let block_size = Storage::BLOCK_SIZE as u32;
         let off = (block * block_size + off) as usize;
         let buf: &[u8] = unsafe { slice::from_raw_parts(buffer as *const u8, size as usize) };
 
@@ -736,10 +733,10 @@ where
     ) -> cty::c_int {
         // println!("in lfs_config_erase");
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
-        let off = block as usize * <Storage as driver::Storage>::BLOCK_SIZE::to_usize();
+        let off = block as usize * Storage::BLOCK_SIZE as usize;
 
         // TODO
-        storage.erase(off, <Storage as driver::Storage>::BLOCK_SIZE::to_usize()).unwrap();
+        storage.erase(off, Storage::BLOCK_SIZE as usize).unwrap();
         0
     }
 
