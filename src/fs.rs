@@ -338,7 +338,7 @@ where
         Error::result_from(return_code)
     }
 
-    /// Given a path, query the file system to get information about a file or directory.
+    /// Given a path, query the filesystem to get information about a file or directory.
     ///
     /// To read user attributes, use
     /// [`Filesystem::attribute`](struct.Filesystem.html#method.attribute)
@@ -954,7 +954,7 @@ impl OpenOptions {
 
 /** Enumeration of possible methods to seek within an I/O object.
 
-Use the the [`Seek`](../io/trait.Seek.html) trait.
+Use the [`Seek`](../io/trait.Seek.html) trait.
 */
 #[derive(Clone,Copy,Debug,Eq,PartialEq)]
 pub enum SeekFrom {
@@ -1007,7 +1007,7 @@ where
     config: ll::lfs_file_config,
 }
 
-/** One of the main API entry points, used to read and write binary non-attribute data to the file system.
+/** One of the main API entry points, used to read and write binary non-attribute data to the filesystem.
 
 Use the constructors
 [`File::open`](struct.File.html#method.open) or
@@ -1022,6 +1022,9 @@ Further, each file (including directories) can have [`Attribute`](struct.Attribu
 
 To manipulate [`Path`](../path/struct.Path.html)s without opening the associated file, use the
 methods of [`Filesystem`](struct.Filesystem.html).
+
+**WARNING**: Whereas `std::fs` files are synched automatically on drop, here this is not possible
+due to the required references. Therefore, **make sure you call `File::sync` after file changes**.
 
 */
 pub struct File<'falloc, S>
@@ -1189,6 +1192,7 @@ where
 
 }
 
+/// Regular file vs directory
 #[derive(Clone,Copy,Debug,Eq,Hash,PartialEq)]
 pub enum FileType {
     File,
