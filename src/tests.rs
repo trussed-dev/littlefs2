@@ -408,8 +408,12 @@ fn test_iter_dirs() {
 
     // version dealing with an actual iterator
     // TODO: does not release the references properly (can't do this before the above version)
-    let mut read_dir = fs.read_dir("/tmp", &mut storage).unwrap();
-    for (i, entry) in read_dir.with(&mut fs, &mut storage).enumerate() {
+    for (i, entry) in fs
+        .read_dir("/tmp", &mut storage)
+        .unwrap()
+        .with(&mut fs, &mut storage)
+        .enumerate()
+    {
         let x = entry.unwrap();
         if i == 0 { assert_eq!(x.file_name(), Filename::new(b".")); }
         if i == 1 { assert_eq!(x.file_name(), Filename::new(b"..")); }

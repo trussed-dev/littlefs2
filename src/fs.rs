@@ -608,8 +608,7 @@ let it = read_dir.with(&mut fs, &mut storage);
 assert_eq!(it.count(), 4); // two directories (`.` and `..`) and two regular files
 
 // confirm
-let mut read_dir = fs.read_dir("/", &mut storage).unwrap();
-let it = read_dir.with(&mut fs, &mut storage);
+let it = fs.read_dir("/", &mut storage).unwrap().with(&mut fs, &mut storage);
 assert_eq!(
     it
         .map(|entry| entry.unwrap().metadata().is_dir() as usize)
@@ -618,8 +617,7 @@ assert_eq!(
 );
 
 // inspect
-let mut read_dir = fs.read_dir("/", &mut storage).unwrap();
-let it = read_dir.with(&mut fs, &mut storage);
+let it = fs.read_dir("/", &mut storage).unwrap().with(&mut fs, &mut storage);
 assert_eq!(
     it
         .map(|entry| entry.unwrap().metadata().len())
@@ -629,19 +627,19 @@ assert_eq!(
 
 ```
 */
-pub struct ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
+pub struct ReadDirWith<'alloc, 'fs, 'storage, S>
 where
     S: driver::Storage,
     <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
     <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
-    read_dir: &'read_dir mut ReadDir<S>,
+    read_dir: ReadDir<S>,
     fs: &'fs mut Filesystem<'alloc, S>,
     storage: &'storage mut S,
 }
 
-impl<'alloc, 'fs, 'read_dir, 'storage, S> ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
+impl<'alloc, 'fs, 'storage, S> ReadDirWith<'alloc, 'fs, 'storage, S>
 where
     S: driver::Storage,
     <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
@@ -650,8 +648,8 @@ where
 {
 }
 
-impl<'alloc, 'fs, 'read_dir, 'storage, S> Iterator
-for ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
+impl<'alloc, 'fs, 'storage, S> Iterator
+for ReadDirWith<'alloc, 'fs, 'storage, S>
 where
     S: driver::Storage,
     <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
@@ -689,11 +687,12 @@ where
     /// Temporarily bind `fs` and `storage`, to get a real
     /// [`Iterator`](https://doc.rust-lang.org/core/iter/trait.Iterator.html)
     pub fn with<'alloc, 'fs, 'read_dir, 'storage>(
-        &'read_dir mut self,
+        self,
         fs: &'fs mut Filesystem<'alloc, S>,
         storage: &'storage mut S,
     ) ->
-        ReadDirWith<'alloc, 'fs, 'read_dir, 'storage, S>
+        ReadDirWith<'alloc, 'fs, 'storage, S>
+    where
     {
         ReadDirWith {
             read_dir: self,
