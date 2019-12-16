@@ -142,8 +142,7 @@ where
     }
 
     /// Creates a new, empty directory at the provided path.
-    pub fn create_dir<P: Into<Path<Storage>>>(&mut self, path: P) -> Result<()> {
-        // self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+    pub fn create_dir(&mut self, path: impl Into<Path<Storage>>) -> Result<()> {
         let return_code = unsafe { ll::lfs_mkdir(
             &mut self.alloc.state,
             &path.into() as *const _ as *const cty::c_char,
@@ -152,8 +151,7 @@ where
     }
 
     /// Remove a file or directory.
-    pub fn remove<P: Into<Path<Storage>>>(&mut self, path: P) -> Result<()> {
-        // self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+    pub fn remove(&mut self, path: impl Into<Path<Storage>>) -> Result<()> {
         let return_code = unsafe { ll::lfs_remove(
             &mut self.alloc.state,
             &path.into() as *const _ as *const cty::c_char,
@@ -162,14 +160,11 @@ where
     }
 
     /// Rename or move a file or directory.
-    pub fn rename<P, Q>(
+    pub fn rename(
         &mut self,
-        from: P, to: Q,
-    ) -> Result<()> where
-        P: Into<Path<Storage>>,
-        Q: Into<Path<Storage>>,
-    {
-        // self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        from: impl Into<Path<Storage>>,
+        to: impl Into<Path<Storage>>,
+    ) -> Result<()> {
         let return_code = unsafe { ll::lfs_rename(
             &mut self.alloc.state,
             &from.into() as *const _ as *const cty::c_char,
@@ -177,8 +172,6 @@ where
         ) };
         Error::result_from(return_code)
     }
-
-
 }
 
 
@@ -405,7 +398,9 @@ where
     }
 
     /// Creates a new, empty directory at the provided path.
-    pub fn create_dir<P: Into<Path<Storage>>>(&mut self, path: P, storage: &mut Storage) -> Result<()> {
+    pub fn create_dir(&mut self, path: impl Into<Path<Storage>>, storage: &mut Storage)
+        -> Result<()>
+    {
         self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_mkdir(
             &mut self.alloc.state,
@@ -415,7 +410,9 @@ where
     }
 
     /// Remove a file or directory.
-    pub fn remove<P: Into<Path<Storage>>>(&mut self, path: P, storage: &mut Storage) -> Result<()> {
+    pub fn remove(&mut self, path: impl Into<Path<Storage>>, storage: &mut Storage)
+        -> Result<()>
+    {
         self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_remove(
             &mut self.alloc.state,
@@ -425,14 +422,12 @@ where
     }
 
     /// Rename or move a file or directory.
-    pub fn rename<P, Q>(
+    pub fn rename(
         &mut self,
-        from: P, to: Q,
+        from: impl Into<Path<Storage>>,
+        to: impl Into<Path<Storage>>,
         storage: &mut Storage,
-    ) -> Result<()> where
-        P: Into<Path<Storage>>,
-        Q: Into<Path<Storage>>,
-    {
+    ) -> Result<()> {
         self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_rename(
             &mut self.alloc.state,
@@ -446,9 +441,9 @@ where
     ///
     /// To read user attributes, use
     /// [`Filesystem::attribute`](struct.Filesystem.html#method.attribute)
-    pub fn metadata<P: Into<Path<Storage>>>(
+    pub fn metadata(
         &mut self,
-        path: P,
+        path: impl Into<Path<Storage>>,
         storage: &mut Storage,
     ) ->
         Result<Metadata>
@@ -470,9 +465,9 @@ where
     }
 
 	/// Returns a pseudo-iterator over the entries within a directory.
-	pub fn read_dir<P: Into<Path<Storage>>>(
+	pub fn read_dir(
         &mut self,
-        path: P,
+        path: impl Into<Path<Storage>>,
         storage: &mut Storage,
     ) ->
         Result<ReadDir<Storage>>
@@ -512,9 +507,9 @@ where
     // }
 
     /// Read attribute.
-    pub fn attribute<P: Into<Path<Storage>>>(
+    pub fn attribute(
         &mut self,
-        path: P,
+        path: impl Into<Path<Storage>>,
         id: u8,
         storage: &mut Storage,
     ) ->
@@ -546,9 +541,9 @@ where
     }
 
     /// Remove attribute.
-    pub fn remove_attribute<P: Into<Path<Storage>>>(
+    pub fn remove_attribute(
         &mut self,
-        path: P,
+        path: impl Into<Path<Storage>>,
         id: u8,
         storage: &mut Storage,
     ) -> Result<()> {
@@ -563,9 +558,9 @@ where
     }
 
     /// Set attribute.
-    pub fn set_attribute<P: Into<Path<Storage>>>(
+    pub fn set_attribute(
         &mut self,
-        path: P,
+        path: impl Into<Path<Storage>>,
         attribute: &Attribute<Storage>, storage: &mut Storage,
     ) ->
         Result<()>
@@ -1020,9 +1015,9 @@ impl OpenOptions {
     }
 
     /// Open the file with the options previously specified.
-    pub fn open<'falloc, 'fsalloc, S, P>(
+    pub fn open<'falloc, 'fsalloc, S>(
         &self,
-        path: P,
+        path: impl Into<Path<S>>,
         // attributes: Option<&mut [Attribute<S>]>,
         alloc: &'falloc mut FileAllocation<S>,
         fs: &mut Filesystem<'fsalloc, S>,
@@ -1030,7 +1025,6 @@ impl OpenOptions {
     ) ->
         Result<File<'falloc, S>>
     where
-        P: Into<Path<S>>,
         S: driver::Storage,
         <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
         <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
@@ -1055,16 +1049,15 @@ impl OpenOptions {
     }
 
     /// Open the file with the options previously specified, keeping references.
-    pub fn open_with<'falloc, 'fs, 'fsalloc, 'storage, S, P>(
+    pub fn open_with<'falloc, 'fs, 'fsalloc, 'storage, S>(
         &self,
-        path: P,
+        path: impl Into<Path<S>>,
         // attributes: Option<&mut [Attribute<S>]>,
         alloc: &'falloc mut FileAllocation<S>,
         fs_with: &'fs mut FilesystemWith<'fsalloc, 'storage, S>,
     ) ->
         Result<FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>>
     where
-        P: Into<Path<S>>,
         S: driver::Storage,
         <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
         <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
@@ -1189,28 +1182,24 @@ where
     // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
     <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
-    pub fn open<P>(
-        path: P,
+    pub fn open(
+        path:  impl Into<Path<S>>,
         alloc: &'falloc mut FileAllocation<S>,
         fs_with: &'fs mut FilesystemWith<'fsalloc, 'storage, S>,
     ) ->
         Result<Self>
-    where
-        P: Into<Path<S>>,
     {
         OpenOptions::new()
             .read(true)
             .open_with(path, alloc, fs_with)
     }
 
-    pub fn create<P>(
-        path: P,
+    pub fn create(
+        path:  impl Into<Path<S>>,
         alloc: &'falloc mut FileAllocation<S>,
         fs_with: &'fs mut FilesystemWith<'fsalloc, 'storage, S>,
     ) ->
         Result<Self>
-    where
-        P: Into<Path<S>>,
     {
         OpenOptions::new()
             .write(true)
@@ -1323,33 +1312,23 @@ where
         }
     }
 
-    pub fn open<'fsalloc, P>(
-        path: P,
+    pub fn open<'fsalloc: 'falloc>(
+        path:  impl Into<Path<S>>,
         alloc: &'falloc mut FileAllocation<S>,
         fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
-    ) ->
-        Result<Self>
-    where
-        P: Into<Path<S>>,
-        'fsalloc: 'falloc,
-    {
+    ) -> Result<Self> {
         OpenOptions::new()
             .read(true)
             .open(path, alloc, fs, storage)
     }
 
-    pub fn create<'fsalloc, P>(
-        path: P,
+    pub fn create<'fsalloc: 'falloc>(
+        path:  impl Into<Path<S>>,
         alloc: &'falloc mut FileAllocation<S>,
         fs: &mut Filesystem<'fsalloc, S>,
         storage: &mut S,
-    ) ->
-        Result<Self>
-    where
-        P: Into<Path<S>>,
-        'fsalloc: 'falloc,
-    {
+    ) -> Result<Self> {
         OpenOptions::new()
             .write(true)
             .create(true)
