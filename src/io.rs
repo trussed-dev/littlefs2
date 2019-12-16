@@ -1,5 +1,7 @@
 //! Traits and types for core I/O functionality.
 
+pub mod prelude;
+
 use littlefs2_sys as ll;
 
 use generic_array::ArrayLength;
@@ -27,6 +29,13 @@ where
         storage: &mut S,
         buf: &mut [u8],
     ) -> Result<usize>;
+}
+
+/// The `ReadWith` trait allows for reading bytes from a file.
+pub trait ReadWith {
+    /// Read at most buf.len() bytes.
+    /// Upon success, return how many bytes were read.
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
 }
 
 /** The `Write` trait allows for writing bytes to a file.
@@ -61,6 +70,18 @@ where
 
 }
 
+pub trait WriteWith {
+    /// Write at most data.len() bytes.
+    /// The file will not necessarily be updated unless
+    /// flush is called as there is a cache.
+    /// Upon success, return how many bytes were written.
+    fn write(&mut self, data: &[u8]) -> Result<usize>;
+
+    /// Write out all pending writes to storage.
+    fn flush(&mut self) -> Result<()>;
+
+}
+
 /** The `Seek` trait provides a cursor which can be moved within a file.
 
 It is possible to seek relative to either end or the current offset.
@@ -79,6 +100,12 @@ where
         storage: &mut S,
         pos: SeekFrom,
     ) -> Result<usize>;
+}
+
+pub trait SeekWith {
+    /// Seek to an offset in bytes.
+    /// If successful, returns the new position from start of file.
+    fn seek(&mut self, pos: SeekFrom) -> Result<usize>;
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

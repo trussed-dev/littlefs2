@@ -64,7 +64,7 @@ Separately, keeping track of the allocations is a chore, we hope that
 
 ```
 # use littlefs2::fs::{Filesystem, File, OpenOptions, SeekFrom};
-# use littlefs2::prelude::*;
+# use littlefs2::io::prelude::*;
 #
 # use littlefs2::{consts, ram_storage, driver, io::Result};
 #
@@ -104,8 +104,6 @@ use littlefs2_sys as ll;
 
 /// Re-export of `typenum::consts`.
 pub use generic_array::typenum::consts;
-
-pub mod prelude;
 
 /// cf. Macros documentation
 #[macro_use]

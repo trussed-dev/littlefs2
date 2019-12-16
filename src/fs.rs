@@ -85,6 +85,102 @@ where
     pub(crate) alloc: &'alloc mut FilesystemAllocation<Storage>,
 }
 
+pub struct FilesystemWith<'alloc, 'storage, Storage>
+where
+    Storage: driver::Storage,
+    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    pub(crate) alloc: &'alloc mut FilesystemAllocation<Storage>,
+    // TODO: remove
+    #[allow(dead_code)]
+    pub(crate) storage: &'storage mut Storage,
+}
+
+
+impl<'alloc, 'storage, Storage> FilesystemWith<'alloc, 'storage, Storage>
+where
+    Storage: driver::Storage,
+    Storage: 'alloc,
+    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+    <Storage as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
+
+{
+    pub fn mount(
+        alloc: &'alloc mut FilesystemAllocation<Storage>,
+        storage: &'storage mut Storage,
+    ) -> Result<FilesystemWith<'alloc, 'storage, Storage>> {
+
+        let fs = Filesystem::placement_new(alloc, storage);
+        fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_mount(&mut fs.alloc.state, &fs.alloc.config) };
+        Error::result_from(return_code).map(move |_| {
+            FilesystemWith { alloc: fs.alloc, storage }
+        })
+    }
+
+    pub fn total_blocks(&self) -> usize {
+        Storage::BLOCK_COUNT
+    }
+
+    /// Total number of bytes in the filesystem
+    pub fn total_space(&self) -> usize {
+        Storage::BLOCK_COUNT * Storage::BLOCK_SIZE
+    }
+
+    pub fn available_blocks(&mut self) -> Result<usize> {
+        // self.alloc.config.context = self.storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_fs_size( &mut self.alloc.state) };
+        Error::usize_result_from(return_code).map(|blocks| self.total_blocks() - blocks)
+    }
+
+    pub fn available_space(&mut self) -> Result<usize> {
+        self.available_blocks().map(|blocks| blocks * Storage::BLOCK_SIZE)
+    }
+
+    /// Creates a new, empty directory at the provided path.
+    pub fn create_dir<P: Into<Path<Storage>>>(&mut self, path: P) -> Result<()> {
+        // self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_mkdir(
+            &mut self.alloc.state,
+            &path.into() as *const _ as *const cty::c_char,
+        ) };
+        Error::result_from(return_code)
+    }
+
+    /// Remove a file or directory.
+    pub fn remove<P: Into<Path<Storage>>>(&mut self, path: P) -> Result<()> {
+        // self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_remove(
+            &mut self.alloc.state,
+            &path.into() as *const _ as *const cty::c_char,
+        ) };
+        Error::result_from(return_code)
+    }
+
+    /// Rename or move a file or directory.
+    pub fn rename<P, Q>(
+        &mut self,
+        from: P, to: Q,
+    ) -> Result<()> where
+        P: Into<Path<Storage>>,
+        Q: Into<Path<Storage>>,
+    {
+        // self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_rename(
+            &mut self.alloc.state,
+            &from.into() as *const _ as *const cty::c_char,
+            &to.into() as *const _ as *const cty::c_char,
+        ) };
+        Error::result_from(return_code)
+    }
+
+
+}
+
 
 impl<'alloc, Storage> Filesystem<'alloc, Storage>
 where
@@ -192,6 +288,14 @@ where
 
         alloc
     }
+
+    pub fn with<'storage>(self, storage: &'storage mut Storage)
+    ->
+        FilesystemWith<'alloc, 'storage, Storage>
+    {
+        FilesystemWith { alloc: self.alloc, storage }
+    }
+
 
     // TODO: make this an internal method,
     // expose just `mount` and `format`.
@@ -579,7 +683,7 @@ Call [`Filesystem::read_dir`](struct.Filesystem.html#method.read_dir) and then
 ## Example
 ```
 # use littlefs2::fs::{Filesystem, File};
-# use littlefs2::prelude::*;
+# use littlefs2::io::prelude::*;
 #
 # use littlefs2::{consts, ram_storage, driver, io::Result};
 #
@@ -949,6 +1053,39 @@ impl OpenOptions {
         Error::result_from(return_code)?;
         Ok(file)
     }
+
+    /// Open the file with the options previously specified, keeping references.
+    pub fn open_with<'falloc, 'fs, 'fsalloc, 'storage, S, P>(
+        &self,
+        path: P,
+        // attributes: Option<&mut [Attribute<S>]>,
+        alloc: &'falloc mut FileAllocation<S>,
+        fs_with: &'fs mut FilesystemWith<'fsalloc, 'storage, S>,
+    ) ->
+        Result<FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>>
+    where
+        P: Into<Path<S>>,
+        S: driver::Storage,
+        <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+        <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+        // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
+        <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+    {
+        // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
+
+        let return_code = unsafe { ll::lfs_file_opencfg(
+                &mut fs_with.alloc.state,
+                &mut alloc.state,
+                &path.into() as *const _  as *const cty::c_char,
+                self.0.bits() as i32,
+                &alloc.config,
+        ) };
+
+        let file_with = FileWith { alloc, fs_with };
+
+        Error::result_from(return_code).map(|_| file_with)
+    }
 }
 
 /** Enumeration of possible methods to seek within an I/O object.
@@ -1033,6 +1170,105 @@ where
 {
     alloc: &'falloc mut FileAllocation<S>,
 }
+
+pub struct FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    alloc: &'falloc mut FileAllocation<S>,
+    fs_with: &'fs mut FilesystemWith<'fsalloc, 'storage, S>,
+}
+
+impl<'falloc, 'fs, 'fsalloc, 'storage, S> FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+    // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    pub fn open<P>(
+        path: P,
+        alloc: &'falloc mut FileAllocation<S>,
+        fs_with: &'fs mut FilesystemWith<'fsalloc, 'storage, S>,
+    ) ->
+        Result<Self>
+    where
+        P: Into<Path<S>>,
+    {
+        OpenOptions::new()
+            .read(true)
+            .open_with(path, alloc, fs_with)
+    }
+
+    pub fn create<P>(
+        path: P,
+        alloc: &'falloc mut FileAllocation<S>,
+        fs_with: &'fs mut FilesystemWith<'fsalloc, 'storage, S>,
+    ) ->
+        Result<Self>
+    where
+        P: Into<Path<S>>,
+    {
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open_with(path, alloc, fs_with)
+    }
+
+    /// Sync the file and drop it.
+    /// NB: `std::fs` does not have this, just drops at end of scope.
+    pub fn close(self) ->
+        Result<()>
+    {
+        // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_file_close(
+            &mut self.fs_with.alloc.state,
+            &mut self.alloc.state,
+        ) };
+        Error::result_from(return_code)
+    }
+
+    /// Synchronize file contents to storage.
+    pub fn sync(&mut self) -> Result<()> {
+        // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_file_sync(
+            &mut self.fs_with.alloc.state,
+            &mut self.alloc.state,
+        ) };
+        Error::result_from(return_code)
+    }
+
+    /// Size of the file in bytes.
+    pub fn len(&mut self) -> Result<usize> {
+        // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_file_size(
+            &mut self.fs_with.alloc.state,
+            &mut self.alloc.state
+        ) };
+        Error::usize_result_from(return_code)
+    }
+
+    /// Truncates or extends the underlying file, updating the size of this file to become size.
+    ///
+    /// If the size is less than the current file's size, then the file will be shrunk. If it is
+    /// greater than the current file's size, then the file will be extended to size and have all
+    /// of the intermediate data filled in with 0s.
+    pub fn set_len(&mut self, size: usize) -> Result<()> {
+        // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_file_truncate(
+            &mut self.fs_with.alloc.state,
+            &mut self.alloc.state,
+            size as u32,
+        ) };
+        Error::result_from(return_code)
+    }
+
+}
+
 
 bitflags! {
     /// Definition of file open flags which can be mixed and matched as appropriate. These definitions
@@ -1267,6 +1503,45 @@ where
     }
 }
 
+impl<'falloc, 'fs, 'fsalloc, 'storage, S> io::ReadWith
+for FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        let return_code = unsafe { ll::lfs_file_read(
+            &mut self.fs_with.alloc.state,
+            &mut self.alloc.state,
+            buf.as_mut_ptr() as *mut cty::c_void,
+            buf.len() as u32,
+        ) };
+        Error::usize_result_from(return_code)
+    }
+}
+
+impl<'falloc, 'fs, 'fsalloc, 'storage, S> io::WriteWith
+for FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
+where
+    S: driver::Storage,
+    'fsalloc: 'falloc,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        let return_code = unsafe { ll::lfs_file_write(
+            &mut self.fs_with.alloc.state,
+            &mut self.alloc.state,
+            buf.as_ptr() as *const cty::c_void,
+            buf.len() as u32,
+        ) };
+        Error::usize_result_from(return_code)
+    }
+
+    fn flush(&mut self) -> Result<()> { Ok(()) }
+}
+
 impl<'falloc, 'fsalloc, S> io::Write<'fsalloc, S> for File<'falloc, S>
 where
     S: driver::Storage,
@@ -1300,6 +1575,25 @@ where
         Result<()>
     {
         Ok(())
+    }
+}
+
+impl<'falloc, 'fs, 'fsalloc, 'storage, S> io::SeekWith
+for FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
+where
+    S: driver::Storage,
+    'fsalloc: 'falloc,
+    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
+    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+{
+    fn seek(&mut self, pos: SeekFrom) -> Result<usize> {
+        let return_code = unsafe { ll::lfs_file_seek(
+            &mut self.fs_with.alloc.state,
+            &mut self.alloc.state,
+            pos.off(),
+            pos.whence(),
+        ) };
+        Error::usize_result_from(return_code)
     }
 }
 

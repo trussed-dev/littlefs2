@@ -29,6 +29,16 @@ version = "0.1.2"
 # branch = "main"
 # path = "../littlefs2-sys"
 
+[dev-dependencies]
+desse = "0.2.1"
+# heapless = "0.5.1"
+ssmarshal = "1"
+# serde = { version = "1", features = ["derive"], default-features = false }
+# serde = { version = "1", features = ["derive"] }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+# serde_cbor = { version = "0.10.2", default-features = false }
+# serde-json-core = { version = "0.1.0" }
+
 [features]
 # enable assertions in backend C code
 ll-assertions = ["littlefs2-sys/assertions"]

@@ -4,7 +4,9 @@ use crate::{
     fs::{
         Attribute,
         File,
+        FileWith,
         Filesystem,
+        FilesystemWith,
         OpenOptions,
         SeekFrom,
     },
@@ -12,7 +14,9 @@ use crate::{
         Error,
         Result,
         Read,
+        ReadWith,
         Write,
+        WriteWith,
         Seek,
     },
     path::Filename,
@@ -104,6 +108,45 @@ fn borrow_fs_allocation() {
     let _file = File::create("data.bin", &mut alloc_file, &mut fs, &mut storage).unwrap();
     File::create("data.bin", &mut alloc_file, &mut fs, &mut storage).unwrap();
 
+}
+
+#[test]
+fn test_fs_with() -> Result<()> {
+    let mut backend = OtherRam::default();
+    let mut storage = OtherRamStorage::new(&mut backend);
+    let mut alloc_fs = Filesystem::allocate();
+    Filesystem::format(&mut storage)?;
+    let mut fs = FilesystemWith::mount(&mut alloc_fs, &mut storage)?;
+    // let mut fs = Filesystem::mount(&mut alloc_fs, &mut storage)?.with(&mut storage);
+
+    assert_eq!(fs.total_blocks(), 512);
+    assert_eq!(fs.total_space(), 256*512);
+    // superblock
+    assert_eq!(fs.available_blocks()?, 512 - 2);
+    assert_eq!(fs.available_space()?, 130_560);
+
+    fs.create_dir("/tmp")?;       assert_eq!(fs.available_blocks()?, 512 - 4);
+    fs.create_dir("/mnt")?;       assert_eq!(fs.available_blocks()?, 512 - 6);
+    fs.rename("tmp", "mnt/tmp")?; assert_eq!(fs.available_blocks()?, 512 - 6);
+    fs.remove("/mnt/tmp")?;       assert_eq!(fs.available_blocks()?, 512 - 4);
+    fs.remove("/mnt")?;           assert_eq!(fs.available_blocks()?, 512 - 2);
+
+    let mut alloc_file = File::allocate();
+
+    let mut file = FileWith::create("/test_with.txt", &mut alloc_file, &mut fs)?;
+    assert!(file.write(&[0u8, 1, 2])? == 3);
+    file.sync()?;
+
+    let mut alloc_file = File::allocate();
+    let mut file = FileWith::open("/test_with.txt", &mut alloc_file, &mut fs)?;
+    let mut buf = [0u8; 3];
+    assert_eq!(file.read(&mut buf)?, 3);
+    assert_eq!(&buf, &[0, 1, 2]);
+
+    // surprise surprise, inline files!
+    assert_eq!(fs.available_blocks()?, 512 - 2);
+
+    Ok(())
 }
 
 #[test]
