@@ -4,8 +4,6 @@ pub mod prelude;
 
 use littlefs2_sys as ll;
 
-use generic_array::ArrayLength;
-
 use crate::{
     fs::{
         Filesystem,
@@ -15,12 +13,7 @@ use crate::{
 };
 
 /// The `Read` trait allows for reading bytes from a file.
-pub trait Read<'alloc, S>
-where
-    S: Storage,
-    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
+pub trait Read<'alloc, S: Storage> {
     /// Read at most buf.len() bytes.
     /// Upon success, return how many bytes were read.
     fn read(
@@ -84,12 +77,7 @@ By analogy with `std::io::Write`, we also define a `flush()`
 method. In the current implementation, writes are final and
 flush has no effect.
 */
-pub trait Write<'alloc, S>
-where
-    S: Storage,
-    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
+pub trait Write<'alloc, S: Storage> {
     /// Write at most data.len() bytes.
     /// The file will not necessarily be updated unless
     /// flush is called as there is a cache.
@@ -126,11 +114,7 @@ pub trait WriteWith {
 
 It is possible to seek relative to either end or the current offset.
 */
-pub trait Seek<'alloc, S>
-where
-    S: Storage,
-    <S as Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
+pub trait Seek<'alloc, S: Storage>
 {
     /// Seek to an offset in bytes.
     /// If successful, returns the new position from start of file.

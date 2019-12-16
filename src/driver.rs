@@ -1,5 +1,6 @@
 //! The `Storage`, `Read`, `Write` and `Seek` driver.
 
+use generic_array::ArrayLength;
 use littlefs2_sys as ll;
 
 use crate::{
@@ -48,13 +49,13 @@ pub trait Storage {
     /// littlefs uses a read cache, a write cache, and one cache per per file.
     /// Must be a multiple of `READ_SIZE` and `WRITE_SIZE`.
     /// Must be a factor of `BLOCK_SIZE`.
-    type CACHE_SIZE;
+    type CACHE_SIZE: ArrayLength<u8>;
 
     /// littlefs itself has a `LOOKAHEAD_SIZE`, which must be a multiple of 8,
     /// as it stores data in a bitmap. It also asks for 4-byte aligned buffers.
     /// Hence, we further restrict `LOOKAHEAD_SIZE` to be a multiple of 32.
     /// Our LOOKAHEADWORDS_SIZE is this multiple.
-    type LOOKAHEADWORDS_SIZE;
+    type LOOKAHEADWORDS_SIZE: ArrayLength<u32>;
 
     /// Maximum length of a filename plus one. Stored in superblock.
     /// Should default to 255+1, but associated type defaults don't exist currently.
@@ -62,13 +63,13 @@ pub trait Storage {
     ///
     /// TODO: We can't actually change this - need to pass on as compile flag
     /// to the C backend.
-    type FILENAME_MAX_PLUS_ONE;
+    type FILENAME_MAX_PLUS_ONE: ArrayLength<u8>;
 
     /// Maximum length of a path plus one. Necessary to convert Rust string slices
     /// to C strings, which requires an allocation for the terminating
     /// zero-byte. If in doubt, set to `FILENAME_MAX_PLUS_ONE`.
     /// Must be larger than `FILENAME_MAX_PLUS_ONE`.
-    type PATH_MAX_PLUS_ONE;
+    type PATH_MAX_PLUS_ONE: ArrayLength<u8>;
 
     /// Maximum size of file. Stored in superblock.
     /// Defaults to 2_147_483_647 (or u31, to avoid sign issues in the C code).
@@ -84,7 +85,7 @@ pub trait Storage {
     ///
     /// TODO: We can't actually change this - need to pass on as compile flag
     /// to the C backend.
-    type ATTRBYTES_MAX;
+    type ATTRBYTES_MAX: ArrayLength<u8>;
 
     /// Read data from the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of READ_SIZE.

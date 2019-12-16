@@ -28,19 +28,13 @@ use bitflags::bitflags;
 use littlefs2_sys as ll;
 
 use generic_array::{
-    ArrayLength,
     GenericArray,
     typenum::marker_traits::Unsigned as _,
 };
 
 /// The three global buffers used by LittleFS
 // #[derive(Debug)]
-struct Buffers<Storage>
-where
-    Storage: driver::Storage,
-    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
+struct Buffers<Storage: driver::Storage> {
     read: GenericArray<u8, Storage::CACHE_SIZE>,
     write: GenericArray<u8, Storage::CACHE_SIZE>,
     // must be 4-byte aligned, hence the `u32`s
@@ -49,12 +43,7 @@ where
 
 /// The state of a `Filesystem`. Pre-allocate with `Filesystem::allocate`.
 // #[derive(Debug)]
-pub struct FilesystemAllocation<Storage>
-where
-    Storage: driver::Storage,
-    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
+pub struct FilesystemAllocation<Storage: driver::Storage> {
     buffers: Buffers<Storage>,
     pub(crate) state: ll::lfs_t,
     pub(crate) config: ll::lfs_config,
@@ -76,21 +65,11 @@ To actually read and write files, use the methods of [`File`](struct.File.html).
 
 */
 // #[derive(Debug)]
-pub struct Filesystem<'alloc, Storage>
-where
-    Storage: driver::Storage,
-    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
+pub struct Filesystem<'alloc, Storage: driver::Storage> {
     pub(crate) alloc: &'alloc mut FilesystemAllocation<Storage>,
 }
 
-pub struct FilesystemWith<'alloc, 'storage, Storage>
-where
-    Storage: driver::Storage,
-    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
+pub struct FilesystemWith<'alloc, 'storage, Storage: driver::Storage> {
     pub(crate) alloc: &'alloc mut FilesystemAllocation<Storage>,
     // TODO: remove
     #[allow(dead_code)]
@@ -102,11 +81,6 @@ impl<'alloc, 'storage, Storage> FilesystemWith<'alloc, 'storage, Storage>
 where
     Storage: driver::Storage,
     Storage: 'alloc,
-    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-    <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-    <Storage as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
 
 {
     pub fn mount(
@@ -179,11 +153,6 @@ impl<'alloc, Storage> Filesystem<'alloc, Storage>
 where
     Storage: driver::Storage,
     Storage: 'alloc,
-    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-    <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-    <Storage as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
 {
     #[allow(clippy::all)] // yes should simplify this
     pub fn allocate() -> FilesystemAllocation<Storage> {
@@ -346,11 +315,6 @@ impl<'alloc, Storage> Filesystem<'alloc, Storage>
 where
     Storage: driver::Storage,
     Storage: 'alloc,
-    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-    <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <Storage as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-    <Storage as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
 {
     // According to documentation, does nothing besides releasing resources.
     // We have drop for that!
@@ -589,21 +553,13 @@ where
 /// Use [`Filesystem::attribute`](struct.Filesystem.html#method.attribute),
 /// [`Filesystem::set_attribute`](struct.Filesystem.html#method.set_attribute), and
 /// [`Filesystem::clear_attribute`](struct.Filesystem.html#method.clear_attribute).
-pub struct Attribute<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
-{
+pub struct Attribute<S: driver::Storage> {
     id: u8,
     data: GenericArray<u8, S::ATTRBYTES_MAX>,
     size: usize,
 }
 
-impl<S> Attribute<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
-{
+impl<S: driver::Storage> Attribute<S> {
     pub fn new(id: u8) -> Self {
         Attribute {
             id,
@@ -636,20 +592,12 @@ where
 /// Item of the directory iterator on [`ReadDirWith`](struct.ReadDirWith.html) and directory
 /// pseudo-iterator on [`ReadDir`](struct.ReadDir.html).
 #[derive(Clone,Debug,PartialEq)]
-pub struct DirEntry<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-{
+pub struct DirEntry<S: driver::Storage> {
     file_name: Filename<S>,
     metadata: Metadata,
 }
 
-impl<S> DirEntry<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-{
+impl<S: driver::Storage> DirEntry<S> {
     // // Returns the full path to the file that this entry represents.
     // pub fn path(&self) -> Path {}
 
@@ -729,31 +677,16 @@ assert_eq!(
 pub struct ReadDirWith<'alloc, 'fs, 'storage, S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     read_dir: ReadDir<S>,
     fs: &'fs mut Filesystem<'alloc, S>,
     storage: &'storage mut S,
 }
 
-impl<'alloc, 'fs, 'storage, S> ReadDirWith<'alloc, 'fs, 'storage, S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
-{
-}
-
 impl<'alloc, 'fs, 'storage, S> Iterator
 for ReadDirWith<'alloc, 'fs, 'storage, S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     type Item = Result<DirEntry<S>>;
 
@@ -779,9 +712,6 @@ where
 impl<S> ReadDir<S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     /// Temporarily bind `fs` and `storage`, to get a real
     /// [`Iterator`](https://doc.rust-lang.org/core/iter/trait.Iterator.html)
@@ -880,8 +810,6 @@ impl<'alloc, Storage> Filesystem<'alloc, Storage>
 where
     Storage: driver::Storage,
     Storage: 'alloc,
-    <Storage as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     /// C callback interface used by LittleFS to read data with the lower level system below the
     /// filesystem.
@@ -1026,10 +954,6 @@ impl OpenOptions {
         Result<File<'falloc, S>>
     where
         S: driver::Storage,
-        <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-        <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-        // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
-        <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     {
         fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
@@ -1059,10 +983,6 @@ impl OpenOptions {
         Result<FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>>
     where
         S: driver::Storage,
-        <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-        <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-        // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
-        <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
     {
         // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
@@ -1129,7 +1049,6 @@ impl SeekFrom {
 pub struct FileAllocation<S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
 {
     cache: GenericArray<u8, S::CACHE_SIZE>,
     state: ll::lfs_file_t,
@@ -1159,7 +1078,6 @@ due to the required references. Therefore, **make sure you call `File::sync` aft
 pub struct File<'falloc, S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
 {
     alloc: &'falloc mut FileAllocation<S>,
 }
@@ -1167,8 +1085,6 @@ where
 pub struct FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     alloc: &'falloc mut FileAllocation<S>,
     fs_with: &'fs mut FilesystemWith<'fsalloc, 'storage, S>,
@@ -1177,10 +1093,6 @@ where
 impl<'falloc, 'fs, 'fsalloc, 'storage, S> FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-    // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     pub fn open(
         path:  impl Into<Path<S>>,
@@ -1289,10 +1201,6 @@ bitflags! {
 impl<'falloc, S> File<'falloc, S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-    // <S as driver::Storage>::ATTRBYTES_MAX: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     pub fn allocate() -> FileAllocation<S> {
         // TODO: more checks
@@ -1465,8 +1373,6 @@ impl<'falloc, 'fsalloc, S> io::Read<'fsalloc, S> for File<'falloc, S>
 where
     S: driver::Storage,
     'fsalloc: 'falloc,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn read(
         &mut self,
@@ -1491,8 +1397,6 @@ impl<'falloc, 'fs, 'fsalloc, 'storage, S> io::ReadWith
 for FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let return_code = unsafe { ll::lfs_file_read(
@@ -1510,8 +1414,6 @@ for FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
 where
     S: driver::Storage,
     'fsalloc: 'falloc,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         let return_code = unsafe { ll::lfs_file_write(
@@ -1530,8 +1432,6 @@ impl<'falloc, 'fsalloc, S> io::Write<'fsalloc, S> for File<'falloc, S>
 where
     S: driver::Storage,
     'fsalloc: 'falloc,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn write(
         &mut self,
@@ -1567,8 +1467,6 @@ for FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
 where
     S: driver::Storage,
     'fsalloc: 'falloc,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn seek(&mut self, pos: SeekFrom) -> Result<usize> {
         let return_code = unsafe { ll::lfs_file_seek(
@@ -1585,8 +1483,6 @@ impl<'falloc, 'fsalloc, S> io::Seek<'fsalloc, S> for File<'falloc, S>
 where
     S: driver::Storage,
     'fsalloc: 'falloc,
-    <S as driver::Storage>::CACHE_SIZE: ArrayLength<u8>,
-    <S as driver::Storage>::LOOKAHEADWORDS_SIZE: ArrayLength<u32>,
 {
     fn seek(
         &mut self,
