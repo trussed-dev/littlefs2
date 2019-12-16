@@ -1,3 +1,6 @@
+// TODO: should add another backend that randomly returns less
+// data than requested, to emphasize the difference between
+// `io::Read::read` and `::read_exact`.
 /// A configurable implementation of the Storage trait in memory.
 #[macro_export]
 macro_rules! ram_storage { (

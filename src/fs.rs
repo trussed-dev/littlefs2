@@ -1219,6 +1219,11 @@ where
             .open_with(path, alloc, fs_with)
     }
 
+    pub fn borrow_filesystem<'a>(&'a mut self)
+        -> &'a mut FilesystemWith<'fsalloc, 'storage, S> {
+        &mut self.fs_with
+    }
+
     /// Sync the file and drop it.
     /// NB: `std::fs` does not have this, just drops at end of scope.
     pub fn close(self) ->

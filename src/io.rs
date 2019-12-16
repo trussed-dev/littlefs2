@@ -29,6 +29,29 @@ where
         storage: &mut S,
         buf: &mut [u8],
     ) -> Result<usize>;
+
+    fn read_exact(
+        &mut self,
+        fs: &mut Filesystem<'alloc, S>,
+        storage: &mut S,
+        mut buf: &mut [u8],
+    ) -> Result<()>
+    {
+        while !buf.is_empty() {
+            match self.read(fs, storage, buf) {
+                Ok(0) => break,
+                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; },
+                Err(e) => return Err(e),
+            }
+        }
+
+        if !buf.is_empty() {
+            // TODO: better error
+            Err(Error::Io)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// The `ReadWith` trait allows for reading bytes from a file.
@@ -36,6 +59,23 @@ pub trait ReadWith {
     /// Read at most buf.len() bytes.
     /// Upon success, return how many bytes were read.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
+
+    fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<()> {
+        while !buf.is_empty() {
+            match self.read(buf) {
+                Ok(0) => break,
+                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; },
+                Err(e) => return Err(e),
+            }
+        }
+
+        if !buf.is_empty() {
+            // TODO: better error
+            Err(Error::Io)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /** The `Write` trait allows for writing bytes to a file.

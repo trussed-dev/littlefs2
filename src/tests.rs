@@ -140,7 +140,11 @@ fn test_fs_with() -> Result<()> {
     let mut alloc_file = File::allocate();
     let mut file = FileWith::open("/test_with.txt", &mut alloc_file, &mut fs)?;
     let mut buf = [0u8; 3];
-    assert_eq!(file.read(&mut buf)?, 3);
+    {
+        let fs = file.borrow_filesystem();
+        assert_eq!(fs.available_blocks()?, 510);
+    }
+    assert!(file.read_exact(&mut buf).is_ok());
     assert_eq!(&buf, &[0, 1, 2]);
 
     // surprise surprise, inline files!
