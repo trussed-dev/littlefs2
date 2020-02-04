@@ -24,6 +24,8 @@ use crate::{
     driver,
 };
 
+// use aligned::{A4, Aligned};
+
 use bitflags::bitflags;
 use littlefs2_sys as ll;
 
@@ -48,6 +50,7 @@ pub struct FilesystemAllocation<Storage: driver::Storage> {
     pub(crate) state: ll::lfs_t,
     pub(crate) config: ll::lfs_config,
 }
+// unsafe impl<Storage: driver::Storage> Send for FilesystemAllocation<Storage> {}
 
 /** One of the main API entry points, manipulates files by [`Path`](../path/struct.Path.html)
 without opening the corresponding [`File`](struct.File.html).
@@ -146,6 +149,30 @@ where
         ) };
         Error::result_from(return_code)
     }
+
+    /// Given a path, query the filesystem to get information about a file or directory.
+    ///
+    /// To read user attributes, use
+    /// [`Filesystem::attribute`](struct.Filesystem.html#method.attribute)
+    pub fn metadata(
+        &mut self,
+        path: impl Into<Path<Storage>>,
+    ) ->
+        Result<Metadata>
+        // Result<Metadata<Storage>>
+    {
+        let mut info: ll::lfs_info = unsafe { mem::MaybeUninit::zeroed().assume_init() };
+        let return_code = unsafe {
+            ll::lfs_stat(
+                &mut self.alloc.state,
+                &path.into() as *const _ as *const cty::c_char,
+                &mut info,
+            )
+        };
+
+        Error::result_from(return_code).map(|_| info.into())
+    }
+
 }
 
 
@@ -1140,6 +1167,7 @@ where
 
     /// Synchronize file contents to storage.
     pub fn sync(&mut self) -> Result<()> {
+        // assert!(self.fs_with.alloc.config.context == self.fs_with.storage as *mut _ as *mut cty::c_void);
         // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_file_sync(
             &mut self.fs_with.alloc.state,

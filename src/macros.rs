@@ -85,6 +85,23 @@ macro_rules! ram_storage { (
             }
         }
     };
+    ($Name:ident, $Backend:ident, $bytes:expr) => {
+        ram_storage!(
+            name=$Name,
+            backend=$Backend,
+            trait=LfsStorage,
+            erase_value=0xff,
+            read_size=1,
+            write_size=1,
+            cache_size_ty=consts::U32,
+            block_size=128,
+            block_count=$bytes/128,
+            lookaheadwords_size_ty=consts::U1,
+            filename_max_plus_one_ty=consts::U256,
+            path_max_plus_one_ty=consts::U256,
+            result=LfsResult,
+        );
+    };
     (tiny) => {
         ram_storage!(
             name=RamStorage,

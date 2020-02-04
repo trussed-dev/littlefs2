@@ -16,7 +16,7 @@
   <!-- API docs -->
   <a href="https://docs.rs/littlefs2">
     <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
-      alt="main branch API docs" />
+      alt="API docs" />
   </a>
   <!-- Continuous build -->
   <a href="https://builds.sr.ht/~nickray/littlefs2">

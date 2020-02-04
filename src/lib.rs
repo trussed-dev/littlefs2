@@ -57,6 +57,8 @@ Currying with lifetime gymnastics!
 
 In the future, we may extend this approach to other operations, thus adding a secondary API layer.
 
+<https://play.rust-lang.org/?edition=2018&gist=c86abf99fc87551cfe3136e398a45d19>
+
 Separately, keeping track of the allocations is a chore, we hope that
 [`Pin`](https://doc.rust-lang.org/core/pin/index.html) magic will help fix this.
 
