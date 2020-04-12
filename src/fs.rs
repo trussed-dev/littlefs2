@@ -16,6 +16,7 @@ use crate::{
         self,
         Error,
         Result,
+        SeekFrom,
     },
     path::{
         Filename,
@@ -27,7 +28,7 @@ use crate::{
 // use aligned::{A4, Aligned};
 
 use bitflags::bitflags;
-use littlefs2_sys as ll;
+pub use littlefs2_sys as ll;
 
 use generic_array::{
     GenericArray,
@@ -86,6 +87,15 @@ where
     Storage: 'alloc,
 
 {
+    pub fn within<R>(
+        &mut self,
+        f: impl FnOnce(&mut Filesystem<'_, Storage>, &mut Storage) -> io::Result<R>,
+    )
+        -> Result<R>
+    {
+        f(&mut Filesystem { alloc: self.alloc }, self.storage)
+    }
+
     pub fn mount(
         alloc: &'alloc mut FilesystemAllocation<Storage>,
         storage: &'storage mut Storage,
@@ -173,6 +183,95 @@ where
         Error::result_from(return_code).map(|_| info.into())
     }
 
+	/// Returns a pseudo-iterator over the entries within a directory.
+	pub fn read_dir(
+        &mut self,
+        path: impl Into<Path<Storage>>,
+    ) ->
+        Result<ReadDir<Storage>>
+    {
+        let mut read_dir = ReadDir {
+            state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
+            _storage: PhantomData,
+        };
+
+        let return_code = unsafe {
+            ll::lfs_dir_open(
+                &mut self.alloc.state,
+                &mut read_dir.state,
+                &path.into() as *const _ as *const cty::c_char,
+            )
+        };
+
+        Error::result_from(return_code).map(|_| read_dir)
+    }
+
+
+    /// Read attribute.
+    pub fn attribute(
+        &mut self,
+        path: impl Into<Path<Storage>>,
+        id: u8,
+    ) ->
+        Result<Option<Attribute<Storage>>>
+    {
+        let mut attribute = Attribute::new(id);
+        let attr_max = <Storage as driver::Storage>::ATTRBYTES_MAX::to_u32();
+
+        let return_code = unsafe { ll::lfs_getattr(
+            &mut self.alloc.state,
+            &path.into() as *const _ as *const cty::c_char,
+            id,
+            &mut attribute.data as *mut _ as *mut cty::c_void,
+            attr_max,
+        ) };
+
+        if return_code >= 0 {
+            attribute.size = cmp::min(attr_max, return_code as u32) as usize;
+            return Ok(Some(attribute));
+        }
+        if return_code == ll::lfs_error_LFS_ERR_NOATTR {
+            return Ok(None)
+        }
+
+        Error::result_from(return_code)?;
+        // TODO: get rid of this
+        unreachable!();
+    }
+
+    /// Remove attribute.
+    pub fn remove_attribute(
+        &mut self,
+        path: impl Into<Path<Storage>>,
+        id: u8,
+    ) -> Result<()> {
+        let return_code = unsafe { ll::lfs_removeattr(
+            &mut self.alloc.state,
+            &path.into() as *const _ as *const cty::c_char,
+            id,
+        ) };
+        Error::result_from(return_code)
+    }
+
+    /// Set attribute.
+    pub fn set_attribute(
+        &mut self,
+        path: impl Into<Path<Storage>>,
+        attribute: &Attribute<Storage>
+    ) ->
+        Result<()>
+    {
+        let return_code = unsafe { ll::lfs_setattr(
+            &mut self.alloc.state,
+            &path.into() as *const _ as *const cty::c_char,
+            attribute.id,
+            &attribute.data as *const _ as *const cty::c_void,
+            attribute.size as u32,
+        ) };
+
+        Error::result_from(return_code)
+    }
+
 }
 
 
@@ -186,9 +285,9 @@ where
         let read_size: u32 = Storage::READ_SIZE as _;
         let write_size: u32 = Storage::WRITE_SIZE as _;
         let block_size: u32 = Storage::BLOCK_SIZE as _;
-        let cache_size: u32 = <Storage as driver::Storage>::CACHE_SIZE::to_u32();
+        let cache_size: u32 = <Storage as driver::Storage>::CACHE_SIZE::U32;
         let lookahead_size: u32 =
-            32 * <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE::to_u32();
+            32 * <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE::U32;
         let block_cycles: i32 = Storage::BLOCK_CYCLES as _;
         let block_count: u32 = Storage::BLOCK_COUNT as _;
 
@@ -1012,6 +1111,7 @@ impl OpenOptions {
         S: driver::Storage,
     {
         // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        // fs_with.alloc.config.context = fs_with.storage as *mut _ as *mut cty::c_void;
         alloc.config.buffer = alloc.cache.as_mut_slice() as *mut _ as *mut cty::c_void;
 
         let return_code = unsafe { ll::lfs_file_opencfg(
@@ -1027,36 +1127,6 @@ impl OpenOptions {
         Error::result_from(return_code).map(|_| file_with)
     }
 }
-
-/** Enumeration of possible methods to seek within an I/O object.
-
-Use the [`Seek`](../io/trait.Seek.html) trait.
-*/
-#[derive(Clone,Copy,Debug,Eq,PartialEq)]
-pub enum SeekFrom {
-    Start(u32),
-    End(i32),
-    Current(i32),
-}
-
-impl SeekFrom {
-    pub(crate) fn off(self) -> i32 {
-        match self {
-            SeekFrom::Start(u) => u as i32,
-            SeekFrom::End(i) => i,
-            SeekFrom::Current(i) => i,
-        }
-    }
-
-    pub(crate) fn whence(self) -> i32 {
-        match self {
-            SeekFrom::Start(_) => 0,
-            SeekFrom::End(_) => 2,
-            SeekFrom::Current(_) => 1,
-        }
-    }
-}
-
 
 // /// The state of a `Dir`. Pre-allocate with `File::allocate()`.
 // pub struct DirAllocation
@@ -1117,6 +1187,13 @@ where
     fs_with: &'fs mut FilesystemWith<'fsalloc, 'storage, S>,
 }
 
+impl<S: driver::Storage> Drop for FileWith<'_, '_, '_, '_, S> {
+    fn drop(&mut self) {
+        self.nonconsuming_close_for_drop().expect("could not close FileWith");
+    }
+}
+
+
 impl<'falloc, 'fs, 'fsalloc, 'storage, S> FileWith<'falloc, 'fs, 'fsalloc, 'storage, S>
 where
     S: driver::Storage,
@@ -1165,9 +1242,20 @@ where
         Error::result_from(return_code)
     }
 
+    pub fn nonconsuming_close_for_drop(&mut self) ->
+        Result<()>
+    {
+        // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        let return_code = unsafe { ll::lfs_file_close(
+            &mut self.fs_with.alloc.state,
+            &mut self.alloc.state,
+        ) };
+        Error::result_from(return_code)
+    }
+
     /// Synchronize file contents to storage.
     pub fn sync(&mut self) -> Result<()> {
-        // assert!(self.fs_with.alloc.config.context == self.fs_with.storage as *mut _ as *mut cty::c_void);
+        assert!(self.fs_with.alloc.config.context == self.fs_with.storage as *mut _ as *mut cty::c_void);
         // fs.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_file_sync(
             &mut self.fs_with.alloc.state,
@@ -1235,17 +1323,20 @@ where
         let cache_size: u32 = <S as driver::Storage>::CACHE_SIZE::to_u32();
         debug_assert!(cache_size > 0);
 
-        let config = ll::lfs_file_config {
-            buffer: core::ptr::null_mut(),
-            attrs: core::ptr::null_mut(),
-            attr_count: 0,
-        };
+        // let config = ll::lfs_file_config {
+        //     buffer: core::ptr::null_mut(),
+        //     attrs: core::ptr::null_mut(),
+        //     attr_count: 0,
+        // };
 
-        FileAllocation {
-            cache: Default::default(),
-            state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
-            config,
-        }
+        // FileAllocation {
+        //     cache: Default::default(),
+        //     state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
+        //     config,
+        // }
+
+        // does not help with our variation on https://github.com/ARMmbed/littlefs/issues/145
+        unsafe { mem::MaybeUninit::zeroed().assume_init() }
     }
 
     pub fn open<'fsalloc: 'falloc>(

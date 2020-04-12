@@ -3,11 +3,11 @@
 pub mod prelude;
 
 use littlefs2_sys as ll;
+use ufmt::derive::uDebug;
 
 use crate::{
     fs::{
         Filesystem,
-        SeekFrom,
     },
     driver::Storage,
 };
@@ -108,6 +108,48 @@ pub trait WriteWith {
     /// Write out all pending writes to storage.
     fn flush(&mut self) -> Result<()>;
 
+    fn write_all(&mut self, mut buf: &[u8]) -> Result<()> {
+        while !buf.is_empty() {
+            match self.write(buf) {
+                Ok(0) => {
+                    // failed to write whole buffer
+                    return Err(Error::Io)
+                }
+                Ok(n) => buf = &buf[n..],
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
+    }
+}
+
+/** Enumeration of possible methods to seek within an I/O object.
+
+Use the [`Seek`](../io/trait.Seek.html) trait.
+*/
+#[derive(Clone,Copy,Debug,Eq,PartialEq)]
+pub enum SeekFrom {
+    Start(u32),
+    End(i32),
+    Current(i32),
+}
+
+impl SeekFrom {
+    pub(crate) fn off(self) -> i32 {
+        match self {
+            SeekFrom::Start(u) => u as i32,
+            SeekFrom::End(i) => i,
+            SeekFrom::Current(i) => i,
+        }
+    }
+
+    pub(crate) fn whence(self) -> i32 {
+        match self {
+            SeekFrom::Start(_) => 0,
+            SeekFrom::End(_) => 2,
+            SeekFrom::Current(_) => 1,
+        }
+    }
 }
 
 /** The `Seek` trait provides a cursor which can be moved within a file.
@@ -135,7 +177,7 @@ pub trait SeekWith {
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Definition of errors that might be returned by filesystem functionality.
-#[derive(Clone,Copy,Debug,PartialEq)]
+#[derive(Clone,Copy,Debug,PartialEq,uDebug)]
 pub enum Error {
     /// Input / output error occurred.
     Io,
