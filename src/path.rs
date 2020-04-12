@@ -66,19 +66,23 @@ where
     // pub fn new<F: AsRef<[u8]> + ?Sized>(f: &F) -> Self {
     pub fn new(f: &[u8]) -> Self {
         let mut padded_filename: GenericArray<u8, S::FILENAME_MAX_PLUS_ONE> = Default::default();
-        let name_max = <S as driver::Storage>::FILENAME_MAX_PLUS_ONE::to_usize();
+        let name_max = <S as driver::Storage>::FILENAME_MAX_PLUS_ONE::USIZE;
         // let len = cmp::min(name_max - 1, f.as_ref().len());
         // padded_filename[..len].copy_from_slice(&f.as_ref()[..len]);
         let len = cmp::min(name_max - 1, f.len());
         padded_filename[..len].copy_from_slice(&f[..len]);
         Filename(padded_filename)
     }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 /// A slice of a specification of the location of a [`File`](../fs/struct.File.html).
 ///
 /// This module is rather incomplete, compared to `std::path`.
-pub struct Path<S> (GenericArray<u8, S::PATH_MAX_PLUS_ONE>)
+pub struct Path<S> (pub(crate) GenericArray<u8, S::PATH_MAX_PLUS_ONE>)
 where
     S: driver::Storage,
     <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
@@ -94,6 +98,16 @@ where
         let mut cloned: GenericArray<u8, S::PATH_MAX_PLUS_ONE> = Default::default();
         cloned.copy_from_slice(&self.0);
         Path(cloned)
+    }
+}
+
+impl<S> PartialEq for Path<S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
     }
 }
 
@@ -116,7 +130,7 @@ where
     /// Silently truncates to maximum configured path length
     pub fn new<P: AsRef<[u8]> + ?Sized>(p: &P) -> Self {
         let mut padded_path: GenericArray<u8, S::PATH_MAX_PLUS_ONE> = Default::default();
-        let name_max = <S as driver::Storage>::PATH_MAX_PLUS_ONE::to_usize();
+        let name_max = <S as driver::Storage>::PATH_MAX_PLUS_ONE::USIZE;
         let len = cmp::min(name_max - 1, p.as_ref().len());
         padded_path[..len].copy_from_slice(&p.as_ref()[..len]);
         Path(padded_path)
@@ -133,6 +147,26 @@ where
     pub fn has_root(&self) -> bool {
         self.0.len() > 0 && self.0[0] == b'/'
     }
+
+    // what to do about possible "array-too-small" errors?
+    // what does littlefs actually do?
+    // one option would be:
+    //
+    // enum Path {
+    //   NotTruncated(RawPath),
+    //   Truncated(RawPath),
+    // }
+    //
+    // impl Deref<RawPath> for Path { ... }
+    //
+    // that is, never fail, but tag if truncation was necessary
+    // this way, no need to do error handling for the rare cases,
+    // but can still detect them
+
+    // pub fn join<P: AsRef<Path>>(&self, path: P) -> Path {
+    // }
+    // pub fn try_join<P: AsRef<Path>>(&self, path: P) -> Result<Path> {
+    // }
 }
 
 impl<S> From<&str> for Path<S>

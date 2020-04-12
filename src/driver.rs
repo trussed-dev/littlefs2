@@ -1,4 +1,5 @@
 //! The `Storage`, `Read`, `Write` and `Seek` driver.
+#![allow(non_camel_case_types)]
 
 use generic_array::ArrayLength;
 use littlefs2_sys as ll;
@@ -56,6 +57,7 @@ pub trait Storage {
     /// Hence, we further restrict `LOOKAHEAD_SIZE` to be a multiple of 32.
     /// Our LOOKAHEADWORDS_SIZE is this multiple.
     type LOOKAHEADWORDS_SIZE: ArrayLength<u32>;
+    // type LOOKAHEAD_SIZE: ArrayLength<u8>;
 
     /// Maximum length of a filename plus one. Stored in superblock.
     /// Should default to 255+1, but associated type defaults don't exist currently.

@@ -114,6 +114,8 @@ pub mod macros;
 pub mod driver;
 
 pub mod fs;
+#[cfg(feature = "closures")]
+pub mod fsc;
 pub mod io;
 pub mod path;
 
