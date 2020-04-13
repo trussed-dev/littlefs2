@@ -314,6 +314,36 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         self.remove(path)
     }
 
+    /// TODO: This method fails if some `println!` calls are removed.
+    /// Whyy?
+    #[cfg(feature = "dir-entry-path")]
+    pub fn remove_dir_all(&self, path: impl Into<Path<Storage>>) -> Result<()> {
+        let path: Path<_> = path.into();
+        #[cfg(test)] println!(":: remove_dir_all({:?})", &path);
+        self.read_dir_and_then(path.clone(), |read_dir| {
+            for (i, entry) in read_dir.enumerate() {
+                let entry = entry?;
+                // skip "." and ".."
+                if i < 2 {
+                    #[cfg(test)] println!("skipping {:?}", entry.path());
+                    continue;
+                }
+                if entry.file_type().is_file() {
+                    #[cfg(test)] println!("removing file {:?}", entry.path());
+                    self.remove(entry.path())?;
+                }
+                if entry.file_type().is_dir() {
+                    #[cfg(test)] println!("recursing into directory {:?}", entry.path());
+                    self.remove_dir_all(entry.path())?;
+                }
+            }
+            Ok(())
+        })?;
+        #[cfg(test)] println!("removing directory {:?}", path);
+        self.remove_dir(path)?;
+        Ok(())
+    }
+
     /// Rename or move a file or directory.
     pub fn rename(
         &self,
@@ -1265,12 +1295,39 @@ mod tests {
                 Ok(())
             })?;
 
+            #[cfg(feature = "dir-entry-path")] {
+                println!("\nDELETION SPREE\n");
+                fs.remove_dir_all("/tmp")?;
+            }
+
             Ok(())
         }).unwrap();
 
         let mut alloc = Allocation::new();
         let fs = Filesystem::mount(&mut alloc, &mut test_storage).unwrap();
         fs.write("/z.txt", &jackson5).unwrap();
+    }
+
+    #[cfg(feature = "dir-entry-path")]
+    #[test]
+    fn remove_dir_all() {
+        let mut test_storage = TestStorage::new();
+        let jackson5 = b"ABC 123";
+        let jackson5 = &jackson5[..];
+
+        Filesystem::format(&mut test_storage).unwrap();
+        Filesystem::mount_and_then(&mut test_storage, |fs| {
+
+            fs.create_dir_all("/tmp/test")?;
+            fs.write(b"/tmp/test/a.txt".as_ref(), jackson5)?;
+            fs.write("/tmp/test/b.txt", jackson5)?;
+            fs.write("/tmp/test/c.txt", jackson5)?;
+
+            println!("\nDELETION SPREE\n");
+            fs.remove_dir_all("/tmp")?;
+
+            Ok(())
+        }).unwrap();
     }
 
     #[test]
