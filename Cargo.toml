@@ -17,7 +17,7 @@ bitflags = "1.0.4"
 cty = "0.2.1"
 generic-array = "0.13.2"
 # heapless = "0.5.1"
-heapless-bytes = { path = "../heapless-bytes", optional = true }
+# heapless-bytes = { path = "../heapless-bytes", optional = true }
 
 # Listed as regular dependency behind feature flag,
 # since dev-dependencies cannot be optional, and we
@@ -45,7 +45,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 [features]
 # default = ["closures"]
 # use experimental closure-based API
-closures = ["aligned", "heapless-bytes"]
+closures = ["aligned"] # , "heapless-bytes"]
 dir-entry-path = []
 # enable assertions in backend C code
 ll-assertions = ["littlefs2-sys/assertions"]
