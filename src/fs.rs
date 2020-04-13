@@ -132,7 +132,7 @@ where
     pub fn create_dir(&mut self, path: impl Into<Path<Storage>>) -> Result<()> {
         let return_code = unsafe { ll::lfs_mkdir(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
     }
@@ -141,7 +141,7 @@ where
     pub fn remove(&mut self, path: impl Into<Path<Storage>>) -> Result<()> {
         let return_code = unsafe { ll::lfs_remove(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
     }
@@ -154,8 +154,8 @@ where
     ) -> Result<()> {
         let return_code = unsafe { ll::lfs_rename(
             &mut self.alloc.state,
-            &from.into() as *const _ as *const cty::c_char,
-            &to.into() as *const _ as *const cty::c_char,
+            &from.into()[..] as *const _ as *const cty::c_char,
+            &to.into()[..] as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
     }
@@ -175,7 +175,7 @@ where
         let return_code = unsafe {
             ll::lfs_stat(
                 &mut self.alloc.state,
-                &path.into() as *const _ as *const cty::c_char,
+                &path.into()[..] as *const _ as *const cty::c_char,
                 &mut info,
             )
         };
@@ -199,7 +199,7 @@ where
             ll::lfs_dir_open(
                 &mut self.alloc.state,
                 &mut read_dir.state,
-                &path.into() as *const _ as *const cty::c_char,
+                &path.into()[..] as *const _ as *const cty::c_char,
             )
         };
 
@@ -220,7 +220,7 @@ where
 
         let return_code = unsafe { ll::lfs_getattr(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
             id,
             &mut attribute.data as *mut _ as *mut cty::c_void,
             attr_max,
@@ -247,7 +247,7 @@ where
     ) -> Result<()> {
         let return_code = unsafe { ll::lfs_removeattr(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
             id,
         ) };
         Error::result_from(return_code)
@@ -263,7 +263,7 @@ where
     {
         let return_code = unsafe { ll::lfs_setattr(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
             attribute.id,
             &attribute.data as *const _ as *const cty::c_void,
             attribute.size as u32,
@@ -494,7 +494,7 @@ where
         self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_mkdir(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
     }
@@ -506,7 +506,7 @@ where
         self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_remove(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
     }
@@ -521,8 +521,8 @@ where
         self.alloc.config.context = storage as *mut _ as *mut cty::c_void;
         let return_code = unsafe { ll::lfs_rename(
             &mut self.alloc.state,
-            &from.into() as *const _ as *const cty::c_char,
-            &to.into() as *const _ as *const cty::c_char,
+            &from.into()[..] as *const _ as *const cty::c_char,
+            &to.into()[..] as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
     }
@@ -546,7 +546,7 @@ where
         let return_code = unsafe {
             ll::lfs_stat(
                 &mut self.alloc.state,
-                &path.into() as *const _ as *const cty::c_char,
+                &path.into()[..] as *const _ as *const cty::c_char,
                 &mut info,
             )
         };
@@ -573,7 +573,7 @@ where
             ll::lfs_dir_open(
                 &mut self.alloc.state,
                 &mut read_dir.state,
-                &path.into() as *const _ as *const cty::c_char,
+                &path.into()[..] as *const _ as *const cty::c_char,
             )
         };
 
@@ -589,7 +589,7 @@ where
     //     Result<[bool; 256]>
     // {
     //     let mut attributes = [false; 256];
-    //     let path = path.into();
+    //     let path = path.into()[..];
     //     for (id, attribute_id) in attributes.iter_mut().enumerate() {
     //         *attribute_id = self.attribute(path.clone(), id as u8, storage)?.is_some();
     //     }
@@ -611,7 +611,7 @@ where
 
         let return_code = unsafe { ll::lfs_getattr(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
             id,
             &mut attribute.data as *mut _ as *mut cty::c_void,
             attr_max,
@@ -641,7 +641,7 @@ where
 
         let return_code = unsafe { ll::lfs_removeattr(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
             id,
         ) };
         Error::result_from(return_code)
@@ -659,7 +659,7 @@ where
 
         let return_code = unsafe { ll::lfs_setattr(
             &mut self.alloc.state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
             attribute.id,
             &attribute.data as *const _ as *const cty::c_void,
             attribute.size as u32,
@@ -1089,7 +1089,7 @@ impl OpenOptions {
         let return_code = unsafe { ll::lfs_file_opencfg(
                 &mut fs.alloc.state,
                 &mut file.alloc.state,
-                &path.into() as *const _  as *const cty::c_char,
+                &path.into()[..] as *const _  as *const cty::c_char,
                 self.0.bits() as i32,
                 &file.alloc.config,
         ) };
@@ -1117,7 +1117,7 @@ impl OpenOptions {
         let return_code = unsafe { ll::lfs_file_opencfg(
                 &mut fs_with.alloc.state,
                 &mut alloc.state,
-                &path.into() as *const _  as *const cty::c_char,
+                &path.into()[..] as *const _  as *const cty::c_char,
                 self.0.bits() as i32,
                 &alloc.config,
         ) };
