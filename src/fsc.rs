@@ -643,6 +643,15 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     /// Not doing this is UB, which is why we have all the closure-based APIs.
     ///
     /// TODO: check if this can be closed >1 times, if so make it safe
+    ///
+    /// Update: It seems like there's an assertion on a flag called `LFS_F_OPENED`:
+    /// https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2549
+    /// https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2566
+    ///
+    /// - On second call, shouldn't find ourselves in the "mlist of mdirs"
+    /// - Since we don't have dynamically allocated buffers, at least we don't hit the double-free.
+    /// - Not sure what happens in `lfs_file_sync`, but it should be easy to just error on
+    ///   not LFS_F_OPENED...
     pub unsafe fn close(self) -> Result<()>
     {
         #[cfg(test)]
@@ -759,6 +768,10 @@ impl OpenOptions {
     {
         let mut alloc = FileAllocation::new(); // lifetime 'c
         let mut file = unsafe { self.open(fs, &mut alloc, path)? };
+        // Q: what is the actually correct behaviour?
+        // E.g. if res is Ok but closing gives an error.
+        // Or if closing fails because something is broken and
+        // we'd already know that from an Err res.
         let res = f(&mut file);
         unsafe { file.close()? };
         res
@@ -998,12 +1011,18 @@ impl<'a, 'b, S: driver::Storage> ReadDir<'a, 'b, S> {
 
 impl<S: driver::Storage> ReadDir<'_, '_, S> {
     // Again, not sure if this can be called twice
-    pub unsafe fn close(self) -> Result<()>
+    // Update: This one seems to be safe to call multiple times,
+    // it just goes through the "mlist" and removes itself.
+    //
+    // Although I guess if the compiler reuses the ReadDirAllocation, and we still
+    // have an (unsafely genereated) ReadDir with that handle; on the other hand
+    // as long as ReadDir is not Copy.
+    pub /* unsafe */ fn close(self) -> Result<()>
     {
-        let return_code = ll::lfs_dir_close(
+        let return_code = unsafe { ll::lfs_dir_close(
             &mut self.fs.alloc.state,
             &mut self.alloc.state,
-        );
+        ) };
         Error::result_from(return_code)
     }
 }
@@ -1026,7 +1045,8 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let mut alloc = ReadDirAllocation::new();
         let mut read_dir = unsafe { self.read_dir(&mut alloc, path)? };
         let res = f(&mut read_dir);
-        unsafe { read_dir.close()? };
+        // unsafe { read_dir.close()? };
+        read_dir.close()?;
         res
     }
 
@@ -1202,6 +1222,13 @@ mod tests {
             fs.write("/tmp/test/b.txt", jackson5)?;
             fs.write("/tmp/test/c.txt", jackson5)?;
             println!("blocks after 3 files of size 3: {}", fs.available_blocks()?);
+
+            // Not only does this need "unsafe", but also the compiler catches
+            // the double-call of `file.close` (here, and in the closure teardown).
+            //
+            // File::create_and_then(&mut fs, "/tmp/zzz", |file| {
+            //     unsafe { file.close() }
+            // }).unwrap();
 
             fs.read_dir_and_then("/", |read_dir| {
                 for entry in read_dir {
