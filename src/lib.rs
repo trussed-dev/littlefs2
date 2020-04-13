@@ -28,6 +28,20 @@ Some complications arise due to the lack of const generics in Rust, we work arou
 with the [`generic-array`](https://lib.rs/generic-array) library, and long for the day when
 constants associated to traits will be treated as constants by the compiler.
 
+Another complication is the fact that files (and directories) need to be closed before they go out of scope,
+since the main littlefs state structure contains a linked list which would exhibit UB (undefined behaviour)
+otherwise, see [issue #3](https://github.com/nickray/littlefs2/issues/3) and
+[issue #5](https://github.com/nickray/littlefs2/issues/5). We choose *not* to call `close` in `drop` (as
+`std::fs` does), since these operations could panic if for instance `littlefs` detects Flash corruption
+(from which the application might otherwise recover).
+
+For this reason, the various `File`-related `open` methods are marked as `unsafe`.
+Instead, a closure-based API is offered (`open_and_then` and friends),
+the same is done for `Filesystem::read_dir`. Under the hood, this API first calls the unsafe constructor,
+then calls the user-supplied closure, and finally closes the object.
+
+**FOLLOWING SECTION OUT-OF-DATE**
+
 ⯈ [**The best place to start reading the API docs is here**](fs/index.html). ⯇
 
 ### Usage
