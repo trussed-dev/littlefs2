@@ -123,6 +123,31 @@ pub trait WriteWith {
     }
 }
 
+pub trait WriteClosure {
+    /// Write at most data.len() bytes.
+    /// The file will not necessarily be updated unless
+    /// flush is called as there is a cache.
+    /// Upon success, return how many bytes were written.
+    fn write(&self, data: &[u8]) -> Result<usize>;
+
+    /// Write out all pending writes to storage.
+    fn flush(&self) -> Result<()>;
+
+    fn write_all(&self, mut buf: &[u8]) -> Result<()> {
+        while !buf.is_empty() {
+            match self.write(buf) {
+                Ok(0) => {
+                    // failed to write whole buffer
+                    return Err(Error::Io)
+                }
+                Ok(n) => buf = &buf[n..],
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
+    }
+}
+
 /** Enumeration of possible methods to seek within an I/O object.
 
 Use the [`Seek`](../io/trait.Seek.html) trait.

@@ -1,6 +1,6 @@
 //! Experimental Filesystem version using closures.
 
-use core::{cmp, mem, slice};
+use core::{cell::RefCell, cmp, mem, slice};
 
 use bitflags::bitflags;
 use generic_array::typenum::marker_traits::Unsigned;
@@ -157,7 +157,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
 // one lifetime is simpler than two... hopefully should be enough
 // also consider "erasing" the lifetime completely
 pub struct Filesystem<'a, Storage: driver::Storage> {
-    alloc: &'a mut Allocation<Storage>,
+    alloc: RefCell<&'a mut Allocation<Storage>>,
     storage: &'a mut Storage,
 }
 
@@ -241,7 +241,8 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
         let alloc = &mut Allocation::new();
         let fs = Filesystem::new(alloc, storage);
-        let return_code = unsafe { ll::lfs_format(&mut fs.alloc.state, &fs.alloc.config) };
+        let mut alloc = fs.alloc.borrow_mut();
+        let return_code = unsafe { ll::lfs_format(&mut alloc.state, &alloc.config) };
         Error::result_from(return_code)
     }
 
@@ -254,22 +255,22 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         }
     }
 
-    // Can BorrowMut be implemented "unsafely" instead?
-    // This is intended to be a second option, besides `into_inner`, to
-    // get access to the Flash peripheral in Storage.
-    pub unsafe fn borrow_storage_mut(&mut self) -> &mut Storage {
-        &mut self.storage
-    }
+    // // Can BorrowMut be implemented "unsafely" instead?
+    // // This is intended to be a second option, besides `into_inner`, to
+    // // get access to the Flash peripheral in Storage.
+    // pub unsafe fn borrow_storage_mut(&mut self) -> &mut Storage {
+    //     &mut self.storage.borrow_mut()
+    // }
 
     /// This API avoids the need for using `Allocation`.
     pub fn mount_and_then<R>(
         storage: &mut Storage,
-        f: impl FnOnce(&mut Filesystem<'_, Storage>) -> Result<R>,
+        f: impl FnOnce(&Filesystem<'_, Storage>) -> Result<R>,
     ) -> Result<R> {
 
         let mut alloc = Allocation::new();
-        let mut fs = Filesystem::mount(&mut alloc, storage)?;
-        f(&mut fs)
+        let fs = Filesystem::mount(&mut alloc, storage)?;
+        f(&fs)
     }
 
     /// Total number of blocks in the filesystem
@@ -290,8 +291,8 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     ///
     /// So it would seem that there are *at least* the number of blocks returned
     /// by this method available, at any given time.
-    pub fn available_blocks(&mut self) -> Result<usize> {
-        let return_code = unsafe { ll::lfs_fs_size( &mut self.alloc.state) };
+    pub fn available_blocks(&self) -> Result<usize> {
+        let return_code = unsafe { ll::lfs_fs_size( &mut self.alloc.borrow_mut().state) };
         Error::usize_result_from(return_code).map(|blocks| self.total_blocks() - blocks)
     }
 
@@ -300,14 +301,14 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// This is a lower bound, more may be available. First, more blocks may be available as
     /// explained in [`available_blocks`](struct.Filesystem.html#method.available_blocks).
     /// Second, files may be inlined.
-    pub fn available_space(&mut self) -> Result<usize> {
+    pub fn available_space(&self) -> Result<usize> {
         self.available_blocks().map(|blocks| blocks * Storage::BLOCK_SIZE)
     }
 
     /// Remove a file or directory.
-    pub fn remove(&mut self, path: impl Into<Path<Storage>>) -> Result<()> {
+    pub fn remove(&self, path: impl Into<Path<Storage>>) -> Result<()> {
         let return_code = unsafe { ll::lfs_remove(
-            &mut self.alloc.state,
+            &mut self.alloc.borrow_mut().state,
             &path.into() as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
@@ -315,12 +316,12 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     /// Rename or move a file or directory.
     pub fn rename(
-        &mut self,
+        &self,
         from: impl Into<Path<Storage>>,
         to: impl Into<Path<Storage>>,
     ) -> Result<()> {
         let return_code = unsafe { ll::lfs_rename(
-            &mut self.alloc.state,
+            &mut self.alloc.borrow_mut().state,
             &from.into() as *const _ as *const cty::c_char,
             &to.into() as *const _ as *const cty::c_char,
         ) };
@@ -331,7 +332,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     ///
     /// To read user attributes, use
     /// [`Filesystem::attribute`](struct.Filesystem.html#method.attribute)
-    pub fn metadata(&mut self, path: impl Into<Path<Storage>>) -> Result<Metadata> {
+    pub fn metadata(&self, path: impl Into<Path<Storage>>) -> Result<Metadata> {
 
         // do *not* not call assume_init here and pass into the unsafe block.
         // strange things happen ;)
@@ -342,7 +343,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let mut info: ll::lfs_info = unsafe { mem::MaybeUninit::zeroed().assume_init() };
         let return_code = unsafe {
             ll::lfs_stat(
-                &mut self.alloc.state,
+                &mut self.alloc.borrow_mut().state,
                 &path.into() as *const _ as *const cty::c_char,
                 &mut info,
             )
@@ -353,7 +354,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     /// Read attribute.
     pub fn attribute(
-        &mut self,
+        &self,
         path: impl Into<Path<Storage>>,
         id: u8,
     ) ->
@@ -363,7 +364,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let attr_max = <Storage as driver::Storage>::ATTRBYTES_MAX::to_u32();
 
         let return_code = unsafe { ll::lfs_getattr(
-            &mut self.alloc.state,
+            &mut self.alloc.borrow_mut().state,
             &path.into() as *const _ as *const cty::c_char,
             id,
             &mut attribute.data as *mut _ as *mut cty::c_void,
@@ -385,12 +386,12 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     /// Remove attribute.
     pub fn remove_attribute(
-        &mut self,
+        &self,
         path: impl Into<Path<Storage>>,
         id: u8,
     ) -> Result<()> {
         let return_code = unsafe { ll::lfs_removeattr(
-            &mut self.alloc.state,
+            &mut self.alloc.borrow_mut().state,
             &path.into() as *const _ as *const cty::c_char,
             id,
         ) };
@@ -399,14 +400,14 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     /// Set attribute.
     pub fn set_attribute(
-        &mut self,
+        &self,
         path: impl Into<Path<Storage>>,
         attribute: &Attribute<Storage>
     ) ->
         Result<()>
     {
         let return_code = unsafe { ll::lfs_setattr(
-            &mut self.alloc.state,
+            &mut self.alloc.borrow_mut().state,
             &path.into() as *const _ as *const cty::c_char,
             attribute.id,
             &attribute.data as *const _ as *const cty::c_void,
@@ -571,7 +572,7 @@ impl<S: driver::Storage> FileAllocation<S> {
 pub struct File<'a, 'b, S: driver::Storage>
 {
     alloc: &'b mut FileAllocation<S>,
-    fs: &'b mut Filesystem<'a, S>,
+    fs: &'b Filesystem<'a, S>,
     #[cfg(test)]
     path: Path<S>,
 }
@@ -583,7 +584,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     }
 
     pub unsafe fn open(
-        fs: &'b mut Filesystem<'a, Storage>,
+        fs: &'b Filesystem<'a, Storage>,
         alloc: &'b mut FileAllocation<Storage>,
         path:  impl Into<Path<Storage>>,
     ) ->
@@ -595,7 +596,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     }
 
     pub fn open_and_then<R>(
-        fs: &mut Filesystem<'a, Storage>,
+        fs: &Filesystem<'a, Storage>,
         path: impl Into<Path<Storage>>,
         f: impl FnOnce(&mut File<'_, '_, Storage>) -> Result<R>,
     ) ->
@@ -607,7 +608,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     }
 
     pub unsafe fn create(
-        fs: &'b mut Filesystem<'a, Storage>,
+        fs: &'b Filesystem<'a, Storage>,
         alloc: &'b mut FileAllocation<Storage>,
         path:  impl Into<Path<Storage>>,
     ) ->
@@ -621,7 +622,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     }
 
     pub fn create_and_then<R>(
-        fs: &mut Filesystem<'a, Storage>,
+        fs: &Filesystem<'a, Storage>,
         path: impl Into<Path<Storage>>,
         f: impl FnOnce(&mut File<'_, '_, Storage>) -> Result<R>,
     ) ->
@@ -635,8 +636,8 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     }
 
     // Safety-hatch to experiment with missing parts of API
-    pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c mut Filesystem<'a, Storage> {
-        &mut self.fs
+    pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c Filesystem<'a, Storage> {
+        &self.fs
     }
 
     /// Sync the file and drop it from the internal linked list.
@@ -658,7 +659,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
         println!("closing file {:?}", &self.path);
 
         let return_code = ll::lfs_file_close(
-            &mut self.fs.alloc.state,
+            &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.state,
         );
         Error::result_from(return_code)
@@ -667,7 +668,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     /// Synchronize file contents to storage.
     pub fn sync(&mut self) -> Result<()> {
         let return_code = unsafe { ll::lfs_file_sync(
-            &mut self.fs.alloc.state,
+            &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.state,
         ) };
         Error::result_from(return_code)
@@ -676,7 +677,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     /// Size of the file in bytes.
     pub fn len(&mut self) -> Result<usize> {
         let return_code = unsafe { ll::lfs_file_size(
-            &mut self.fs.alloc.state,
+            &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.state
         ) };
         Error::usize_result_from(return_code)
@@ -689,7 +690,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     /// of the intermediate data filled in with 0s.
     pub fn set_len(&mut self, size: usize) -> Result<()> {
         let return_code = unsafe { ll::lfs_file_truncate(
-            &mut self.fs.alloc.state,
+            &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.state,
             size as u32,
         ) };
@@ -730,7 +731,7 @@ impl OpenOptions {
     ///   Drop and panic if something went wrong.
     pub unsafe fn open<'a, 'b, S: driver::Storage>(
         &self,
-        fs: &'b mut Filesystem<'a, S>,
+        fs: &'b Filesystem<'a, S>,
         alloc: &'b mut FileAllocation<S>,
         path: impl Into<Path<S>>,
     ) ->
@@ -740,7 +741,7 @@ impl OpenOptions {
         let path = path.into();
 
         let return_code = ll::lfs_file_opencfg(
-                &mut fs.alloc.state,
+                &mut fs.alloc.borrow_mut().state,
                 &mut alloc.state,
                 &path as *const _  as *const cty::c_char,
                 self.0.bits() as i32,
@@ -760,7 +761,7 @@ impl OpenOptions {
     /// (Hopefully) safe abstraction around `open`.
     pub fn open_and_then<'a, R, S: driver::Storage>(
         &self,
-        fs: &mut Filesystem<'a, S>,
+        fs: &Filesystem<'a, S>,
         path: impl Into<Path<S>>,
         f: impl FnOnce(&mut File<'a, '_, S>) -> Result<R>,
     )
@@ -841,7 +842,7 @@ impl<S: driver::Storage> io::ReadWith for File<'_, '_, S>
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let return_code = unsafe { ll::lfs_file_read(
-            &mut self.fs.alloc.state,
+            &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.state,
             buf.as_mut_ptr() as *mut cty::c_void,
             buf.len() as u32,
@@ -854,7 +855,7 @@ impl<S: driver::Storage> io::SeekWith for File<'_, '_, S>
 {
     fn seek(&mut self, pos: SeekFrom) -> Result<usize> {
         let return_code = unsafe { ll::lfs_file_seek(
-            &mut self.fs.alloc.state,
+            &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.state,
             pos.off(),
             pos.whence(),
@@ -867,7 +868,7 @@ impl<S: driver::Storage> io::WriteWith for File<'_, '_, S>
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         let return_code = unsafe { ll::lfs_file_write(
-            &mut self.fs.alloc.state,
+            &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.state,
             buf.as_ptr() as *const cty::c_void,
             buf.len() as u32,
@@ -949,7 +950,7 @@ impl ReadDirAllocation {
 pub struct ReadDir<'a, 'b, S: driver::Storage>
 {
     alloc: &'b mut ReadDirAllocation,
-    fs: &'b mut Filesystem<'a, S>,
+    fs: &'b Filesystem<'a, S>,
     #[cfg(feature = "dir-entry-path")]
     path: Path<S>,
 }
@@ -967,7 +968,7 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S>
 
         let return_code = unsafe {
             ll::lfs_dir_read(
-                &mut self.fs.alloc.state,
+                &mut self.fs.alloc.borrow_mut().state,
                 &mut self.alloc.state,
                 &mut info,
             )
@@ -1004,8 +1005,8 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S>
 impl<'a, 'b, S: driver::Storage> ReadDir<'a, 'b, S> {
 
     // Safety-hatch to experiment with missing parts of API
-    pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c mut Filesystem<'a, S> {
-        &mut self.fs
+    pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c Filesystem<'a, S> {
+        &self.fs
     }
 }
 
@@ -1020,7 +1021,7 @@ impl<S: driver::Storage> ReadDir<'_, '_, S> {
     pub /* unsafe */ fn close(self) -> Result<()>
     {
         let return_code = unsafe { ll::lfs_dir_close(
-            &mut self.fs.alloc.state,
+            &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.state,
         ) };
         Error::result_from(return_code)
@@ -1037,7 +1038,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     //     f: impl FnOnce(&mut File<'_, '_, S>) -> Result<R>,
     // )
     pub fn read_dir_and_then<R>(
-        &mut self,
+        &self,
         path: impl Into<Path<Storage>>,
         f: impl FnOnce(&mut ReadDir<'_, '_, Storage>) -> Result<R>,
     ) -> Result<R>
@@ -1054,7 +1055,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     ///
     /// This is unsafe since it can induce UB just like File::open.
 	pub unsafe fn read_dir<'b>(
-        &'b mut self,
+        &'b self,
         alloc: &'b mut ReadDirAllocation,
         path: impl Into<Path<Storage>>,
     ) ->
@@ -1063,7 +1064,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let path = path.into();
 
         let return_code = ll::lfs_dir_open(
-            &mut self.alloc.state,
+            &mut self.alloc.borrow_mut().state,
             &mut alloc.state,
             &path as *const _ as *const cty::c_char,
         );
@@ -1089,7 +1090,9 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     ) -> Result<Self> {
 
         let fs = Self::new(alloc, storage);
-        let return_code = unsafe { ll::lfs_mount(&mut fs.alloc.state, &fs.alloc.config) };
+        let mut alloc = fs.alloc.borrow_mut();
+        let return_code = unsafe { ll::lfs_mount(&mut alloc.state, &alloc.config) };
+        drop(alloc);
         Error::result_from(return_code).map(move |_| { fs } )
     }
 
@@ -1102,7 +1105,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         alloc.config.prog_buffer = &mut alloc.cache.write as *mut _ as *mut cty::c_void;
         alloc.config.lookahead_buffer = &mut alloc.cache.lookahead as *mut _ as *mut cty::c_void;
 
-        Filesystem { alloc, storage }
+        Filesystem { alloc: RefCell::new(alloc), storage }
     }
 
     /// Deconstruct `Filesystem`, intention is to allow access to
@@ -1110,21 +1113,21 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     ///
     /// See also `borrow_storage_mut`.
     pub fn into_inner(self) -> (&'a mut Allocation<Storage>, &'a mut Storage) {
-        (self.alloc, self. storage)
+        (self.alloc.into_inner(), self.storage)
     }
 
     /// Creates a new, empty directory at the provided path.
-    pub fn create_dir(&mut self, path: impl Into<Path<Storage>>) -> Result<()> {
+    pub fn create_dir(&self, path: impl Into<Path<Storage>>) -> Result<()> {
 
         let return_code = unsafe { ll::lfs_mkdir(
-            &mut self.alloc.state,
+            &mut self.alloc.borrow_mut().state,
             &path.into() as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
     }
 
     /// Recursively create a directory and all of its parent components if they are missing.
-    pub fn create_dir_all(&mut self, path: impl Into<Path<Storage>>) -> Result<()> {
+    pub fn create_dir_all(&self, path: impl Into<Path<Storage>>) -> Result<()> {
         // Placeholder implementation!
         // - Path should gain a few methods
         // - Maybe should pull in `heapless-bytes` (and merge upstream into `heapless`)
@@ -1169,7 +1172,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     /// This function will create a file if it does not exist,
     /// and will entirely replace its contents if it does.
     pub fn write(
-        &mut self,
+        &self,
         path: impl Into<Path<Storage>>,
         contents: &[u8],
     ) -> Result<()>
@@ -1183,20 +1186,20 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 
 }
 
-impl<Storage: driver::Storage> core::ops::Deref for Filesystem<'_, Storage> {
-    type Target = Storage;
+// impl<Storage: driver::Storage> core::ops::Deref for Filesystem<'_, Storage> {
+//     type Target = Storage;
 
-    fn deref(&self) -> &Self::Target {
-        self.storage
-    }
-}
+//     fn deref(&self) -> &Self::Target {
+//         &self.storage.borrow()
+//     }
+// }
 
-impl<Storage: driver::Storage> core::ops::DerefMut for Filesystem<'_, Storage> {
+// impl<Storage: driver::Storage> core::ops::DerefMut for Filesystem<'_, Storage> {
 
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.storage
-    }
-}
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.storage.borrow_mut()
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -1258,7 +1261,7 @@ mod tests {
         }).unwrap();
 
         let mut alloc = Allocation::new();
-        let mut fs = Filesystem::mount(&mut alloc, &mut test_storage).unwrap();
+        let fs = Filesystem::mount(&mut alloc, &mut test_storage).unwrap();
         fs.write("/z.txt", &jackson5).unwrap();
     }
 
@@ -1282,10 +1285,12 @@ mod tests {
                     // Do we want a way to borrow_filesystem for DirEntry?
                     // One usecase is to read data from the files iterated over.
                     //
-                    // unsafe { read_dir.borrow_filesystem() }.write(
-                    //     &entry.file_name()[..],
-                    //     b"wowee zowie"
-                    // )?;
+                    if entry.metadata.is_file() {
+                        fs.write(
+                            &entry.file_name()[..],
+                            b"wowee zowie"
+                        )?;
+                    }
                 }
                 Ok(())
             })?;
