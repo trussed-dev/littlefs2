@@ -1122,16 +1122,20 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 
     /// Read the entire contents of a file into a bytes vector.
     pub fn read<N: generic_array::ArrayLength<u8>>(
-        &'a mut self,
+        &self,
         path: impl Into<Path<Storage>>,
     )
-        -> Result<Bytes<N>>
+        -> Result<heapless::Vec<u8, N>>
     {
-        let mut contents = Bytes::default();
-        File::open_and_then(self, path, |file| {
+        let mut contents: heapless::Vec::<u8, N> = Default::default();
+        contents.resize_default(contents.capacity()).unwrap();
+        let len = File::open_and_then(self, path, |file| {
             use io::ReadClosure;
-            file.read_exact(&mut contents)
+            // let len = file.read_to_end(&mut contents)?;
+            let len = file.read(&mut contents)?;
+            Ok(len)
         })?;
+        contents.resize_default(len).unwrap();
         Ok(contents)
     }
 
@@ -1174,7 +1178,9 @@ mod tests {
 
             println!("blocks going in: {}", fs.available_blocks()?);
             fs.create_dir_all("/tmp/test")?;
-            fs.write("/tmp/test/a.t\x7fxt", jackson5)?;
+            // let weird_filename = b"/tmp/test/a.t\x7fxt";
+            // fs.write(&weird_filename[..], jackson5)?;
+            fs.write(b"/tmp/test/a.t\x7fxt".as_ref(), jackson5)?;
             fs.write("/tmp/test/b.txt", jackson5)?;
             fs.write("/tmp/test/c.txt", jackson5)?;
             println!("blocks after 3 files of size 3: {}", fs.available_blocks()?);
@@ -1215,6 +1221,8 @@ mod tests {
                             attribute.set_data(b"directory alarm");
                         } else {
                             attribute.set_data(b"ceci n'est pas une pipe");
+                            // not 100% sure this is allowed, but if seems to work :)
+                            fs.write(entry.path(), b"Alles neu macht n\xc3\xa4chstens der Mai")?;
                         }
                         fs.set_attribute(entry.path(), &attribute)?;
                     }
@@ -1224,11 +1232,35 @@ mod tests {
 
             #[cfg(feature = "dir-entry-path")]
             fs.read_dir_and_then("/tmp/test", |read_dir| {
-                for entry in read_dir {
+                for (i, entry) in read_dir.enumerate() {
                     let entry = entry?;
+                    println!("\nfile {:?}", entry.file_name());
+
+                    if entry.file_type().is_file() {
+                        let content: heapless::Vec::<u8, heapless::consts::U256> = fs.read(entry.path())?;
+                        println!("content:\n{:?}", core::str::from_utf8(&content).unwrap());
+                        // println!("and now the removal");
+                        // fs.remove(entry.path())?;
+                    }
+
                     let attribute = fs.attribute(entry.path(), 37)?.unwrap();
-                    println!("file {:?}", entry.file_name());
-                    println!("attribute 37: {:?}", core::str::from_utf8(attribute.data()).unwrap())
+                    println!("attribute 37: {:?}", core::str::from_utf8(attribute.data()).unwrap());
+
+                    // TODO: There is a problem removing the file with special name.
+                    // Not sure if I'm not understanding how Rust "strings" work, or whether
+                    // littlefs has a problem with filenames of this type.
+                    // if entry.file_type().is_file() {
+                    if entry.file_type().is_file() && i >= 2 + 1 {
+                        fs.remove(entry.path())?;
+                    }
+
+                    // // this one fails:
+                    // // - our iterator reaches it (at the end, after `c.txt`)
+                    // // - reading it fails with `NoSuchEntry`
+                    // if i == 3 {
+                    //     fs.write("/tmp/test/out-of-nowhere.txt", &[])?;
+                    // }
+
                 }
                 Ok(())
             })?;
