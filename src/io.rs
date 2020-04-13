@@ -71,6 +71,30 @@ pub trait ReadWith {
     }
 }
 
+/// The `ReadClosure` trait allows for reading bytes from a file.
+pub trait ReadClosure {
+    /// Read at most buf.len() bytes.
+    /// Upon success, return how many bytes were read.
+    fn read(&self, buf: &mut [u8]) -> Result<usize>;
+
+    fn read_exact(&self, mut buf: &mut [u8]) -> Result<()> {
+        while !buf.is_empty() {
+            match self.read(buf) {
+                Ok(0) => break,
+                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; },
+                Err(e) => return Err(e),
+            }
+        }
+
+        if !buf.is_empty() {
+            // TODO: better error
+            Err(Error::Io)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /** The `Write` trait allows for writing bytes to a file.
 
 By analogy with `std::io::Write`, we also define a `flush()`
@@ -191,6 +215,12 @@ pub trait Seek<'alloc, S: Storage>
         storage: &mut S,
         pos: SeekFrom,
     ) -> Result<usize>;
+}
+
+pub trait SeekClosure {
+    /// Seek to an offset in bytes.
+    /// If successful, returns the new position from start of file.
+    fn seek(&self, pos: SeekFrom) -> Result<usize>;
 }
 
 pub trait SeekWith {
