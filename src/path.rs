@@ -22,6 +22,17 @@ where
     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 ;
 
+impl<S> core::ops::Deref for Filename<S>
+where
+    S: driver::Storage,
+    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
+{
+    type Target = [u8];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 // to compare filename
 impl<S> cmp::PartialEq for Filename<S>
 where

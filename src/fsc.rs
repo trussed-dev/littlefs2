@@ -1263,6 +1263,39 @@ mod tests {
     }
 
     #[test]
+    fn nested() {
+        let mut test_storage = TestStorage::new();
+
+        Filesystem::format(&mut test_storage).unwrap();
+        Filesystem::mount_and_then(&mut test_storage, |fs| {
+
+            fs.write("a.txt", &[])?;
+            fs.write("b.txt", &[])?;
+            fs.write("c.txt", &[])?;
+
+            fs.read_dir_and_then(".", |read_dir| {
+                for entry in read_dir {
+                    let entry = entry?;
+                    println!("{:?}", entry.file_type());
+
+                    // The `&mut ReadDir` is not actually available here
+                    // Do we want a way to borrow_filesystem for DirEntry?
+                    // One usecase is to read data from the files iterated over.
+                    //
+                    // unsafe { read_dir.borrow_filesystem() }.write(
+                    //     &entry.file_name()[..],
+                    //     b"wowee zowie"
+                    // )?;
+                }
+                Ok(())
+            })?;
+
+            Ok(())
+        }).unwrap();
+    }
+
+
+    #[test]
     fn issue_3_original_report() {
         let mut test_storage = TestStorage::new();
 
