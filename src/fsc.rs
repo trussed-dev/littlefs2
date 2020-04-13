@@ -304,9 +304,14 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     pub fn remove(&self, path: impl Into<Path<Storage>>) -> Result<()> {
         let return_code = unsafe { ll::lfs_remove(
             &mut self.alloc.borrow_mut().state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
+    }
+
+    /// Remove a file or directory.
+    pub fn remove_dir(&self, path: impl Into<Path<Storage>>) -> Result<()> {
+        self.remove(path)
     }
 
     /// Rename or move a file or directory.
@@ -317,8 +322,8 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     ) -> Result<()> {
         let return_code = unsafe { ll::lfs_rename(
             &mut self.alloc.borrow_mut().state,
-            &from.into() as *const _ as *const cty::c_char,
-            &to.into() as *const _ as *const cty::c_char,
+            &from.into()[..] as *const _ as *const cty::c_char,
+            &to.into()[..] as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
     }
@@ -339,7 +344,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let return_code = unsafe {
             ll::lfs_stat(
                 &mut self.alloc.borrow_mut().state,
-                &path.into() as *const _ as *const cty::c_char,
+                &path.into()[..] as *const _ as *const cty::c_char,
                 &mut info,
             )
         };
@@ -360,7 +365,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
         let return_code = unsafe { ll::lfs_getattr(
             &mut self.alloc.borrow_mut().state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
             id,
             &mut attribute.data as *mut _ as *mut cty::c_void,
             attr_max,
@@ -387,7 +392,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     ) -> Result<()> {
         let return_code = unsafe { ll::lfs_removeattr(
             &mut self.alloc.borrow_mut().state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
             id,
         ) };
         Error::result_from(return_code)
@@ -403,7 +408,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     {
         let return_code = unsafe { ll::lfs_setattr(
             &mut self.alloc.borrow_mut().state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
             attribute.id,
             &attribute.data as *const _ as *const cty::c_void,
             attribute.size as u32,
@@ -568,8 +573,6 @@ pub struct File<'a, 'b, S: driver::Storage>
 {
     alloc: RefCell<&'b mut FileAllocation<S>>,
     fs: &'b Filesystem<'a, S>,
-    #[cfg(test)]
-    path: Path<S>,
 }
 
 impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
@@ -650,9 +653,6 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     ///   not LFS_F_OPENED...
     pub unsafe fn close(self) -> Result<()>
     {
-        #[cfg(test)]
-        println!("closing file {:?}", &self.path);
-
         let return_code = ll::lfs_file_close(
             &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.borrow_mut().state,
@@ -738,7 +738,7 @@ impl OpenOptions {
         let return_code = ll::lfs_file_opencfg(
                 &mut fs.alloc.borrow_mut().state,
                 &mut alloc.state,
-                &path as *const _  as *const cty::c_char,
+                &path[..] as *const _  as *const cty::c_char,
                 self.0.bits() as i32,
                 &alloc.config,
         );
@@ -746,8 +746,6 @@ impl OpenOptions {
         let file = File {
             alloc: RefCell::new(alloc),
             fs,
-            #[cfg(test)]
-            path,
         };
 
         Error::result_from(return_code).map(|_| file)
@@ -949,21 +947,22 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S>
         };
 
         if return_code > 0 {
-            #[cfg(feature = "dir-entry-path")]
-            panic!("not decided how to handle overflowing path arrays yet...");
-
             // well here we have it: nasty C strings!
             // actually... nasty C arrays with static lengths! o.O
-            let file_name = Filename::new(& unsafe { mem::transmute::<[cty::c_char; 256], [u8; 256]>(info.name) } );
-            // let buf: &mut [u8] = unsafe { slice::from_raw_parts_mut(buffer as *mut u8, size as usize) };
+            let transmuted = & unsafe { mem::transmute::<[cty::c_char; 256], [u8; 256]>(info.name) };
+            let file_name = Filename::new(transmuted);
 
             let metadata = info.into();
+
+            #[cfg(feature = "dir-entry-path")]
+            // TODO: error handling...
+            let path = self.path.try_join(&file_name).unwrap();
 
             let dir_entry = DirEntry {
                 file_name,
                 metadata,
                 #[cfg(feature = "dir-entry-path")]
-                path: self.path.clone()// / file_name
+                path,
             };
             return Some(Ok(dir_entry));
         }
@@ -1035,7 +1034,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let return_code = ll::lfs_dir_open(
             &mut self.alloc.borrow_mut().state,
             &mut alloc.state,
-            &path as *const _ as *const cty::c_char,
+            &path[..] as *const _ as *const cty::c_char,
         );
 
         let read_dir = ReadDir {
@@ -1090,7 +1089,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 
         let return_code = unsafe { ll::lfs_mkdir(
             &mut self.alloc.borrow_mut().state,
-            &path.into() as *const _ as *const cty::c_char,
+            &path.into()[..] as *const _ as *const cty::c_char,
         ) };
         Error::result_from(return_code)
     }
@@ -1175,7 +1174,7 @@ mod tests {
 
             println!("blocks going in: {}", fs.available_blocks()?);
             fs.create_dir_all("/tmp/test")?;
-            fs.write("/tmp/test/a.txt", jackson5)?;
+            fs.write("/tmp/test/a.t\x7fxt", jackson5)?;
             fs.write("/tmp/test/b.txt", jackson5)?;
             fs.write("/tmp/test/c.txt", jackson5)?;
             println!("blocks after 3 files of size 3: {}", fs.available_blocks()?);
@@ -1189,7 +1188,10 @@ mod tests {
 
             fs.read_dir_and_then("/", |read_dir| {
                 for entry in read_dir {
-                    println!("entry: {:?}", entry?.file_name());
+                    let entry: DirEntry<_> = entry?;
+                    println!("hello {:?}", entry.file_name());
+                    #[cfg(feature = "dir-entry-path")]
+                    println!("--> path = {:?}", entry.path());
                 }
                 Ok(())
             })?;
@@ -1205,8 +1207,28 @@ mod tests {
                 for entry in read_dir {
                     let entry = entry?;
                     println!("entry: {:?}", entry.file_name());
-                    // not implemented yet...
-                    // println!("path: {:?}", entry.path());
+                    #[cfg(feature = "dir-entry-path")] {
+                        println!("path: {:?}", entry.path());
+
+                        let mut attribute = Attribute::new(37);
+                        if entry.file_type().is_dir() {
+                            attribute.set_data(b"directory alarm");
+                        } else {
+                            attribute.set_data(b"ceci n'est pas une pipe");
+                        }
+                        fs.set_attribute(entry.path(), &attribute)?;
+                    }
+                }
+                Ok(())
+            })?;
+
+            #[cfg(feature = "dir-entry-path")]
+            fs.read_dir_and_then("/tmp/test", |read_dir| {
+                for entry in read_dir {
+                    let entry = entry?;
+                    let attribute = fs.attribute(entry.path(), 37)?.unwrap();
+                    println!("file {:?}", entry.file_name());
+                    println!("attribute 37: {:?}", core::str::from_utf8(attribute.data()).unwrap())
                 }
                 Ok(())
             })?;
@@ -1220,20 +1242,25 @@ mod tests {
     }
 
     #[test]
+    fn path() {
+        let _path: Path<TestStorage> = b"a.txt"[..].into();
+    }
+
+    #[test]
     fn nested() {
         let mut test_storage = TestStorage::new();
 
         Filesystem::format(&mut test_storage).unwrap();
         Filesystem::mount_and_then(&mut test_storage, |fs| {
 
-            fs.write("a.txt", &[])?;
+            fs.write("a\x7f.txt", &[])?;
             fs.write("b.txt", &[])?;
             fs.write("c.txt", &[])?;
 
             fs.read_dir_and_then(".", |read_dir| {
                 for entry in read_dir {
                     let entry = entry?;
-                    println!("{:?}", entry.file_type());
+                    println!("{:?}", entry.file_name());
 
                     // The `&mut ReadDir` is not actually available here
                     // Do we want a way to borrow_filesystem for DirEntry?
