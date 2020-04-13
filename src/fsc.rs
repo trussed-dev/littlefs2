@@ -552,6 +552,144 @@ bitflags! {
     }
 }
 
+/// The state of a `File`. Pre-allocate with `File::allocate`.
+pub struct FileAllocation<S: driver::Storage>
+{
+    cache: Bytes<S::CACHE_SIZE>,
+    state: ll::lfs_file_t,
+    config: ll::lfs_file_config,
+}
+
+impl<S: driver::Storage> FileAllocation<S> {
+    pub fn new() -> Self {
+        let cache_size: u32 = <S as driver::Storage>::CACHE_SIZE::to_u32();
+        debug_assert!(cache_size > 0);
+        unsafe { mem::MaybeUninit::zeroed().assume_init() }
+    }
+}
+
+pub struct File<'a, 'b, S: driver::Storage>
+{
+    alloc: &'b mut FileAllocation<S>,
+    fs: &'b mut Filesystem<'a, S>,
+    #[cfg(test)]
+    path: Path<S>,
+}
+
+impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
+{
+    pub fn allocate() -> FileAllocation<Storage> {
+        FileAllocation::new()
+    }
+
+    pub unsafe fn open(
+        fs: &'b mut Filesystem<'a, Storage>,
+        alloc: &'b mut FileAllocation<Storage>,
+        path:  impl Into<Path<Storage>>,
+    ) ->
+        Result<Self>
+    {
+        OpenOptions::new()
+            .read(true)
+            .open(fs, alloc, path)
+    }
+
+    pub fn open_and_then<R>(
+        fs: &mut Filesystem<'a, Storage>,
+        path: impl Into<Path<Storage>>,
+        f: impl FnOnce(&mut File<'_, '_, Storage>) -> Result<R>,
+    ) ->
+        Result<R>
+    {
+        OpenOptions::new()
+            .read(true)
+            .open_and_then(fs, path, f)
+    }
+
+    pub unsafe fn create(
+        fs: &'b mut Filesystem<'a, Storage>,
+        alloc: &'b mut FileAllocation<Storage>,
+        path:  impl Into<Path<Storage>>,
+    ) ->
+        Result<Self>
+    {
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(fs, alloc, path)
+    }
+
+    pub fn create_and_then<R>(
+        fs: &mut Filesystem<'a, Storage>,
+        path: impl Into<Path<Storage>>,
+        f: impl FnOnce(&mut File<'_, '_, Storage>) -> Result<R>,
+    ) ->
+        Result<R>
+    {
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open_and_then(fs, path, f)
+    }
+
+    // Safety-hatch to experiment with missing parts of API
+    pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c mut Filesystem<'a, Storage> {
+        &mut self.fs
+    }
+
+    /// Sync the file and drop it from the internal linked list.
+    /// Not doing this is UB, which is why we have all the closure-based APIs.
+    ///
+    /// TODO: check if this can be closed >1 times, if so make it safe
+    pub unsafe fn close(self) -> Result<()>
+    {
+        #[cfg(test)]
+        println!("closing file {:?}", &self.path);
+
+        let return_code = ll::lfs_file_close(
+            &mut self.fs.alloc.state,
+            &mut self.alloc.state,
+        );
+        Error::result_from(return_code)
+    }
+
+    /// Synchronize file contents to storage.
+    pub fn sync(&mut self) -> Result<()> {
+        let return_code = unsafe { ll::lfs_file_sync(
+            &mut self.fs.alloc.state,
+            &mut self.alloc.state,
+        ) };
+        Error::result_from(return_code)
+    }
+
+    /// Size of the file in bytes.
+    pub fn len(&mut self) -> Result<usize> {
+        let return_code = unsafe { ll::lfs_file_size(
+            &mut self.fs.alloc.state,
+            &mut self.alloc.state
+        ) };
+        Error::usize_result_from(return_code)
+    }
+
+    /// Truncates or extends the underlying file, updating the size of this file to become size.
+    ///
+    /// If the size is less than the current file's size, then the file will be shrunk. If it is
+    /// greater than the current file's size, then the file will be extended to size and have all
+    /// of the intermediate data filled in with 0s.
+    pub fn set_len(&mut self, size: usize) -> Result<()> {
+        let return_code = unsafe { ll::lfs_file_truncate(
+            &mut self.fs.alloc.state,
+            &mut self.alloc.state,
+            size as u32,
+        ) };
+        Error::result_from(return_code)
+    }
+
+}
+
+
 /// Options and flags which can be used to configure how a file is opened.
 ///
 /// This builder exposes the ability to configure how a File is opened and what operations
@@ -569,6 +707,63 @@ impl Default for OpenOptions {
 }
 
 impl OpenOptions {
+
+    /// Open the file with the options previously specified, keeping references.
+    ///
+    /// unsafe since UB can arise if files are not closed (see below).
+    ///
+    /// The alternative method `open_and_then` is suggested.
+    ///
+    /// Note that:
+    /// - files *must* be closed before going out of scope (they are stored in a linked list),
+    ///   closing removes them from there
+    /// - since littlefs is supposed to be *fail-safe*, we can't just close files in
+    ///   Drop and panic if something went wrong.
+    pub unsafe fn open<'a, 'b, S: driver::Storage>(
+        &self,
+        fs: &'b mut Filesystem<'a, S>,
+        alloc: &'b mut FileAllocation<S>,
+        path: impl Into<Path<S>>,
+    ) ->
+        Result<File<'a, 'b, S>>
+    {
+        alloc.config.buffer = &mut alloc.cache as *mut _ as *mut cty::c_void;
+        let path = path.into();
+
+        let return_code = ll::lfs_file_opencfg(
+                &mut fs.alloc.state,
+                &mut alloc.state,
+                &path as *const _  as *const cty::c_char,
+                self.0.bits() as i32,
+                &alloc.config,
+        );
+
+        let file = File {
+            alloc,
+            fs,
+            #[cfg(test)]
+            path,
+        };
+
+        Error::result_from(return_code).map(|_| file)
+    }
+
+    /// (Hopefully) safe abstraction around `open`.
+    pub fn open_and_then<'a, R, S: driver::Storage>(
+        &self,
+        fs: &mut Filesystem<'a, S>,
+        path: impl Into<Path<S>>,
+        f: impl FnOnce(&mut File<'a, '_, S>) -> Result<R>,
+    )
+        -> Result<R>
+    {
+        let mut alloc = FileAllocation::new(); // lifetime 'c
+        let mut file = unsafe { self.open(fs, &mut alloc, path)? };
+        let res = f(&mut file);
+        unsafe { file.close()? };
+        res
+    }
+
     pub fn new() -> Self {
         OpenOptions(FileOpenFlags::empty())
     }
@@ -623,187 +818,8 @@ impl OpenOptions {
         }; self
     }
 
-    /// Open the file with the options previously specified, keeping references.
-    ///
-    /// unsafe since UB can arise if files are not closed (see below).
-    ///
-    /// The alternative method `open_and_then` is suggested.
-    ///
-    /// Note that:
-    /// - files *must* be closed before going out of scope (they are stored in a linked list),
-    ///   closing removes them from there
-    /// - since littlefs is supposed to be *fail-safe*, we can't just close files in
-    ///   Drop and panic if something went wrong.
-    pub unsafe fn open<'a, 'b, S: driver::Storage>(
-        &self,
-        fs: &'a mut Filesystem<'a, S>,
-        alloc: &'b mut FileAllocation<S>,
-        path: impl Into<Path<S>>,
-    ) ->
-        Result<File<'a, 'b, S>>
-    {
-        alloc.config.buffer = &mut alloc.cache as *mut _ as *mut cty::c_void;
-
-        let return_code = ll::lfs_file_opencfg(
-                &mut fs.alloc.state,
-                &mut alloc.state,
-                &path.into() as *const _  as *const cty::c_char,
-                self.0.bits() as i32,
-                &alloc.config,
-        );
-
-        let file_with = File { alloc, fs };
-
-        Error::result_from(return_code).map(|_| file_with)
-    }
-
-    /// (Hopefully) safe abstraction around `open`.
-    pub fn open_and_then<'a, R, S: driver::Storage>(
-        &self,
-        fs: &'a mut Filesystem<'a, S>,
-        path: impl Into<Path<S>>,
-        f: impl FnOnce(&mut File<'_, '_, S>) -> Result<R>,
-    )
-        -> Result<R>
-    {
-        let mut alloc = FileAllocation::new();
-        let mut file = unsafe { self.open(fs, &mut alloc, path)? };
-        let res = f(&mut file);
-        unsafe { file.close()? };
-        res
-    }
-
     pub fn with_options() -> OpenOptions {
         OpenOptions::new()
-    }
-
-}
-
-
-/// The state of a `File`. Pre-allocate with `File::allocate`.
-pub struct FileAllocation<S: driver::Storage>
-{
-    cache: Bytes<S::CACHE_SIZE>,
-    state: ll::lfs_file_t,
-    config: ll::lfs_file_config,
-}
-
-impl<S: driver::Storage> FileAllocation<S> {
-    pub fn new() -> Self {
-        let cache_size: u32 = <S as driver::Storage>::CACHE_SIZE::to_u32();
-        debug_assert!(cache_size > 0);
-        unsafe { mem::MaybeUninit::zeroed().assume_init() }
-    }
-}
-
-pub struct File<'a: 'b, 'b, S: driver::Storage>
-{
-    alloc: &'b mut FileAllocation<S>,
-    fs: &'a mut Filesystem<'a, S>,
-}
-
-impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
-{
-    pub unsafe fn open(
-        fs: &'a mut Filesystem<'a, Storage>,
-        alloc: &'b mut FileAllocation<Storage>,
-        path:  impl Into<Path<Storage>>,
-    ) ->
-        Result<Self>
-    {
-        OpenOptions::new()
-            .read(true)
-            .open(fs, alloc, path)
-    }
-
-    pub fn open_and_then<R>(
-        fs: &'a mut Filesystem<'a, Storage>,
-        path:  impl Into<Path<Storage>>,
-        f: impl FnOnce(&mut File<'_, '_, Storage>) -> Result<R>,
-    ) ->
-        Result<R>
-    {
-        OpenOptions::new()
-            .read(true)
-            .open_and_then(fs, path, f)
-    }
-
-    pub unsafe fn create(
-        fs: &'a mut Filesystem<'a, Storage>,
-        alloc: &'b mut FileAllocation<Storage>,
-        path:  impl Into<Path<Storage>>,
-    ) ->
-        Result<Self>
-    {
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(fs, alloc, path)
-    }
-
-    pub fn create_and_then<R>(
-        fs: &'a mut Filesystem<'a, Storage>,
-        path:  impl Into<Path<Storage>>,
-        f: impl FnOnce(&mut File<'_, '_, Storage>) -> Result<R>,
-    ) ->
-        Result<R>
-    {
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open_and_then(fs, path, f)
-    }
-
-    // Safety-hatch to experiment with missing parts of API
-    pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c mut Filesystem<'a, Storage> {
-        &mut self.fs
-    }
-
-    /// Sync the file and drop it from the internal linked list.
-    /// Not doing this is UB, which is why we have all the closure-based APIs.
-    ///
-    /// TODO: check if this can be closed >1 times, if so make it safe
-    pub unsafe fn close(self) -> Result<()>
-    {
-        let return_code = ll::lfs_file_close(
-            &mut self.fs.alloc.state,
-            &mut self.alloc.state,
-        );
-        Error::result_from(return_code)
-    }
-
-    /// Synchronize file contents to storage.
-    pub fn sync(&mut self) -> Result<()> {
-        let return_code = unsafe { ll::lfs_file_sync(
-            &mut self.fs.alloc.state,
-            &mut self.alloc.state,
-        ) };
-        Error::result_from(return_code)
-    }
-
-    /// Size of the file in bytes.
-    pub fn len(&mut self) -> Result<usize> {
-        let return_code = unsafe { ll::lfs_file_size(
-            &mut self.fs.alloc.state,
-            &mut self.alloc.state
-        ) };
-        Error::usize_result_from(return_code)
-    }
-
-    /// Truncates or extends the underlying file, updating the size of this file to become size.
-    ///
-    /// If the size is less than the current file's size, then the file will be shrunk. If it is
-    /// greater than the current file's size, then the file will be extended to size and have all
-    /// of the intermediate data filled in with 0s.
-    pub fn set_len(&mut self, size: usize) -> Result<()> {
-        let return_code = unsafe { ll::lfs_file_truncate(
-            &mut self.fs.alloc.state,
-            &mut self.alloc.state,
-            size as u32,
-        ) };
-        Error::result_from(return_code)
     }
 
 }
@@ -920,7 +936,7 @@ impl ReadDirAllocation {
 pub struct ReadDir<'a, 'b, S: driver::Storage>
 {
     alloc: &'b mut ReadDirAllocation,
-    fs: &'a mut Filesystem<'a, S>,
+    fs: &'b mut Filesystem<'a, S>,
     #[cfg(feature = "dir-entry-path")]
     path: Path<S>,
 }
@@ -1002,7 +1018,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     //     f: impl FnOnce(&mut File<'_, '_, S>) -> Result<R>,
     // )
     pub fn read_dir_and_then<R>(
-        &'a mut self,
+        &mut self,
         path: impl Into<Path<Storage>>,
         f: impl FnOnce(&mut ReadDir<'_, '_, Storage>) -> Result<R>,
     ) -> Result<R>
@@ -1018,7 +1034,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     ///
     /// This is unsafe since it can induce UB just like File::open.
 	pub unsafe fn read_dir<'b>(
-        &'a mut self,
+        &'b mut self,
         alloc: &'b mut ReadDirAllocation,
         path: impl Into<Path<Storage>>,
     ) ->
@@ -1105,6 +1121,11 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
                 }
             }
         }
+        match self.create_dir(&path.0[..]) {
+            Ok(_) => {}
+            Err(io::Error::EntryAlreadyExisted) => {}
+            error => { panic!("{:?}", &error); }
+        }
         Ok(())
     }
 
@@ -1112,7 +1133,8 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     pub fn read<N: generic_array::ArrayLength<u8>>(
         &'a mut self,
         path: impl Into<Path<Storage>>,
-    ) -> Result<Bytes<N>>
+    )
+        -> Result<Bytes<N>>
     {
         let mut contents = Bytes::default();
         File::open_and_then(self, path, |file| {
@@ -1127,15 +1149,13 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     /// This function will create a file if it does not exist,
     /// and will entirely replace its contents if it does.
     pub fn write(
-        &'a mut self,
+        &mut self,
         path: impl Into<Path<Storage>>,
-        // contents: AsRef<[u8]>,
         contents: &[u8],
     ) -> Result<()>
     {
         File::create_and_then(self, path, |file| {
             use io::WriteWith;
-            // file.write_all(contents.as_ref())
             file.write_all(contents)
         })?;
         Ok(())
@@ -1155,5 +1175,103 @@ impl<Storage: driver::Storage> core::ops::DerefMut for Filesystem<'_, Storage> {
 
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.storage
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use generic_array::typenum::consts;
+    use driver::Storage as LfsStorage;
+    use io::Result as LfsResult;
+    const_ram_storage!(TestStorage, 4096);
+
+    #[test]
+    fn todo() {
+        let mut test_storage = TestStorage::new();
+        // let jackson5 = [b"A", b"B", b"C", 1, 2, 3];
+        let jackson5 = b"ABC 123";
+        let jackson5 = &jackson5[..];
+
+        Filesystem::format(&mut test_storage).unwrap();
+        Filesystem::mount_and_then(&mut test_storage, |fs| {
+
+            println!("blocks going in: {}", fs.available_blocks()?);
+            fs.create_dir_all("/tmp/test")?;
+            fs.write("/tmp/test/a.txt", jackson5)?;
+            fs.write("/tmp/test/b.txt", jackson5)?;
+            fs.write("/tmp/test/c.txt", jackson5)?;
+            println!("blocks after 3 files of size 3: {}", fs.available_blocks()?);
+
+            fs.read_dir_and_then("/", |read_dir| {
+                for entry in read_dir {
+                    println!("entry: {:?}", entry?.file_name());
+                }
+                Ok(())
+            })?;
+
+            fs.read_dir_and_then("/tmp", |read_dir| {
+                for entry in read_dir {
+                    println!("entry: {:?}", entry?.file_name());
+                }
+                Ok(())
+            })?;
+
+            fs.read_dir_and_then("/tmp/test", |read_dir| {
+                for entry in read_dir {
+                    let entry = entry?;
+                    println!("entry: {:?}", entry.file_name());
+                    // not implemented yet...
+                    // println!("path: {:?}", entry.path());
+                }
+                Ok(())
+            })?;
+
+            Ok(())
+        }).unwrap();
+
+        let mut alloc = Allocation::new();
+        let mut fs = Filesystem::mount(&mut alloc, &mut test_storage).unwrap();
+        fs.write("/z.txt", &jackson5).unwrap();
+    }
+
+    #[test]
+    fn issue_3_original_report() {
+        let mut test_storage = TestStorage::new();
+
+        Filesystem::format(&mut test_storage).unwrap();
+        Filesystem::mount_and_then(&mut test_storage, |mut fs| {
+
+            fs.write("a.txt", &[])?;
+            fs.write("b.txt", &[])?;
+            fs.write("c.txt", &[])?;
+
+            // works fine
+            fs.read_dir_and_then(".", |read_dir| {
+                for entry in read_dir {
+                    let entry = entry?;
+                    println!("{:?}", entry.file_type());
+                }
+                Ok(())
+            })?;
+
+            // NOTE omitting FileAlloc for simplicity
+            let mut a1 = File::allocate();
+            let mut a2 = File::allocate();
+
+            use io::WriteWith;
+
+            let mut f1 = unsafe { File::open(&mut fs, &mut a1, "a.txt")? };
+            f1.write(b"some text")?;
+
+            let mut fs = unsafe { f1.borrow_filesystem() };
+            let mut f2 = unsafe { File::open(&mut fs, &mut a2, "b.txt")? };
+            f2.write(b"more text")?;
+
+            unsafe { f1.close()? }; // program hangs here
+            // unsafe { f2.close()? }; // this statement is never reached
+
+            Ok(())
+        }).unwrap();
     }
 }

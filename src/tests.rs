@@ -8,7 +8,6 @@ use crate::{
         Filesystem,
         FilesystemWith,
         OpenOptions,
-        SeekFrom,
     },
     io::{
         Error,
@@ -18,6 +17,7 @@ use crate::{
         Write,
         WriteWith,
         Seek,
+        SeekFrom,
     },
     path::Filename,
     driver,
@@ -136,6 +136,7 @@ fn test_fs_with() -> Result<()> {
     let mut file = FileWith::create("/test_with.txt", &mut alloc_file, &mut fs)?;
     assert!(file.write(&[0u8, 1, 2])? == 3);
     file.sync()?;
+    drop(file);
 
     let mut alloc_file = File::allocate();
     let mut file = FileWith::open("/test_with.txt", &mut alloc_file, &mut fs)?;
@@ -146,6 +147,7 @@ fn test_fs_with() -> Result<()> {
     }
     assert!(file.read_exact(&mut buf).is_ok());
     assert_eq!(&buf, &[0, 1, 2]);
+    drop(file);
 
     // surprise surprise, inline files!
     assert_eq!(fs.available_blocks()?, 512 - 2);
