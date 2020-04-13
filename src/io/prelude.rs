@@ -6,5 +6,6 @@ pub use super::{
     Write,
     WriteWith,
     Seek,
+    SeekFrom,
     SeekWith,
 };

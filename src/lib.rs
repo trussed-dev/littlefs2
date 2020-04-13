@@ -1,4 +1,5 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
+// #![no_std]
 
 /*!
 
@@ -65,7 +66,7 @@ Separately, keeping track of the allocations is a chore, we hope that
 ### Example
 
 ```
-# use littlefs2::fs::{Filesystem, File, OpenOptions, SeekFrom};
+# use littlefs2::fs::{Filesystem, File, OpenOptions};
 # use littlefs2::io::prelude::*;
 #
 # use littlefs2::{consts, ram_storage, driver, io::Result};

@@ -53,7 +53,8 @@ where
     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt(f)
+        let len = self.0.iter().position(|b| *b == 0).unwrap_or(self.0.len());
+        core::str::from_utf8(&self.0[..len]).unwrap().fmt(f)
     }
 }
 
@@ -118,7 +119,8 @@ where
     <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt(f)
+        let len = self.0.iter().position(|b| *b == 0).unwrap_or(self.0.len());
+        core::str::from_utf8(&self.0[..len]).unwrap().fmt(f)
     }
 }
 
