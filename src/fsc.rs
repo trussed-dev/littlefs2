@@ -609,6 +609,18 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
         FileAllocation::new()
     }
 
+    /// Returns a new OpenOptions object.
+    ///
+    /// This function returns a new OpenOptions object that you can use to open or create a file
+    /// with specific options if open() or create() are not appropriate.
+    ///
+    /// It is equivalent to OpenOptions::new() but allows you to write more readable code.
+    /// This also avoids the need to import OpenOptions`.
+
+    pub fn with_options() -> OpenOptions {
+        OpenOptions::new()
+    }
+
     pub unsafe fn open(
         fs: &'b Filesystem<'a, Storage>,
         alloc: &'b mut FileAllocation<Storage>,
@@ -851,10 +863,6 @@ impl OpenOptions {
         } else {
             self.0.remove(FileOpenFlags::TRUNCATE)
         }; self
-    }
-
-    pub fn with_options() -> OpenOptions {
-        OpenOptions::new()
     }
 
 }
@@ -1219,9 +1227,8 @@ mod tests {
             fs.read_dir_and_then("/", |read_dir| {
                 for entry in read_dir {
                     let entry: DirEntry<_> = entry?;
-                    println!("hello {:?}", entry.file_name());
                     #[cfg(feature = "dir-entry-path")]
-                    println!("--> path = {:?}", entry.path());
+                    println!("{:?} --> path = {:?}", entry.file_name(), entry.path());
                 }
                 Ok(())
             })?;
@@ -1258,7 +1265,7 @@ mod tests {
             fs.read_dir_and_then("/tmp/test", |read_dir| {
                 for (i, entry) in read_dir.enumerate() {
                     let entry = entry?;
-                    println!("\nfile {:?}", entry.file_name());
+                    println!("\nfile {}: {:?}", i, entry.file_name());
 
                     if entry.file_type().is_file() {
                         let content: heapless::Vec::<u8, heapless::consts::U256> = fs.read(entry.path())?;
@@ -1271,13 +1278,22 @@ mod tests {
                         println!("attribute 37: {:?}", core::str::from_utf8(attribute.data()).unwrap());
                     }
 
-                    // deleting file while iterating!
+                    // deleting (self) file while iterating!
                     if entry.file_type().is_file() {
+                        println!("removing {:?}", entry.path());
                         fs.remove(entry.path())?;
                     }
 
+                    // WE CANNOT REMOVE THE NEXT FILE
+                    // // can we `remove` the "next" file?
+                    // if entry.file_name() == Filename::new(b"b.txt") {
+                    //     println!("deleting c.txt");
+                    //     fs.remove("/tmp/test/c.txt")?;
+                    // }
+
                     // adding file while iterating!
-                    if i == 3 {
+                    if i == 1 {
+                        println!("writing new file");
                         fs.write("/tmp/test/out-of-nowhere.txt", &[])?;
                     }
 
