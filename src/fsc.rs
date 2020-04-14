@@ -319,27 +319,25 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     #[cfg(feature = "dir-entry-path")]
     pub fn remove_dir_all(&self, path: impl Into<Path<Storage>>) -> Result<()> {
         let path: Path<_> = path.into();
-        #[cfg(test)] println!(":: remove_dir_all({:?})", &path);
+
         self.read_dir_and_then(path.clone(), |read_dir| {
             for (i, entry) in read_dir.enumerate() {
                 let entry = entry?;
+
                 // skip "." and ".."
                 if i < 2 {
-                    #[cfg(test)] println!("skipping {:?}", entry.path());
+                    // #[cfg(test)] println!("skipping {:?}", entry.path());
                     continue;
                 }
                 if entry.file_type().is_file() {
-                    #[cfg(test)] println!("removing file {:?}", entry.path());
                     self.remove(entry.path())?;
                 }
                 if entry.file_type().is_dir() {
-                    #[cfg(test)] println!("recursing into directory {:?}", entry.path());
                     self.remove_dir_all(entry.path())?;
                 }
             }
             Ok(())
         })?;
-        #[cfg(test)] println!("removing directory {:?}", path);
         self.remove_dir(path)?;
         Ok(())
     }
@@ -977,11 +975,7 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S>
         };
 
         if return_code > 0 {
-            // well here we have it: nasty C strings!
-            // actually... nasty C arrays with static lengths! o.O
-            let transmuted = & unsafe { mem::transmute::<[cty::c_char; 256], [u8; 256]>(info.name) };
-            let file_name = Filename::new(transmuted);
-
+            let file_name = Filename::from_littlefs_file_name_c_string(&info.name);
             let metadata = info.into();
 
             #[cfg(feature = "dir-entry-path")]
@@ -1273,23 +1267,19 @@ mod tests {
                         // fs.remove(entry.path())?;
                     }
 
-                    let attribute = fs.attribute(entry.path(), 37)?.unwrap();
-                    println!("attribute 37: {:?}", core::str::from_utf8(attribute.data()).unwrap());
+                    if let Some(attribute) = fs.attribute(entry.path(), 37)? {
+                        println!("attribute 37: {:?}", core::str::from_utf8(attribute.data()).unwrap());
+                    }
 
-                    // TODO: There is a problem removing the file with special name.
-                    // Not sure if I'm not understanding how Rust "strings" work, or whether
-                    // littlefs has a problem with filenames of this type.
-                    // if entry.file_type().is_file() {
-                    if entry.file_type().is_file() && i >= 2 + 1 {
+                    // deleting file while iterating!
+                    if entry.file_type().is_file() {
                         fs.remove(entry.path())?;
                     }
 
-                    // // this one fails:
-                    // // - our iterator reaches it (at the end, after `c.txt`)
-                    // // - reading it fails with `NoSuchEntry`
-                    // if i == 3 {
-                    //     fs.write("/tmp/test/out-of-nowhere.txt", &[])?;
-                    // }
+                    // adding file while iterating!
+                    if i == 3 {
+                        fs.write("/tmp/test/out-of-nowhere.txt", &[])?;
+                    }
 
                 }
                 Ok(())

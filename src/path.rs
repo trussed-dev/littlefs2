@@ -2,10 +2,9 @@
 
 use core::convert::AsRef;
 // use core::marker::PhantomData;
-use core::{
-    cmp,
-    fmt,
-};
+use core::{cmp, fmt, mem};
+#[cfg(test)]
+use core::slice;
 
 use generic_array::{
     ArrayLength,
@@ -19,6 +18,11 @@ use crate::{
     driver,
 };
 
+// TODO: add a `CString` type to heapless?
+// - meaning a "byte" string (not UTF-8)
+// - allocate "one more" than necessary
+// - keep invariants (data till first null, then only nulls)
+// - allow transforming in both directions
 
 // GENERALLY:
 // - littlefs has a notion of "max filename"
@@ -86,6 +90,9 @@ where
     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     fn eq(&self, other: &Self) -> bool {
+        // let shrunk_self = self.clone().shrunk_to_first_null();
+        // let shrunk_other = other.clone().shrunk_to_first_null();
+        // shrunk_self.0 == shrunk_other.0
         self.0 == other.0
     }
 }
@@ -97,7 +104,8 @@ where
     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     fn clone(&self) -> Self {
-        Filename(self.0.clone())
+        // the `Clone` impl skips unused bytes
+        Filename(self.0.clone()).shrunk_to_first_null()
     }
 }
 
@@ -159,11 +167,47 @@ where
         self
     }
 
+    pub fn shrunk_to_first_null(self) -> Self {
+        let mut self_ = self;
+        self_.shrink_to_first_null();
+        self_
+    }
+
+
     pub fn resize_to_capacity(&mut self) -> &mut Self {
         self.0.resize_default(self.0.capacity()).unwrap();
         self
     }
 
+    // LFS_NAME_MAX + 1 = 256 is hardcoded in littlefs2-sys
+    // - can't actually change it via driver::Storage trait
+    // - need to fix in future..
+    pub fn from_littlefs_file_name_c_string(name: &[cty::c_char; 256]) -> Self {
+        let effective_length = name.iter().position(|b| *b == 0).unwrap_or(255);
+        let usable_length = cmp::min(
+            effective_length,
+            <S as driver::Storage>::FILENAME_MAX_PLUS_ONE::to_usize() - 1,
+        );
+
+        // // explicit version
+        // let mut filename = Self::new(&[]);
+        // for i in 0..usable_length {
+        //     filename.0.push(name[i] as u8).unwrap();
+        // }
+        // filename
+
+        Self::new(unsafe { mem::transmute::<&[cty::c_char], &[u8]>(&name[..usable_length]) })
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn print_raw(&self) {
+        let underlying_array = unsafe {
+            let ptr = &self[..] as *const _ as *const u8;
+            slice::from_raw_parts(ptr, 255)
+        };
+        println!("-> raw path {:?}", &underlying_array);
+    }
 }
 
 /// A slice of a specification of the location of a [`File`](../fs/struct.File.html).
@@ -182,7 +226,8 @@ where
     <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     fn clone(&self) -> Self {
-        Path(self.0.clone())
+        // the `Clone` impl skips unused bytes
+        Path(self.0.clone()).shrunk_to_first_null()
     }
 }
 
@@ -192,6 +237,9 @@ where
     <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     fn eq(&self, other: &Self) -> bool {
+        // let shrunk_self = self.clone().shrunk_to_first_null();
+        // let shrunk_other = other.clone().shrunk_to_first_null();
+        // shrunk_self.0 == shrunk_other.0
         self.0 == other.0
     }
 }
@@ -229,8 +277,8 @@ where
         let mut path = Path(Default::default());
         path.resize_to_capacity();
 
-        let name_max = <S as driver::Storage>::PATH_MAX_PLUS_ONE::USIZE;
-        let len = cmp::min(name_max - 1, p.as_ref().len());
+        let path_max = <S as driver::Storage>::PATH_MAX_PLUS_ONE::USIZE;
+        let len = cmp::min(path_max - 1, p.as_ref().len());
 
         path.0[..len].copy_from_slice(&p.as_ref()[..len]);
 
@@ -260,9 +308,25 @@ where
         self
     }
 
+    pub fn shrunk_to_first_null(self) -> Self {
+        let mut self_ = self;
+        self_.shrink_to_first_null();
+        self_
+    }
+
     pub fn resize_to_capacity(&mut self) -> &mut Self {
         self.0.resize_default(self.0.capacity()).unwrap();
         self
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    fn print_raw(&self) {
+        let underlying_array = unsafe {
+            let ptr = &self[..] as *const _ as *const u8;
+            slice::from_raw_parts(ptr, 255)
+        };
+        println!("-> raw path {:?}", &underlying_array);
     }
 
     // what to do about possible "array-too-small" errors?
