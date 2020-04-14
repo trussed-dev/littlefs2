@@ -72,27 +72,36 @@ pub trait ReadWith {
 }
 
 /// The `ReadClosure` trait allows for reading bytes from a file.
-pub trait ReadClosure {
+pub trait ReadClosure<N: heapless::ArrayLength<u8>> {
     /// Read at most buf.len() bytes.
     /// Upon success, return how many bytes were read.
     fn read(&self, buf: &mut [u8]) -> Result<usize>;
 
-    fn read_exact(&self, mut buf: &mut [u8]) -> Result<()> {
-        while !buf.is_empty() {
-            match self.read(buf) {
-                Ok(0) => break,
-                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; },
-                Err(e) => return Err(e),
-            }
-        }
-
-        if !buf.is_empty() {
-            // TODO: better error
-            Err(Error::Io)
-        } else {
+    fn read_exact(&self, buf: &mut [u8]) -> Result<()> {
+        // Same assumption as for `read_to_end`.
+        let len = self.read(buf)?;
+        if len == buf.len() {
             Ok(())
+        } else {
+            // TODO: Decide whether to add an equivalent of `ErrorKind::UnexpectedEof`
+            Err(Error::Io)
         }
     }
+
+    fn read_to_end(&self, buf: &mut heapless::Vec<u8, N>) -> Result<usize> {
+        // My understanding of
+        // https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2816
+        // is that littlefs keeps reading until either the buffer is full, or the file is exhausted
+
+        let had = buf.len();
+        // no panic by construction
+        buf.resize_default(buf.capacity()).unwrap();
+        let read = self.read(&mut buf[had..])?;
+        // no panic by construction
+        buf.resize_default(had + read).unwrap();
+        Ok(read)
+    }
+
 }
 
 /** The `Write` trait allows for writing bytes to a file.

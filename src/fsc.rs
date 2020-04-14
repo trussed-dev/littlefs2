@@ -903,7 +903,7 @@ impl OpenOptions {
 
 }
 
-impl<S: driver::Storage> io::ReadClosure for File<'_, '_, S>
+impl<N: heapless::ArrayLength<u8>, S: driver::Storage> io::ReadClosure<N> for File<'_, '_, S>
 {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let return_code = unsafe { ll::lfs_file_read(
@@ -1196,14 +1196,11 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         -> Result<heapless::Vec<u8, N>>
     {
         let mut contents: heapless::Vec::<u8, N> = Default::default();
-        contents.resize_default(contents.capacity()).unwrap();
-        let len = File::open_and_then(self, path, |file| {
+        File::open_and_then(self, path, |file| {
             use io::ReadClosure;
-            // let len = file.read_to_end(&mut contents)?;
-            let len = file.read(&mut contents)?;
+            let len = file.read_to_end(&mut contents)?;
             Ok(len)
         })?;
-        contents.resize_default(len).unwrap();
         Ok(contents)
     }
 
@@ -1260,10 +1257,10 @@ mod tests {
             //     unsafe { file.close() }
             // }).unwrap();
 
+            #[cfg(feature = "dir-entry-path")]
             fs.read_dir_and_then("/", |read_dir| {
                 for entry in read_dir {
                     let entry: DirEntry<_> = entry?;
-                    #[cfg(feature = "dir-entry-path")]
                     println!("{:?} --> path = {:?}", entry.file_name(), entry.path());
                 }
                 Ok(())
