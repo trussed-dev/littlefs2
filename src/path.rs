@@ -350,7 +350,11 @@ where
     pub fn try_join(&self, path: impl Into<Path<S>>) -> core::result::Result<Path<S>, ()> {
         let mut joined = self.clone();
         // yolo
-        joined.0.extend_from_slice(b"/")?;
+        if joined.0.len() > 0 {
+            if joined.0[joined.0.len() - 1] != b'/' {
+                joined.0.extend_from_slice(b"/")?;
+            }
+        }
         joined.0.extend_from_slice(&path.into().0).map(|_| joined)
     }
 }
