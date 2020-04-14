@@ -380,6 +380,42 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         Error::result_from(return_code).map(|_| info.into())
     }
 
+    pub fn create_file_and_then<R>(
+        &self,
+        path: impl Into<Path<Storage>>,
+        f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
+    ) ->
+        Result<R>
+    {
+        File::create_and_then(self, path, f)
+    }
+
+    pub fn open_file_and_then<R>(
+        &self,
+        path: impl Into<Path<Storage>>,
+        f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
+    ) ->
+        Result<R>
+    {
+        File::open_and_then(self, path, f)
+    }
+
+    pub fn with_options() -> OpenOptions {
+        OpenOptions::new()
+    }
+
+    pub fn open_file_with_options_and_then<R>(
+        &self,
+        o: impl FnOnce(&mut OpenOptions) -> &OpenOptions,
+        path: impl Into<Path<Storage>>,
+        f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
+    ) -> Result<R>
+    {
+        let mut options = OpenOptions::new();
+        o(&mut options).open_and_then(self, path, f)
+    }
+
+
     /// Read attribute.
     pub fn attribute(
         &self,
@@ -1339,6 +1375,37 @@ mod tests {
     #[test]
     fn path() {
         let _path: Path<TestStorage> = b"a.txt"[..].into();
+    }
+
+    #[test]
+    fn open_file_with_options_and_then() {
+        let mut test_storage = TestStorage::new();
+        Filesystem::format(&mut test_storage).unwrap();
+        Filesystem::mount_and_then(&mut test_storage, |fs| {
+            let filename = "append.to.me";
+            fs.write(filename, b"first part")?;
+
+            fs.open_file_with_options_and_then(
+                |options| options.write(true).create(false).truncate(false),
+                filename,
+                |file| {
+                    // this is a bit of a pitfall :)
+                    use io::SeekClosure;
+                    file.seek(io::SeekFrom::End(0))?;
+
+                    use io::WriteClosure;
+                    file.write(b" - ")?;
+                    file.write(b"second part")?;
+
+                    Ok(())
+                }
+            )?;
+
+            let content: heapless::Vec<_, consts::U256> = fs.read(filename)?;
+            assert_eq!(content, b"first part - second part");
+            // println!("content: {:?}", core::str::from_utf8(&content).unwrap());
+            Ok(())
+        }).unwrap();
     }
 
     #[test]
