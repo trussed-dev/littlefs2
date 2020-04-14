@@ -5,74 +5,8 @@ pub mod prelude;
 use littlefs2_sys as ll;
 use ufmt::derive::uDebug;
 
-use crate::{
-    fs::{
-        Filesystem,
-    },
-    driver::Storage,
-};
-
 /// The `Read` trait allows for reading bytes from a file.
-pub trait Read<'alloc, S: Storage> {
-    /// Read at most buf.len() bytes.
-    /// Upon success, return how many bytes were read.
-    fn read(
-        &mut self,
-        fs: &mut Filesystem<'alloc, S>,
-        storage: &mut S,
-        buf: &mut [u8],
-    ) -> Result<usize>;
-
-    fn read_exact(
-        &mut self,
-        fs: &mut Filesystem<'alloc, S>,
-        storage: &mut S,
-        mut buf: &mut [u8],
-    ) -> Result<()>
-    {
-        while !buf.is_empty() {
-            match self.read(fs, storage, buf) {
-                Ok(0) => break,
-                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; },
-                Err(e) => return Err(e),
-            }
-        }
-
-        if !buf.is_empty() {
-            // TODO: better error
-            Err(Error::Io)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-/// The `ReadWith` trait allows for reading bytes from a file.
-pub trait ReadWith {
-    /// Read at most buf.len() bytes.
-    /// Upon success, return how many bytes were read.
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
-
-    fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<()> {
-        while !buf.is_empty() {
-            match self.read(buf) {
-                Ok(0) => break,
-                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; },
-                Err(e) => return Err(e),
-            }
-        }
-
-        if !buf.is_empty() {
-            // TODO: better error
-            Err(Error::Io)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-/// The `ReadClosure` trait allows for reading bytes from a file.
-pub trait ReadClosure<N: heapless::ArrayLength<u8>> {
+pub trait Read {
     /// Read at most buf.len() bytes.
     /// Upon success, return how many bytes were read.
     fn read(&self, buf: &mut [u8]) -> Result<usize>;
@@ -88,20 +22,6 @@ pub trait ReadClosure<N: heapless::ArrayLength<u8>> {
         }
     }
 
-    fn read_to_end(&self, buf: &mut heapless::Vec<u8, N>) -> Result<usize> {
-        // My understanding of
-        // https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2816
-        // is that littlefs keeps reading until either the buffer is full, or the file is exhausted
-
-        let had = buf.len();
-        // no panic by construction
-        buf.resize_default(buf.capacity()).unwrap();
-        let read = self.read(&mut buf[had..])?;
-        // no panic by construction
-        buf.resize_default(had + read).unwrap();
-        Ok(read)
-    }
-
 }
 
 /** The `Write` trait allows for writing bytes to a file.
@@ -110,53 +30,7 @@ By analogy with `std::io::Write`, we also define a `flush()`
 method. In the current implementation, writes are final and
 flush has no effect.
 */
-pub trait Write<'alloc, S: Storage> {
-    /// Write at most data.len() bytes.
-    /// The file will not necessarily be updated unless
-    /// flush is called as there is a cache.
-    /// Upon success, return how many bytes were written.
-    fn write(
-        &mut self,
-        fs: &mut Filesystem<'alloc, S>,
-        storage: &mut S,
-        data: &[u8],
-    ) -> Result<usize>;
-
-    /// Write out all pending writes to storage.
-    fn flush(
-        &mut self,
-        fs: &mut Filesystem<'alloc, S>,
-        storage: &mut S,
-    ) -> Result<()>;
-
-}
-
-pub trait WriteWith {
-    /// Write at most data.len() bytes.
-    /// The file will not necessarily be updated unless
-    /// flush is called as there is a cache.
-    /// Upon success, return how many bytes were written.
-    fn write(&mut self, data: &[u8]) -> Result<usize>;
-
-    /// Write out all pending writes to storage.
-    fn flush(&mut self) -> Result<()>;
-
-    fn write_all(&mut self, mut buf: &[u8]) -> Result<()> {
-        while !buf.is_empty() {
-            match self.write(buf) {
-                Ok(0) => {
-                    // failed to write whole buffer
-                    return Err(Error::Io)
-                }
-                Ok(n) => buf = &buf[n..],
-                Err(e) => return Err(e),
-            }
-        }
-        Ok(())
-    }
-}
-
-pub trait WriteClosure {
+pub trait Write {
     /// Write at most data.len() bytes.
     /// The file will not necessarily be updated unless
     /// flush is called as there is a cache.
@@ -214,28 +88,10 @@ impl SeekFrom {
 
 It is possible to seek relative to either end or the current offset.
 */
-pub trait Seek<'alloc, S: Storage>
-{
-    /// Seek to an offset in bytes.
-    /// If successful, returns the new position from start of file.
-    fn seek(
-        &mut self,
-        fs: &mut Filesystem<'alloc, S>,
-        storage: &mut S,
-        pos: SeekFrom,
-    ) -> Result<usize>;
-}
-
-pub trait SeekClosure {
+pub trait Seek {
     /// Seek to an offset in bytes.
     /// If successful, returns the new position from start of file.
     fn seek(&self, pos: SeekFrom) -> Result<usize>;
-}
-
-pub trait SeekWith {
-    /// Seek to an offset in bytes.
-    /// If successful, returns the new position from start of file.
-    fn seek(&mut self, pos: SeekFrom) -> Result<usize>;
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

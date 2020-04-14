@@ -10,9 +10,8 @@ categories = ["embedded", "filesystem", "no-std"]
 repository = "https://github.com/nickray/littlefs2"
 
 [dependencies]
-aligned = { version = "0.3.2", optional = true }
+# aligned = { version = "0.3.2", optional = true }
 bitflags = "1.0.4"
-# cortex-m-semihosting = "0.3.5"
 # cstr_core = "0.1.2"
 cty = "0.2.1"
 generic-array = "0.13.2"
@@ -28,24 +27,15 @@ trybuild = { version = "1.0", optional = true }
 ufmt = "0.1.0"
 
 [dependencies.littlefs2-sys]
-version = "0.1.3"
-# git = "https://github.com/nickray/littlefs2-sys"
-# branch = "main"
+version = "0.1.5"
 
 [dev-dependencies]
-desse = "0.2.1"
-# heapless = "0.5.1"
 ssmarshal = "1"
-# serde = { version = "1", features = ["derive"], default-features = false }
-# serde = { version = "1", features = ["derive"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
-# serde_cbor = { version = "0.10.2", default-features = false }
-# serde-json-core = { version = "0.1.0" }
 
 [features]
-# default = ["closures"]
+default = ["dir-entry-path"]
 # use experimental closure-based API
-closures = ["aligned"] # , "heapless-bytes"]
 dir-entry-path = []
 # enable assertions in backend C code
 ll-assertions = ["littlefs2-sys/assertions"]

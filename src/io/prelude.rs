@@ -2,10 +2,7 @@
 
 pub use super::{
     Read,
-    ReadWith,
     Write,
-    WriteWith,
     Seek,
     SeekFrom,
-    SeekWith,
 };
