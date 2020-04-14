@@ -97,21 +97,18 @@ Filesystem::format(&mut storage).unwrap();
 let mut alloc = Filesystem::allocate();
 let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
-// must allocate state statically before use
-let mut alloc = File::allocate();
 // may use common `OpenOptions`
-let mut file = OpenOptions::new()
-	.read(true)
-	.write(true)
-	.create(true)
-	.open("example.txt", &mut alloc, &mut fs, &mut storage)
-	.unwrap();
-
-// may read/write/seek as usual
-file.write(&mut fs, &mut storage, b"Why is black smoke coming out?!").unwrap();
-file.seek(&mut fs, &mut storage, SeekFrom::End(-24)).unwrap();
 let mut buf = [0u8; 11];
-assert_eq!(file.read(&mut fs, &mut storage, &mut buf).unwrap(), 11);
+fs.open_file_with_options_and_then(
+    |options| options.read(true).write(true).create(true),
+    "example.txt",
+    |file| {
+        file.write(b"Why is black smoke coming out?!")?;
+        file.seek(SeekFrom::End(-24)).unwrap();
+        assert_eq!(file.read(&mut buf)?, 11);
+        Ok(())
+    }
+).unwrap();
 assert_eq!(&buf, b"black smoke");
 ```
 */
@@ -129,8 +126,6 @@ pub mod macros;
 pub mod driver;
 
 pub mod fs;
-#[cfg(feature = "closures")]
-pub mod fsc;
 pub mod io;
 pub mod path;
 
