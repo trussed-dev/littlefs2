@@ -10,16 +10,8 @@ use littlefs2_sys as ll;
 pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 
 use crate::{
-    io::{
-        self,
-        Error,
-        Result,
-        SeekFrom,
-    },
-    path::{
-        Filename,
-        Path,
-    },
+    io::{self, Result},
+    path::{Filename, Path},
     driver,
 };
 
@@ -238,7 +230,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let fs = Filesystem::new(alloc, storage);
         let mut alloc = fs.alloc.borrow_mut();
         let return_code = unsafe { ll::lfs_format(&mut alloc.state, &alloc.config) };
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 
     // TODO: check if this is equivalent to `is_formatted`.
@@ -288,7 +280,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// by this method available, at any given time.
     pub fn available_blocks(&self) -> Result<usize> {
         let return_code = unsafe { ll::lfs_fs_size( &mut self.alloc.borrow_mut().state) };
-        Error::usize_result_from(return_code).map(|blocks| self.total_blocks() - blocks)
+        io::result_from(return_code).map(|blocks| self.total_blocks() - blocks as usize)
     }
 
     /// Available number of unused bytes in the filesystem
@@ -306,7 +298,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             &mut self.alloc.borrow_mut().state,
             &path.into()[..] as *const _ as *const cty::c_char,
         ) };
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 
     /// Remove a file or directory.
@@ -353,7 +345,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             &from.into()[..] as *const _ as *const cty::c_char,
             &to.into()[..] as *const _ as *const cty::c_char,
         ) };
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 
     /// Given a path, query the filesystem to get information about a file or directory.
@@ -377,7 +369,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             )
         };
 
-        Error::result_from(return_code).map(|_| info.into())
+        io::result_from(return_code).map(drop).map(|_| info.into())
     }
 
     pub fn create_file_and_then<R>(
@@ -443,7 +435,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             return Ok(None)
         }
 
-        Error::result_from(return_code)?;
+        io::result_from(return_code).map(drop)?;
         // TODO: get rid of this
         unreachable!();
     }
@@ -459,7 +451,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             &path.into()[..] as *const _ as *const cty::c_char,
             id,
         ) };
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 
     /// Set attribute.
@@ -478,7 +470,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             attribute.size as u32,
         ) };
 
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 
 
@@ -492,7 +484,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         size: ll::lfs_size_t,
     ) -> cty::c_int {
         // println!("in lfs_config_read for {} bytes", size);
-        let storage = unsafe { &mut *((*c).context as *mut Storage) };
+        let storage = unsafe { &*((*c).context as *const Storage) };
         debug_assert!(!c.is_null());
         let block_size = unsafe { c.read().block_size };
         let off = (block * block_size + off) as usize;
@@ -584,7 +576,7 @@ impl<S: driver::Storage> Attribute<S> {
         &self.data[..len]
     }
 
-    pub fn set_data(&mut self, data: &[u8]) {
+    pub fn set_data(&mut self, data: &[u8]) -> &mut Self {
         let attr_max = <S as driver::Storage>::ATTRBYTES_MAX::to_usize();
         let len = cmp::min(attr_max, data.len());
         self.data[..len].copy_from_slice(&data[..len]);
@@ -592,6 +584,7 @@ impl<S: driver::Storage> Attribute<S> {
         for entry in self.data[len..].iter_mut() {
             *entry = 0;
         }
+        self
     }
 }
 
@@ -733,7 +726,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
             &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.borrow_mut().state,
         );
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 
     /// Synchronize file contents to storage.
@@ -742,7 +735,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
             &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.borrow_mut().state,
         ) };
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 
     /// Size of the file in bytes.
@@ -751,7 +744,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
             &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.borrow_mut().state
         ) };
-        Error::usize_result_from(return_code)
+        io::result_from(return_code).map(|e| e as usize)
     }
 
     /// Truncates or extends the underlying file, updating the size of this file to become size.
@@ -765,7 +758,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
             &mut self.alloc.borrow_mut().state,
             size as u32,
         ) };
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 
     // This belongs in `io::Read` but really don't want that to have a generic parameter
@@ -777,13 +770,24 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
         let had = buf.len();
         // no panic by construction
         buf.resize_default(buf.capacity()).unwrap();
-        use io::Read;
+        // use io::Read;
         let read = self.read(&mut buf[had..])?;
         // no panic by construction
         buf.resize_default(had + read).unwrap();
         Ok(read)
     }
 
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        <Self as io::Read>::read(self, buf)
+    }
+
+    pub fn seek(&self, pos: io::SeekFrom) -> Result<usize> {
+        <Self as io::Seek>::seek(self, pos)
+    }
+
+    pub fn write(&self, buf: &[u8]) -> Result<usize> {
+        <Self as io::Write>::write(self, buf)
+    }
 }
 
 
@@ -840,7 +844,7 @@ impl OpenOptions {
             fs,
         };
 
-        Error::result_from(return_code).map(|_| file)
+        io::result_from(return_code).map(drop).map(|_| file)
     }
 
     /// (Hopefully) safe abstraction around `open`.
@@ -928,20 +932,20 @@ impl<S: driver::Storage> io::Read for File<'_, '_, S>
             buf.as_mut_ptr() as *mut cty::c_void,
             buf.len() as u32,
         ) };
-        Error::usize_result_from(return_code)
+        io::result_from(return_code).map(|read| read as usize)
     }
 }
 
 impl<S: driver::Storage> io::Seek for File<'_, '_, S>
 {
-    fn seek(&self, pos: SeekFrom) -> Result<usize> {
+    fn seek(&self, pos: io::SeekFrom) -> Result<usize> {
         let return_code = unsafe { ll::lfs_file_seek(
             &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.borrow_mut().state,
             pos.off(),
             pos.whence(),
         ) };
-        Error::usize_result_from(return_code)
+        io::result_from(return_code).map(|position| position as usize)
     }
 }
 
@@ -954,7 +958,7 @@ impl<S: driver::Storage> io::Write for File<'_, '_, S>
             buf.as_ptr() as *const cty::c_void,
             buf.len() as u32,
         ) };
-        Error::usize_result_from(return_code)
+        io::result_from(return_code).map(|written| written as usize)
     }
 
     fn flush(&self) -> Result<()> { Ok(()) }
@@ -1055,7 +1059,7 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S>
             return None
         }
 
-        Some(Err(Error::result_from(return_code).unwrap_err()))
+        Some(Err(io::result_from(return_code).map(drop).unwrap_err()))
     }
 }
 
@@ -1081,7 +1085,7 @@ impl<S: driver::Storage> ReadDir<'_, '_, S> {
             &mut self.fs.alloc.borrow_mut().state,
             &mut self.alloc.borrow_mut().state,
         ) };
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 }
 
@@ -1128,7 +1132,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
             path,
         };
 
-        Error::result_from(return_code).map(|_| read_dir)
+        io::result_from(return_code).map(drop).map(|_| read_dir)
     }
 
 }
@@ -1145,7 +1149,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let mut alloc = fs.alloc.borrow_mut();
         let return_code = unsafe { ll::lfs_mount(&mut alloc.state, &alloc.config) };
         drop(alloc);
-        Error::result_from(return_code).map(move |_| { fs } )
+        io::result_from(return_code).map(drop).map(move |_| { fs } )
     }
 
     // Not public, user should use `mount`, possibly after `format`
@@ -1175,7 +1179,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
             &mut self.alloc.borrow_mut().state,
             &path.into()[..] as *const _ as *const cty::c_char,
         ) };
-        Error::result_from(return_code)
+        io::result_from(return_code).map(drop)
     }
 
     /// Recursively create a directory and all of its parent components if they are missing.
@@ -1334,11 +1338,11 @@ mod tests {
                     }
 
                     // WE CANNOT REMOVE THE NEXT FILE
-                    // // can we `remove` the "next" file?
-                    // if entry.file_name() == Filename::new(b"b.txt") {
-                    //     println!("deleting c.txt");
-                    //     fs.remove("/tmp/test/c.txt")?;
-                    // }
+                    // can we `remove` the "next" file?
+                    if entry.file_name() == Filename::new(b"b.txt") {
+                        println!("deleting c.txt");
+                        fs.remove("/tmp/test/c.txt")?;
+                    }
 
                     // adding file while iterating!
                     if i == 1 {
