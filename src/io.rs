@@ -59,7 +59,7 @@ pub trait Write {
 
 Use the [`Seek`](../io/trait.Seek.html) trait.
 */
-#[derive(Clone,Copy,Debug,Eq,PartialEq)]
+#[derive(Clone,Copy,Debug,Eq,PartialEq,uDebug)]
 pub enum SeekFrom {
     Start(u32),
     End(i32),
@@ -131,39 +131,26 @@ pub enum Error {
     Unknown(i32),
 }
 
-// TODO: Should this return an enum ErrorCode { Result<()>, usize } ?
-impl Error {
-    pub(crate) fn result_from(error_code: ll::lfs_error) -> Result<()> {
-        match error_code {
-            // negative codes
-            ll::lfs_error_LFS_ERR_IO => Err(Error::Io),
-            ll::lfs_error_LFS_ERR_CORRUPT => Err(Error::Corruption),
-            ll::lfs_error_LFS_ERR_NOENT => Err(Error::NoSuchEntry),
-            ll::lfs_error_LFS_ERR_EXIST => Err(Error::EntryAlreadyExisted),
-            ll::lfs_error_LFS_ERR_NOTDIR => Err(Error::PathNotDir),
-            ll::lfs_error_LFS_ERR_ISDIR => Err(Error::PathIsDir),
-            ll::lfs_error_LFS_ERR_NOTEMPTY => Err(Error::DirNotEmpty),
-            ll::lfs_error_LFS_ERR_BADF => Err(Error::BadFileDescriptor),
-            ll::lfs_error_LFS_ERR_FBIG => Err(Error::FileTooBig),
-            ll::lfs_error_LFS_ERR_INVAL => Err(Error::Invalid),
-            ll::lfs_error_LFS_ERR_NOSPC => Err(Error::NoSpace),
-            ll::lfs_error_LFS_ERR_NOMEM => Err(Error::NoMemory),
-            ll::lfs_error_LFS_ERR_NOATTR => Err(Error::NoAttribute),
-            ll::lfs_error_LFS_ERR_NAMETOOLONG => Err(Error::FilenameTooLong),
-            ll::lfs_error_LFS_ERR_OK => Ok(()),
-            // positive codes should always indicate success
-            _ => Err(Error::Unknown(error_code)),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn usize_result_from(error_code: ll::lfs_error) -> Result<usize> {
-        let result = Error::result_from(error_code);
-        match result {
-            Ok(()) => Ok(0),
-            Err(Error::Unknown(value)) => Ok(value as usize),
-            Err(error) => Err(error),
-        }
+pub fn result_from(error_code: ll::lfs_error) -> Result<u32> {
+    match error_code {
+        n if n >= 0 => Ok(n as u32),
+        // negative codes
+        ll::lfs_error_LFS_ERR_IO => Err(Error::Io),
+        ll::lfs_error_LFS_ERR_CORRUPT => Err(Error::Corruption),
+        ll::lfs_error_LFS_ERR_NOENT => Err(Error::NoSuchEntry),
+        ll::lfs_error_LFS_ERR_EXIST => Err(Error::EntryAlreadyExisted),
+        ll::lfs_error_LFS_ERR_NOTDIR => Err(Error::PathNotDir),
+        ll::lfs_error_LFS_ERR_ISDIR => Err(Error::PathIsDir),
+        ll::lfs_error_LFS_ERR_NOTEMPTY => Err(Error::DirNotEmpty),
+        ll::lfs_error_LFS_ERR_BADF => Err(Error::BadFileDescriptor),
+        ll::lfs_error_LFS_ERR_FBIG => Err(Error::FileTooBig),
+        ll::lfs_error_LFS_ERR_INVAL => Err(Error::Invalid),
+        ll::lfs_error_LFS_ERR_NOSPC => Err(Error::NoSpace),
+        ll::lfs_error_LFS_ERR_NOMEM => Err(Error::NoMemory),
+        ll::lfs_error_LFS_ERR_NOATTR => Err(Error::NoAttribute),
+        ll::lfs_error_LFS_ERR_NAMETOOLONG => Err(Error::FilenameTooLong),
+        // positive codes should always indicate success
+        _ => Err(Error::Unknown(error_code)),
     }
 }
 

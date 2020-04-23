@@ -1,5 +1,4 @@
 #![cfg_attr(not(test), no_std)]
-// #![no_std]
 
 /*!
 
@@ -114,7 +113,7 @@ assert_eq!(&buf, b"black smoke");
 */
 
 /// Low-level bindings
-use littlefs2_sys as ll;
+pub use littlefs2_sys as ll;
 
 /// Re-export of `typenum::consts`.
 pub use generic_array::typenum::consts;

@@ -24,6 +24,7 @@ heapless = "0.5.4"
 # and test the `no_std` situation mainly.
 # Run UI tests with `cargo test --features ui-tests`.
 trybuild = { version = "1.0", optional = true }
+typenum = "1.12.0"
 ufmt = "0.1.0"
 
 [dependencies.littlefs2-sys]
