@@ -11,7 +11,7 @@ pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 
 use crate::{
     io::{self, Result},
-    path::{Filename, Path},
+    path::{Path, PathBuf},
     driver,
 };
 
@@ -293,28 +293,29 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     }
 
     /// Remove a file or directory.
-    pub fn remove(&self, path: impl Into<Path<Storage>>) -> Result<()> {
+    pub fn remove(&self, path: &Path) -> Result<()> {
         let return_code = unsafe { ll::lfs_remove(
             &mut self.alloc.borrow_mut().state,
-            &path.into()[..] as *const _ as *const cty::c_char,
+            path.as_ptr(),
         ) };
         io::result_from(return_code).map(drop)
     }
 
     /// Remove a file or directory.
-    pub fn remove_dir(&self, path: impl Into<Path<Storage>>) -> Result<()> {
+    pub fn remove_dir(&self, path: &Path) -> Result<()> {
         self.remove(path)
     }
 
     /// TODO: This method fails if some `println!` calls are removed.
     /// Whyy?
     #[cfg(feature = "dir-entry-path")]
-    pub fn remove_dir_all(&self, path: impl Into<Path<Storage>>) -> Result<()> {
-        let path: Path<_> = path.into();
+    pub fn remove_dir_all(&self, path: &Path) -> Result<()> {
 
-        self.read_dir_and_then(path.clone(), |read_dir| {
+        self.read_dir_and_then(path, |read_dir| {
             for (i, entry) in read_dir.enumerate() {
                 let entry = entry?;
+                #[cfg(test)]
+                println!("entry = {:?}", &entry);
 
                 // skip "." and ".."
                 if i < 2 {
@@ -335,15 +336,11 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     }
 
     /// Rename or move a file or directory.
-    pub fn rename(
-        &self,
-        from: impl Into<Path<Storage>>,
-        to: impl Into<Path<Storage>>,
-    ) -> Result<()> {
+    pub fn rename(&self, from: &Path, to: &Path) -> Result<()> {
         let return_code = unsafe { ll::lfs_rename(
             &mut self.alloc.borrow_mut().state,
-            &from.into()[..] as *const _ as *const cty::c_char,
-            &to.into()[..] as *const _ as *const cty::c_char,
+            from.as_ptr(),
+            to.as_ptr(),
         ) };
         io::result_from(return_code).map(drop)
     }
@@ -352,7 +349,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     ///
     /// To read user attributes, use
     /// [`Filesystem::attribute`](struct.Filesystem.html#method.attribute)
-    pub fn metadata(&self, path: impl Into<Path<Storage>>) -> Result<Metadata> {
+    pub fn metadata(&self, path: &Path) -> Result<Metadata> {
 
         // do *not* not call assume_init here and pass into the unsafe block.
         // strange things happen ;)
@@ -364,7 +361,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let return_code = unsafe {
             ll::lfs_stat(
                 &mut self.alloc.borrow_mut().state,
-                &path.into()[..] as *const _ as *const cty::c_char,
+                path.as_ptr(),
                 &mut info,
             )
         };
@@ -374,7 +371,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     pub fn create_file_and_then<R>(
         &self,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
     ) ->
         Result<R>
@@ -384,7 +381,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     pub fn open_file_and_then<R>(
         &self,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
     ) ->
         Result<R>
@@ -399,7 +396,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     pub fn open_file_with_options_and_then<R>(
         &self,
         o: impl FnOnce(&mut OpenOptions) -> &OpenOptions,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
     ) -> Result<R>
     {
@@ -411,7 +408,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// Read attribute.
     pub fn attribute(
         &self,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         id: u8,
     ) ->
         Result<Option<Attribute<Storage>>>
@@ -421,7 +418,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
         let return_code = unsafe { ll::lfs_getattr(
             &mut self.alloc.borrow_mut().state,
-            &path.into()[..] as *const _ as *const cty::c_char,
+            path.as_ptr(),
             id,
             &mut attribute.data as *mut _ as *mut cty::c_void,
             attr_max,
@@ -443,12 +440,12 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// Remove attribute.
     pub fn remove_attribute(
         &self,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         id: u8,
     ) -> Result<()> {
         let return_code = unsafe { ll::lfs_removeattr(
             &mut self.alloc.borrow_mut().state,
-            &path.into()[..] as *const _ as *const cty::c_char,
+            path.as_ptr(),
             id,
         ) };
         io::result_from(return_code).map(drop)
@@ -457,14 +454,14 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// Set attribute.
     pub fn set_attribute(
         &self,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         attribute: &Attribute<Storage>
     ) ->
         Result<()>
     {
         let return_code = unsafe { ll::lfs_setattr(
             &mut self.alloc.borrow_mut().state,
-            &path.into()[..] as *const _ as *const cty::c_char,
+            path.as_ptr(),
             attribute.id,
             &attribute.data as *const _ as *const cty::c_void,
             attribute.size as u32,
@@ -653,7 +650,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     pub unsafe fn open(
         fs: &'b Filesystem<'a, Storage>,
         alloc: &'b mut FileAllocation<Storage>,
-        path:  impl Into<Path<Storage>>,
+        path:  &Path,
     ) ->
         Result<Self>
     {
@@ -664,7 +661,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
 
     pub fn open_and_then<R>(
         fs: &Filesystem<'a, Storage>,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
     ) ->
         Result<R>
@@ -677,7 +674,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     pub unsafe fn create(
         fs: &'b Filesystem<'a, Storage>,
         alloc: &'b mut FileAllocation<Storage>,
-        path:  impl Into<Path<Storage>>,
+        path:  &Path,
     ) ->
         Result<Self>
     {
@@ -690,7 +687,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
 
     pub fn create_and_then<R>(
         fs: &Filesystem<'a, Storage>,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
     ) ->
         Result<R>
@@ -824,17 +821,16 @@ impl OpenOptions {
         &self,
         fs: &'b Filesystem<'a, S>,
         alloc: &'b mut FileAllocation<S>,
-        path: impl Into<Path<S>>,
+        path: &Path,
     ) ->
         Result<File<'a, 'b, S>>
     {
         alloc.config.buffer = &mut alloc.cache as *mut _ as *mut cty::c_void;
-        let path = path.into();
 
         let return_code = ll::lfs_file_opencfg(
                 &mut fs.alloc.borrow_mut().state,
                 &mut alloc.state,
-                &path[..] as *const _  as *const cty::c_char,
+                path.as_ptr(),
                 self.0.bits() as i32,
                 &alloc.config,
         );
@@ -851,7 +847,7 @@ impl OpenOptions {
     pub fn open_and_then<'a, R, S: driver::Storage>(
         &self,
         fs: &Filesystem<'a, S>,
-        path: impl Into<Path<S>>,
+        path: &Path,
         f: impl FnOnce(&File<'a, '_, S>) -> Result<R>,
     )
         -> Result<R>
@@ -965,14 +961,14 @@ impl<S: driver::Storage> io::Write for File<'_, '_, S>
 }
 
 #[derive(Clone,Debug,PartialEq)]
-pub struct DirEntry<S: driver::Storage> {
-    file_name: Filename<S>,
+pub struct DirEntry {
+    file_name: PathBuf,
     metadata: Metadata,
     #[cfg(feature = "dir-entry-path")]
-    path: Path<S>,
+    path: PathBuf,
 }
 
-impl<S: driver::Storage> DirEntry<S> {
+impl DirEntry {
     // // Returns the full path to the file that this entry represents.
     // pub fn path(&self) -> Path {}
 
@@ -987,16 +983,16 @@ impl<S: driver::Storage> DirEntry<S> {
     }
 
     // Returns the bare file name of this directory entry without any other leading path component.
-    pub fn file_name(&self) -> Filename<S> {
-        self.file_name.clone()
+    pub fn file_name(&self) -> &Path {
+        &self.file_name
     }
 
     /// Returns the full path to the file that this entry represents.
     ///
     /// The full path is created by joining the original path to read_dir with the filename of this entry.
     #[cfg(feature = "dir-entry-path")]
-    pub fn path(&self) -> Path<S> {
-        self.path.clone()
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
 }
@@ -1016,12 +1012,12 @@ pub struct ReadDir<'a, 'b, S: driver::Storage>
     alloc: RefCell<&'b mut ReadDirAllocation>,
     fs: &'b Filesystem<'a, S>,
     #[cfg(feature = "dir-entry-path")]
-    path: Path<S>,
+    path: PathBuf,
 }
 
 impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S>
 {
-    type Item = Result<DirEntry<S>>;
+    type Item = Result<DirEntry>;
 
     // remove this allowance again, once path overflow is properly handled
     #[allow(unreachable_code)]
@@ -1039,12 +1035,12 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S>
         };
 
         if return_code > 0 {
-            let file_name = Filename::from_littlefs_file_name_c_string(&info.name);
+            let file_name = unsafe { PathBuf::from_buffer(info.name) };
             let metadata = info.into();
 
             #[cfg(feature = "dir-entry-path")]
             // TODO: error handling...
-            let path = self.path.try_join(&file_name).unwrap();
+            let path = self.path.join(&file_name);
 
             let dir_entry = DirEntry {
                 file_name,
@@ -1094,7 +1090,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 
     pub fn read_dir_and_then<R>(
         &self,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         // *not* &ReadDir, as Iterator takes &mut
         f: impl FnOnce(&mut ReadDir<'_, '_, Storage>) -> Result<R>,
     ) -> Result<R>
@@ -1113,23 +1109,21 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 	pub unsafe fn read_dir<'b>(
         &'b self,
         alloc: &'b mut ReadDirAllocation,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
     ) ->
         Result<ReadDir<'a, 'b, Storage>>
     {
-        let path = path.into();
-
         let return_code = ll::lfs_dir_open(
             &mut self.alloc.borrow_mut().state,
             &mut alloc.state,
-            &path[..] as *const _ as *const cty::c_char,
+            path.as_ptr(),
         );
 
         let read_dir = ReadDir {
             alloc: RefCell::new(alloc),
             fs: self,
             #[cfg(feature = "dir-entry-path")]
-            path,
+            path: PathBuf::from(path),
         };
 
         io::result_from(return_code).map(drop).map(|_| read_dir)
@@ -1173,45 +1167,70 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     }
 
     /// Creates a new, empty directory at the provided path.
-    pub fn create_dir(&self, path: impl Into<Path<Storage>>) -> Result<()> {
+    pub fn create_dir(&self, path: &Path) -> Result<()> {
 
+        #[cfg(test)]
+        println!("creating {:?}", path);
         let return_code = unsafe { ll::lfs_mkdir(
             &mut self.alloc.borrow_mut().state,
-            &path.into()[..] as *const _ as *const cty::c_char,
+            path.as_ptr(),
         ) };
         io::result_from(return_code).map(drop)
     }
 
     /// Recursively create a directory and all of its parent components if they are missing.
-    pub fn create_dir_all(&self, path: impl Into<Path<Storage>>) -> Result<()> {
+    pub fn create_dir_all(&self, path: &Path) -> Result<()> {
         // Placeholder implementation!
         // - Path should gain a few methods
         // - Maybe should pull in `heapless-bytes` (and merge upstream into `heapless`)
         // - All kinds of sanity checks and possible logic errors possible...
-        let path = path.into();
 
-        for i in 0..path.0.len() {
-            if path.0[i] == b'/' {
-                let dir = &path.0[..i];
-                match self.create_dir(dir) {
+        let path_slice = path.as_ref().as_bytes();
+        for i in 0..path_slice.len() {
+            if path_slice[i] == b'/' {
+                let dir = PathBuf::from(&path_slice[..i]);
+                #[cfg(test)]
+                println!("generated PathBuf dir {:?} using i = {}", &dir, i);
+                match self.create_dir(&dir) {
                     Ok(_) => {}
                     Err(io::Error::EntryAlreadyExisted) => {}
                     error => { panic!("{:?}", &error); }
                 }
             }
         }
-        match self.create_dir(&path.0[..]) {
+        match self.create_dir(path) {
             Ok(_) => {}
             Err(io::Error::EntryAlreadyExisted) => {}
             error => { panic!("{:?}", &error); }
         }
         Ok(())
+
+        // if path.as_ref() == "" {
+        //     return Ok(());
+        // }
+
+        // match self.create_dir(path) {
+        //     Ok(()) => return Ok(()),
+        //     Err(_) if path.is_dir() => return Ok(()),
+        //     Err(e) => return Err(e),
+        // }
+
+        // match path.parent() {
+        //     Some(p) => self.create_dir(p)?,
+        //     None => panic!("unexpected"),
+        // }
+
+        // match self.create_dir(path) {
+        //     Ok(()) => return Ok(()),
+        //     Err(e) => return Err(e),
+        // }
+
     }
 
     /// Read the entire contents of a file into a bytes vector.
     pub fn read<N: generic_array::ArrayLength<u8>>(
         &self,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
     )
         -> Result<heapless::Vec<u8, N>>
     {
@@ -1230,10 +1249,12 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     /// and will entirely replace its contents if it does.
     pub fn write(
         &self,
-        path: impl Into<Path<Storage>>,
+        path: &Path,
         contents: &[u8],
     ) -> Result<()>
     {
+        #[cfg(test)]
+        println!("writing {:?}", path);
         File::create_and_then(self, path, |file| {
             use io::Write;
             file.write_all(contents)
@@ -1246,6 +1267,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::convert::TryInto;
     use generic_array::typenum::consts;
     use driver::Storage as LfsStorage;
     use io::Result as LfsResult;
@@ -1262,12 +1284,14 @@ mod tests {
         Filesystem::mount_and_then(&mut test_storage, |fs| {
 
             println!("blocks going in: {}", fs.available_blocks()?);
-            fs.create_dir_all("/tmp/test")?;
+            fs.create_dir_all(b"/tmp/test\0".try_into().unwrap())?;
+            println!("dir done");
             // let weird_filename = b"/tmp/test/a.t\x7fxt";
             // fs.write(&weird_filename[..], jackson5)?;
-            fs.write(b"/tmp/test/a.t\x7fxt".as_ref(), jackson5)?;
-            fs.write("/tmp/test/b.txt", jackson5)?;
-            fs.write("/tmp/test/c.txt", jackson5)?;
+            fs.write(b"/tmp/test/a.txt\0".try_into().unwrap(), jackson5)?;
+            println!("a.txt");
+            fs.write(b"/tmp/test/b.txt\0".try_into().unwrap(), jackson5)?;
+            fs.write(b"/tmp/test/c.txt\0".try_into().unwrap(), jackson5)?;
             println!("blocks after 3 files of size 3: {}", fs.available_blocks()?);
 
             // Not only does this need "unsafe", but also the compiler catches
@@ -1278,22 +1302,22 @@ mod tests {
             // }).unwrap();
 
             #[cfg(feature = "dir-entry-path")]
-            fs.read_dir_and_then("/", |read_dir| {
+            fs.read_dir_and_then(b"/\0".try_into().unwrap(), |read_dir| {
                 for entry in read_dir {
-                    let entry: DirEntry<_> = entry?;
+                    let entry = entry?;
                     println!("{:?} --> path = {:?}", entry.file_name(), entry.path());
                 }
                 Ok(())
             })?;
 
-            fs.read_dir_and_then("/tmp", |read_dir| {
+            fs.read_dir_and_then(b"/tmp\0".try_into().unwrap(), |read_dir| {
                 for entry in read_dir {
                     println!("entry: {:?}", entry?.file_name());
                 }
                 Ok(())
             })?;
 
-            fs.read_dir_and_then("/tmp/test", |read_dir| {
+            fs.read_dir_and_then(b"/tmp/test\0".try_into().unwrap(), |read_dir| {
                 for entry in read_dir {
                     let entry = entry?;
                     println!("entry: {:?}", entry.file_name());
@@ -1315,7 +1339,7 @@ mod tests {
             })?;
 
             #[cfg(feature = "dir-entry-path")]
-            fs.read_dir_and_then("/tmp/test", |read_dir| {
+            fs.read_dir_and_then(b"/tmp/test\0".try_into().unwrap(), |read_dir| {
                 for (i, entry) in read_dir.enumerate() {
                     let entry = entry?;
                     println!("\nfile {}: {:?}", i, entry.file_name());
@@ -1337,17 +1361,17 @@ mod tests {
                         fs.remove(entry.path())?;
                     }
 
-                    // WE CANNOT REMOVE THE NEXT FILE
-                    // can we `remove` the "next" file?
-                    if entry.file_name() == Filename::new(b"b.txt") {
-                        println!("deleting c.txt");
-                        fs.remove("/tmp/test/c.txt")?;
-                    }
+                    // // WE CANNOT REMOVE THE NEXT FILE
+                    // // can we `remove` the "next" file?
+                    // if entry.file_name() == "b.txt"{
+                    //     println!("deleting c.txt");
+                    //     fs.remove(&PathBuf::from(b"/tmp/test/c.txt\0"))?;
+                    // }
 
                     // adding file while iterating!
                     if i == 1 {
                         println!("writing new file");
-                        fs.write("/tmp/test/out-of-nowhere.txt", &[])?;
+                        fs.write(b"/tmp/test/out-of-nowhere.txt\0".try_into().unwrap(), &[])?;
                     }
 
                 }
@@ -1356,7 +1380,13 @@ mod tests {
 
             #[cfg(feature = "dir-entry-path")] {
                 println!("\nDELETION SPREE\n");
-                fs.remove_dir_all("/tmp")?;
+                // behaves veeryweirldy
+                // (...)
+                // entry = DirEntry { file_name: "test", metadata: Metadata { file_type: Dir, size: 0 }, path: "/tmp\u{0}/test" }
+                // (...)
+                // fs.remove_dir_all(&PathBuf::from(b"/tmp\0"))?;
+                // fs.remove_dir_all(&PathBuf::from(b"/tmp"))?;
+                fs.remove_dir_all(b"/tmp\0".try_into().unwrap())?;
             }
 
             Ok(())
@@ -1364,7 +1394,8 @@ mod tests {
 
         let mut alloc = Allocation::new();
         let fs = Filesystem::mount(&mut alloc, &mut test_storage).unwrap();
-        fs.write("/z.txt", &jackson5).unwrap();
+        // fs.write(b"/z.txt\0".try_into().unwrap(), &jackson5).unwrap();
+        fs.write(&PathBuf::from(b"/z.txt"), &jackson5).unwrap();
     }
 
     #[cfg(feature = "dir-entry-path")]
@@ -1377,13 +1408,13 @@ mod tests {
         Filesystem::format(&mut test_storage).unwrap();
         Filesystem::mount_and_then(&mut test_storage, |fs| {
 
-            fs.create_dir_all("/tmp/test")?;
-            fs.write(b"/tmp/test/a.txt".as_ref(), jackson5)?;
-            fs.write("/tmp/test/b.txt", jackson5)?;
-            fs.write("/tmp/test/c.txt", jackson5)?;
+            fs.create_dir_all(b"/tmp/test\0".try_into().unwrap())?;
+            fs.write(b"/tmp/test/a.txt\0".try_into().unwrap(), jackson5)?;
+            fs.write(b"/tmp/test/b.txt\0".try_into().unwrap(), jackson5)?;
+            fs.write(b"/tmp/test/c.txt\0".try_into().unwrap(), jackson5)?;
 
             println!("\nDELETION SPREE\n");
-            fs.remove_dir_all("/tmp")?;
+            fs.remove_dir_all(b"/tmp\0".try_into().unwrap())?;
 
             Ok(())
         }).unwrap();
@@ -1391,7 +1422,7 @@ mod tests {
 
     #[test]
     fn path() {
-        let _path: Path<TestStorage> = b"a.txt"[..].into();
+        let _path: &Path = b"a.txt\0".try_into().unwrap();
     }
 
     #[test]
@@ -1399,7 +1430,7 @@ mod tests {
         let mut test_storage = TestStorage::new();
         Filesystem::format(&mut test_storage).unwrap();
         Filesystem::mount_and_then(&mut test_storage, |fs| {
-            let filename = "append.to.me";
+            let filename = b"append.to.me\0".try_into().unwrap();
             fs.write(filename, b"first part")?;
 
             fs.open_file_with_options_and_then(
@@ -1407,10 +1438,7 @@ mod tests {
                 filename,
                 |file| {
                     // this is a bit of a pitfall :)
-                    use io::Seek;
                     file.seek(io::SeekFrom::End(0))?;
-
-                    use io::Write;
                     file.write(b" - ")?;
                     file.write(b"second part")?;
 
@@ -1432,11 +1460,11 @@ mod tests {
         Filesystem::format(&mut test_storage).unwrap();
         Filesystem::mount_and_then(&mut test_storage, |fs| {
 
-            fs.write("a\x7f.txt", &[])?;
-            fs.write("b.txt", &[])?;
-            fs.write("c.txt", &[])?;
+            fs.write(b"a.txt\0".try_into().unwrap(), &[])?;
+            fs.write(b"b.txt\0".try_into().unwrap(), &[])?;
+            fs.write(b"c.txt\0".try_into().unwrap(), &[])?;
 
-            fs.read_dir_and_then(".", |read_dir| {
+            fs.read_dir_and_then(b".\0".try_into().unwrap(), |read_dir| {
                 for entry in read_dir {
                     let entry = entry?;
                     println!("{:?}", entry.file_name());
@@ -1447,7 +1475,7 @@ mod tests {
                     //
                     if entry.metadata.is_file() {
                         fs.write(
-                            &entry.file_name()[..],
+                            &entry.file_name(),
                             b"wowee zowie"
                         )?;
                     }
@@ -1467,12 +1495,12 @@ mod tests {
         Filesystem::format(&mut test_storage).unwrap();
         Filesystem::mount_and_then(&mut test_storage, |fs| {
 
-            fs.write("a.txt", &[])?;
-            fs.write("b.txt", &[])?;
-            fs.write("c.txt", &[])?;
+            fs.write(b"a.txt\0".try_into().unwrap(), &[])?;
+            fs.write(b"b.txt\0".try_into().unwrap(), &[])?;
+            fs.write(b"c.txt\0".try_into().unwrap(), &[])?;
 
             // works fine
-            fs.read_dir_and_then(".", |read_dir| {
+            fs.read_dir_and_then(b".\0".try_into().unwrap(), |read_dir| {
                 for entry in read_dir {
                     let entry = entry?;
                     println!("{:?}", entry.file_type());
@@ -1481,14 +1509,12 @@ mod tests {
             })?;
 
 
-            use io::Write;
-
             let mut a1 = File::allocate();
-            let f1 = unsafe { File::open(&fs, &mut a1, "a.txt")? };
+            let f1 = unsafe { File::open(&fs, &mut a1, b"a.txt\0".try_into().unwrap())? };
             f1.write(b"some text")?;
 
             let mut a2 = File::allocate();
-            let f2 = unsafe { File::open(&fs, &mut a2, "b.txt")? };
+            let f2 = unsafe { File::open(&fs, &mut a2, b"b.txt\0".try_into().unwrap())? };
             f2.write(b"more text")?;
 
             unsafe { f1.close()? }; // program hangs here

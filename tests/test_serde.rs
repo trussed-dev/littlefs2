@@ -2,7 +2,8 @@ use littlefs2::{
     consts,
     driver,
     fs::Filesystem,
-    io::{Result, prelude::*},
+    io::Result,
+    path::Path,
     ram_storage,
 };
 
@@ -35,8 +36,8 @@ fn main() {
     let size = serialize(&mut buf, &entity).unwrap();
     assert_eq!(size, 28);
 
-    fs.write("entity.bin", &buf[..size]).unwrap();
-    fs.open_file_and_then("entity.bin", |file| {
+    fs.write(Path::from_bytes_with_nul(b"entity.bin\0").unwrap(), &buf[..size]).unwrap();
+    fs.open_file_and_then(Path::from_bytes_with_nul(b"entity.bin\0").unwrap(), |file| {
         file.read(&mut buf)
     }).unwrap();
     // let mut alloc = File::allocate();

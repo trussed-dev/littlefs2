@@ -1,391 +1,326 @@
-//! Path manipulation
+//! Paths
 
-use core::convert::AsRef;
-// use core::marker::PhantomData;
-use core::{cmp, fmt, mem};
-#[cfg(test)]
-use core::slice;
+use core::{convert::TryFrom, fmt, mem::MaybeUninit, ops, ptr, slice, str};
 
-use generic_array::{
-    ArrayLength,
-    typenum::marker_traits::Unsigned as _,
-};
+use cstr_core::CStr;
+use cty::{c_char, size_t};
 
-// TODO: use `heapless-bytes` instead?
-use heapless::Vec;
+use crate::consts;
 
-use crate::{
-    driver,
-};
-
-// TODO: add a `CString` type to heapless?
-// - meaning a "byte" string (not UTF-8)
-// - allocate "one more" than necessary
-// - keep invariants (data till first null, then only nulls)
-// - allow transforming in both directions
-
-// GENERALLY:
-// - littlefs has a notion of "max filename"
-// - our "max path" only comes from being alloc-free
-// - std::path distinguishes between Path and PathBuf (our Path is really their PathBuf)
-// - for filenames, std::path uses OsString
-//
-// At minimum get rid of copy-paste implementation of Filename/Path
-
-// pub trait CStringType {}
-// pub struct PathType {}
-// impl CStringType for PathType {}
-// pub struct FilenameType {}
-// impl CStringType for FilenameType {}
-
-// pub struct CString<T: CStringType, N: ArrayLength<u8>> (Vec<u8, N>, PhantomData<T>);
-
-// pub type Filename2<S> = CString<FilenameType, <S as driver::Storage>::FILENAME_MAX_PLUS_ONE>;
-
-// impl<S> core::ops::Deref for Filename2<S>
-// where
-//     S: driver::Storage,
-//     <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-// {
-//     type Target = [u8];
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }
-
-/// PREVIOUSLY...
-
-pub struct Filename<S> (Vec<u8, S::FILENAME_MAX_PLUS_ONE>)
-where
-    S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-;
-
-impl<S> core::ops::Deref for Filename<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-{
-    type Target = [u8];
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+/// A path
+///
+/// Paths must be null terminated ASCII strings
+///
+/// This assumption is not needed for littlefs itself (it works like Linux and
+/// accepts arbitrary C strings), but the assumption makes `AsRef<str>` trivial
+/// to implement.
+pub struct Path {
+    inner: CStr,
 }
 
-impl<S> core::ops::Deref for Path<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-{
-    type Target = [u8];
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl Path {
+    /// Creates a path from a byte buffer
+    ///
+    /// The buffer will be first interpreted as a `CStr` and then checked to be comprised only of
+    /// ASCII characters.
+    pub fn from_bytes_with_nul<'b>(bytes: &'b [u8]) -> Result<&'b Self> {
+        let cstr = CStr::from_bytes_with_nul(bytes).map_err(|_| Error::NotCStr)?;
+        Self::from_cstr(cstr)
     }
-}
 
-// to compare filename
-impl<S> cmp::PartialEq for Filename<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-{
-    fn eq(&self, other: &Self) -> bool {
-        // let shrunk_self = self.clone().shrunk_to_first_null();
-        // let shrunk_other = other.clone().shrunk_to_first_null();
-        // shrunk_self.0 == shrunk_other.0
-        self.0 == other.0
+    /// Unchecked version of `from_bytes_with_nul`
+    ///
+    /// # Safety
+    /// `bytes` must be null terminated string comprised of only ASCII characters
+    pub unsafe fn from_bytes_with_nul_unchecked(bytes: &[u8]) -> &Self {
+        &*(bytes as *const [u8] as *const Path)
     }
-}
 
-// to make `DirEntry` Clone
-impl<S> Clone for Filename<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-{
-    fn clone(&self) -> Self {
-        // the `Clone` impl skips unused bytes
-        Filename(self.0.clone()).shrunk_to_first_null()
-    }
-}
-
-// to make `Metadata` Debug
-impl<S> fmt::Debug for Filename<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // let len = self.0.iter().position(|b| *b == 0).unwrap_or(self.0.len());
-        // core::str::from_utf8(&self.0[..len]).unwrap().fmt(f)
-
-        use core::ascii::escape_default;
-        f.write_str("b'")?;
-        for byte in &self.0 {
-            for ch in escape_default(*byte) {
-                // Debug::fmt(unsafe { core::str::from_utf8_unchecked(&[ch]) }, f)?;
-                f.write_str(unsafe { core::str::from_utf8_unchecked(&[ch]) })?;
-                // f.write(&ch);
-            }
+    /// Creates a path from a C string
+    ///
+    /// The string will be checked to be comprised only of ASCII characters
+    // XXX should we reject empty paths (`""`) here?
+    pub fn from_cstr<'s>(cstr: &'s CStr) -> Result<&'s Self> {
+        let bytes = cstr.to_bytes();
+        let n = cstr.to_bytes().len();
+        if n > consts::PATH_MAX {
+            Err(Error::TooLarge)
+        } else if bytes.is_ascii() {
+            Ok(unsafe { Self::from_cstr_unchecked(cstr) })
+        } else {
+            Err(Error::NotAscii)
         }
-        f.write_str("'")?;
-        Ok(())
+    }
+
+    /// Unchecked version of `from_cstr`
+    ///
+    /// # Safety
+    /// `cstr` must be comprised only of ASCII characters
+    pub unsafe fn from_cstr_unchecked(cstr: &CStr) -> &Self {
+        &*(cstr as *const CStr as *const Path)
+    }
+
+    /// Returns the inner pointer to this C string.
+    pub(crate) fn as_ptr(&self) -> *const c_char {
+        self.inner.as_ptr()
+    }
+
+    /// Creates an owned `PathBuf` with `path` adjoined to `self`.
+    pub fn join(&self, path: &Path) -> PathBuf {
+        let mut p = PathBuf::from(self);
+        p.push(path);
+        p
     }
 }
 
-impl<S> Filename<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>
-{
-    /// Silently truncates to maximum configured path length
-    // pub fn new<F: AsRef<[u8]> + ?Sized>(f: &F) -> Self {
-    pub fn new(f: &[u8]) -> Self {
-        let mut filename = Filename(Default::default());
-        filename.resize_to_capacity();
+impl AsRef<str> for Path {
+    fn as_ref(&self) -> &str {
+        // NOTE(unsafe) ASCII is valid UTF-8
+        unsafe { str::from_utf8_unchecked(self.inner.to_bytes()) }
+    }
+}
 
-        let name_max = <S as driver::Storage>::FILENAME_MAX_PLUS_ONE::USIZE;
-        let len = cmp::min(name_max - 1, f.len());
+impl fmt::Debug for Path {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.as_ref())
+    }
+}
 
-        filename.0[..len].copy_from_slice(&f[..len]);
+impl fmt::Display for Path {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_ref())
+    }
+}
 
-        filename.shrink_to_first_null();
-        filename
+impl<'b> TryFrom<&'b [u8]> for &'b Path {
+    type Error = Error;
+
+    fn try_from(bytes: &[u8]) -> Result<&Path> {
+        Path::from_bytes_with_nul(bytes)
+    }
+}
+
+impl PartialEq<str> for Path {
+    fn eq(&self, rhs: &str) -> bool {
+        self.as_ref() == rhs
+    }
+}
+
+// without this you need to slice byte string literals (`b"foo\0"[..].try_into()`)
+macro_rules! array_impls {
+    ($($N:expr),+) => {
+        $(
+            impl<'b> TryFrom<&'b [u8; $N]> for &'b Path {
+                type Error = Error;
+
+                fn try_from(bytes: &[u8; $N]) -> Result<&Path> {
+                    Path::from_bytes_with_nul(&bytes[..])
+                }
+            }
+
+            impl From<&[u8; $N]> for PathBuf {
+                fn from(bytes: &[u8; $N]) -> Self {
+                    Self::from(&bytes[..])
+                }
+            }
+
+            impl PartialEq<[u8; $N]> for Path {
+                fn eq(&self, rhs: &[u8; $N]) -> bool {
+                    self.as_ref().as_bytes() == &rhs[..]
+                }
+            }
+
+        )+
+    }
+}
+
+array_impls!(
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+    28, 29, 30, 31, 32
+);
+
+/// An owned, mutable path
+#[derive(Clone)]
+pub struct PathBuf {
+    buf: [c_char; consts::PATH_MAX_PLUS_ONE],
+    // NOTE `len` DOES include the final null byte
+    len: usize,
+}
+
+/// # Safety
+/// `s` must point to valid memory; `s` will be treated as a null terminated string
+unsafe fn strlen(mut s: *const c_char) -> size_t {
+    let mut n = 0;
+    while *s != 0 {
+        s = s.add(1);
+        n += 1;
+    }
+    n
+}
+
+impl PathBuf {
+    pub(crate) unsafe fn from_buffer(buf: [c_char; consts::PATH_MAX_PLUS_ONE]) -> Self {
+        let len = strlen(buf.as_ptr()) + 1 /* null byte */;
+        PathBuf { buf, len }
     }
 
-    // pub fn as_bytes(&self) -> &[u8] {
-    //     &self.0
-    // }
+    /// Extends `self` with `path`
+    pub fn push(&mut self, path: &Path) {
+        match path.as_ref() {
+            // no-operation
+            "" => return,
 
-    pub fn shrink_to_first_null(&mut self) -> &mut Self {
-        self.resize_to_capacity();
-        let len = self.0.iter().position(|b| *b == 0).unwrap_or(self.0.len());
-        self.0.resize_default(len).unwrap();
-        // now clear potential "junk"
-        self.resize_to_capacity();
-        self.0.resize_default(len).unwrap();
-        self
-    }
+            // `self` becomes `/` (root), to match `std::Path` implementation
+            // NOTE(allow) cast is necessary on some architectures (e.g. x86)
+            #[allow(clippy::unnecessary_cast)]
+            "/" => {
+                self.buf[0] = b'/' as c_char;
+                self.buf[1] = 0;
+                self.len = 2;
+                return;
+            }
+            _ => {}
+        }
 
-    pub fn shrunk_to_first_null(self) -> Self {
-        let mut self_ = self;
-        self_.shrink_to_first_null();
-        self_
-    }
-
-
-    pub fn resize_to_capacity(&mut self) -> &mut Self {
-        self.0.resize_default(self.0.capacity()).unwrap();
-        self
-    }
-
-    // LFS_NAME_MAX + 1 = 256 is hardcoded in littlefs2-sys
-    // - can't actually change it via driver::Storage trait
-    // - need to fix in future..
-    pub fn from_littlefs_file_name_c_string(name: &[cty::c_char; 256]) -> Self {
-        let effective_length = name.iter().position(|b| *b == 0).unwrap_or(255);
-        let usable_length = cmp::min(
-            effective_length,
-            <S as driver::Storage>::FILENAME_MAX_PLUS_ONE::to_usize() - 1,
+        let src = path.as_ref().as_bytes();
+        let needs_separator = self
+            .as_ref()
+            .as_bytes()
+            .last()
+            .map(|byte| *byte != b'/')
+            .unwrap_or(false);
+        let slen = src.len();
+        #[cfg(test)]
+        println!("{}, {}, {}", self.len, slen, consts::PATH_MAX_PLUS_ONE);
+        assert!(
+            self.len
+                + slen
+                + if needs_separator {
+                    // b'/'
+                    1
+                } else {
+                    0
+                }
+                <= consts::PATH_MAX_PLUS_ONE
         );
 
-        // // explicit version
-        // let mut filename = Self::new(&[]);
-        // for i in 0..usable_length {
-        //     filename.0.push(name[i] as u8).unwrap();
-        // }
-        // filename
-
-        Self::new(unsafe { mem::transmute::<&[cty::c_char], &[u8]>(&name[..usable_length]) })
-    }
-
-    #[cfg(test)]
-    #[allow(dead_code)]
-    pub(crate) fn print_raw(&self) {
-        let underlying_array = unsafe {
-            let ptr = &self[..] as *const _ as *const u8;
-            slice::from_raw_parts(ptr, 255)
-        };
-        println!("-> raw path {:?}", &underlying_array);
+        let len = self.len;
+        unsafe {
+            let mut p = self.buf.as_mut_ptr().cast::<u8>().add(len - 1);
+            if needs_separator {
+                p.write(b'/');
+                p = p.add(1);
+                self.len += 1;
+            }
+            ptr::copy_nonoverlapping(src.as_ptr(), p, slen);
+            p.add(slen).write(0); // null byte
+            self.len += slen;
+        }
     }
 }
 
-/// A slice of a specification of the location of a [`File`](../fs/struct.File.html).
-///
-/// This module is rather incomplete, compared to `std::path`.
-pub struct Path<S> (pub(crate) Vec<u8, S::PATH_MAX_PLUS_ONE>)
-where
-    S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-;
-
-// to make `Metadata` Clone
-impl<S> Clone for Path<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-{
-    fn clone(&self) -> Self {
-        // the `Clone` impl skips unused bytes
-        Path(self.0.clone()).shrunk_to_first_null()
+impl From<&Path> for PathBuf {
+    fn from(path: &Path) -> Self {
+        let mut buf = MaybeUninit::<[c_char; consts::PATH_MAX_PLUS_ONE]>::uninit();
+        let bytes = path.as_ref().as_bytes();
+        let len = bytes.len();
+        unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len) }
+        Self {
+            buf: unsafe { buf.assume_init() },
+            len: len + 1,
+        }
     }
 }
 
-impl<S> PartialEq for Path<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-{
+impl From<&[u8]> for PathBuf {
+    fn from(bytes: &[u8]) -> Self {
+        let mut buf = [0; consts::PATH_MAX_PLUS_ONE];
+        let len = bytes.len();
+        assert!(len <= consts::PATH_MAX);
+        assert!(bytes.iter().position(|x| *x == 0).is_none());
+        unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len) }
+        Self {
+            buf,
+            len: len + 1,
+        }
+    }
+}
+
+impl ops::Deref for PathBuf {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        unsafe {
+            Path::from_bytes_with_nul_unchecked(slice::from_raw_parts(
+                self.buf.as_ptr().cast(),
+                self.len,
+            ))
+        }
+    }
+}
+
+impl fmt::Debug for PathBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <Path as fmt::Debug>::fmt(self, f)
+    }
+}
+
+impl fmt::Display for PathBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <Path as fmt::Display>::fmt(self, f)
+    }
+}
+
+impl core::cmp::PartialEq for PathBuf {
     fn eq(&self, other: &Self) -> bool {
-        // let shrunk_self = self.clone().shrunk_to_first_null();
-        // let shrunk_other = other.clone().shrunk_to_first_null();
-        // shrunk_self.0 == shrunk_other.0
-        self.0 == other.0
+        // from cstr_core
+        self == other
     }
 }
 
-// to make `Metadata` Debug
-impl<S> fmt::Debug for Path<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // let len = self.0.iter().position(|b| *b == 0).unwrap_or(self.0.len());
-        // core::str::from_utf8(&self.0[..len]).unwrap().fmt(f)
-
-        use core::ascii::escape_default;
-        f.write_str("b\"")?;
-        for byte in &self.0 {
-            for ch in escape_default(*byte) {
-                f.write_str(unsafe { core::str::from_utf8_unchecked(&[ch]) })?;
-            }
-        }
-        f.write_str("\"")?;
-        Ok(())
-    }
+/// Errors that arise from converting byte buffers into paths
+#[derive(Clone, Copy, Debug)]
+pub enum Error {
+    /// Byte buffer contains non-ASCII characters
+    NotAscii,
+    /// Byte buffer is not a C string
+    NotCStr,
+    /// Byte buffer is too long (longer than `consts::PATH_MAX_PLUS_ONE`)
+    TooLarge,
 }
 
-impl<S> Path<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>
-{
-    /// Silently truncates to maximum configured path length
-    pub fn new<P: AsRef<[u8]> + ?Sized>(p: &P) -> Self {
+/// Result type that has its Error variant set to `path::Error`
+pub type Result<T> = core::result::Result<T, Error>;
 
-        let mut path = Path(Default::default());
-        path.resize_to_capacity();
+#[cfg(tests)]
+mod tests {
+    use super::Path;
 
-        let path_max = <S as driver::Storage>::PATH_MAX_PLUS_ONE::USIZE;
-        let len = cmp::min(path_max - 1, p.as_ref().len());
+    #[test]
+    fn join() {
+        let empty = Path::from_bytes_with_nul(b"\0").unwrap();
+        let slash = Path::from_bytes_with_nul(b"/\0").unwrap();
+        let a = Path::from_bytes_with_nul(b"a\0").unwrap();
+        let b = Path::from_bytes_with_nul(b"b\0").unwrap();
 
-        path.0[..len].copy_from_slice(&p.as_ref()[..len]);
+        assert_eq!(empty.join(empty).as_ref(), "");
+        assert_eq!(empty.join(slash).as_ref(), "/");
+        assert_eq!(empty.join(a).as_ref(), "a");
+        assert_eq!(empty.join(b).as_ref(), "b");
 
-        path.shrink_to_first_null();
-        path
-    }
+        assert_eq!(slash.join(empty).as_ref(), "/");
+        assert_eq!(slash.join(slash).as_ref(), "/");
+        assert_eq!(slash.join(a).as_ref(), "/a");
+        assert_eq!(slash.join(b).as_ref(), "/b");
 
-    pub fn is_absolute(&self) -> bool {
-        self.has_root()
-    }
+        assert_eq!(a.join(empty).as_ref(), "a");
+        assert_eq!(a.join(slash).as_ref(), "/");
+        assert_eq!(a.join(a).as_ref(), "a/a");
+        assert_eq!(a.join(b).as_ref(), "a/b");
 
-    pub fn is_relative(&self) -> bool {
-        !self.is_absolute()
-    }
-
-    pub fn has_root(&self) -> bool {
-        self.0.len() > 0 && self.0[0] == b'/'
-    }
-
-    pub fn shrink_to_first_null(&mut self) -> &mut Self {
-        self.resize_to_capacity();
-        let len = self.0.iter().position(|b| *b == 0).unwrap_or(self.0.len());
-        self.0.resize_default(len).unwrap();
-        // now clear potential "junk"
-        self.resize_to_capacity();
-        self.0.resize_default(len).unwrap();
-        self
-    }
-
-    pub fn shrunk_to_first_null(self) -> Self {
-        let mut self_ = self;
-        self_.shrink_to_first_null();
-        self_
-    }
-
-    pub fn resize_to_capacity(&mut self) -> &mut Self {
-        self.0.resize_default(self.0.capacity()).unwrap();
-        self
-    }
-
-    #[cfg(test)]
-    #[allow(dead_code)]
-    fn print_raw(&self) {
-        let underlying_array = unsafe {
-            let ptr = &self[..] as *const _ as *const u8;
-            slice::from_raw_parts(ptr, 255)
-        };
-        println!("-> raw path {:?}", &underlying_array);
-    }
-
-    // what to do about possible "array-too-small" errors?
-    // what does littlefs actually do?
-    // one option would be:
-    //
-    // enum Path {
-    //   NotTruncated(RawPath),
-    //   Truncated(RawPath),
-    // }
-    //
-    // impl Deref<RawPath> for Path { ... }
-    //
-    // that is, never fail, but tag if truncation was necessary
-    // this way, no need to do error handling for the rare cases,
-    // but can still detect them
-
-    // pub fn join<P: AsRef<Path>>(&self, path: P) -> Path {
-    // }
-
-    pub fn try_join(&self, path: impl Into<Path<S>>) -> core::result::Result<Path<S>, ()> {
-        let mut joined = self.clone();
-        // yolo
-        if joined.0.len() > 0 {
-            if joined.0[joined.0.len() - 1] != b'/' {
-                joined.0.extend_from_slice(b"/")?;
-            }
-        }
-        joined.0.extend_from_slice(&path.into().0).map(|_| joined)
+        assert_eq!(b.join(empty).as_ref(), "b");
+        assert_eq!(b.join(slash).as_ref(), "/");
+        assert_eq!(b.join(a).as_ref(), "b/a");
+        assert_eq!(b.join(b).as_ref(), "b/b");
     }
 }
-
-impl<S> From<&str> for Path<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>
-{
-    fn from(p: &str) -> Path<S> {
-        Path::new(p.as_bytes())
-    }
-}
-
-impl<S> From<&[u8]> for Path<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>
-{
-    fn from(p: &[u8]) -> Path<S> {
-        Path::new(p)
-    }
-}
-
-impl<S> From<&Filename<S>> for Path<S>
-where
-    S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>
-{
-    fn from(p: &Filename<S>) -> Path<S> {
-        Path::new(&p[..])
-    }
-}
-
