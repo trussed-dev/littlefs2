@@ -81,6 +81,7 @@ Separately, keeping track of the allocations is a chore, we hope that
 ```
 # use littlefs2::fs::{Filesystem, File, OpenOptions};
 # use littlefs2::io::prelude::*;
+# use littlefs2::path::PathBuf;
 #
 # use littlefs2::{consts, ram_storage, driver, io::Result};
 #
@@ -100,7 +101,7 @@ let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 let mut buf = [0u8; 11];
 fs.open_file_with_options_and_then(
     |options| options.read(true).write(true).create(true),
-    "example.txt",
+    &PathBuf::from(b"example.txt"),
     |file| {
         file.write(b"Why is black smoke coming out?!")?;
         file.seek(SeekFrom::End(-24)).unwrap();
@@ -115,13 +116,11 @@ assert_eq!(&buf, b"black smoke");
 /// Low-level bindings
 pub use littlefs2_sys as ll;
 
-/// Re-export of `typenum::consts`.
-pub use generic_array::typenum::consts;
-
 /// cf. Macros documentation
 #[macro_use]
 pub mod macros;
 
+pub mod consts;
 pub mod driver;
 
 pub mod fs;

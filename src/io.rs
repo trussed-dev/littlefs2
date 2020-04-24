@@ -131,6 +131,12 @@ pub enum Error {
     Unknown(i32),
 }
 
+impl From<crate::path::Error> for Error {
+    fn from(_error: crate::path::Error) -> Self {
+        Error::Io
+    }
+}
+
 pub fn result_from(error_code: ll::lfs_error) -> Result<u32> {
     match error_code {
         n if n >= 0 => Ok(n as u32),
