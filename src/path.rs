@@ -1,9 +1,10 @@
 //! Paths
 
-use core::{convert::TryFrom, fmt, mem::MaybeUninit, ops, ptr, slice, str};
+use core::{convert::TryFrom, fmt, marker::PhantomData, mem::MaybeUninit, ops, ptr, slice, str};
 
 use cstr_core::CStr;
 use cty::{c_char, size_t};
+use ufmt::uwrite;
 
 use crate::consts;
 
@@ -71,6 +72,10 @@ impl Path {
         p.push(path);
         p
     }
+
+    pub fn exists<S: crate::driver::Storage>(&self, fs: &crate::fs::Filesystem<S>) -> bool {
+        fs.metadata(self).is_ok()
+    }
 }
 
 impl AsRef<str> for Path {
@@ -89,6 +94,15 @@ impl fmt::Debug for Path {
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_ref())
+    }
+}
+
+impl ufmt::uDebug for Path {
+    fn fmt<W: ?Sized>(&self, f: &mut ufmt::Formatter<W>) -> core::result::Result<(), W::Error>
+    where
+        W: ufmt::uWrite
+    {
+        uwrite!(f, "{:?}", self.as_ref().as_bytes())
     }
 }
 
@@ -159,6 +173,15 @@ unsafe fn strlen(mut s: *const c_char) -> size_t {
 }
 
 impl PathBuf {
+    pub fn new() -> Self {
+        Self { buf: [0; consts::PATH_MAX_PLUS_ONE], len: 1 }
+    }
+
+    pub fn clear(&mut self) {
+        self.buf = [0; consts::PATH_MAX_PLUS_ONE];
+        self.len = 1;
+    }
+
     pub(crate) unsafe fn from_buffer(buf: [c_char; consts::PATH_MAX_PLUS_ONE]) -> Self {
         let len = strlen(buf.as_ptr()) + 1 /* null byte */;
         PathBuf { buf, len }
@@ -192,6 +215,7 @@ impl PathBuf {
         let slen = src.len();
         #[cfg(test)]
         println!("{}, {}, {}", self.len, slen, consts::PATH_MAX_PLUS_ONE);
+        // hprintln!("{}, {}, {}", self.len, slen, consts::PATH_MAX_PLUS_ONE);
         assert!(
             self.len
                 + slen
@@ -234,6 +258,7 @@ impl From<&Path> for PathBuf {
 
 impl From<&[u8]> for PathBuf {
     fn from(bytes: &[u8]) -> Self {
+        // NB: This needs to set the final NUL byte
         let mut buf = [0; consts::PATH_MAX_PLUS_ONE];
         let len = bytes.len();
         assert!(len <= consts::PATH_MAX);
@@ -259,9 +284,59 @@ impl ops::Deref for PathBuf {
     }
 }
 
+
+impl serde::Serialize for PathBuf {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.as_ref().as_bytes())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PathBuf
+{
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ValueVisitor<'de>(PhantomData<&'de ()>);
+
+        impl<'de> serde::de::Visitor<'de> for ValueVisitor<'de>
+        {
+            type Value = PathBuf;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a path buffer")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> core::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v.len() > consts::PATH_MAX {
+                    return Err(E::invalid_length(v.len(), &self))?;
+                }
+                Ok(PathBuf::from(v))
+            }
+        }
+
+        deserializer.deserialize_bytes(ValueVisitor(PhantomData))
+    }
+}
+
 impl fmt::Debug for PathBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         <Path as fmt::Debug>::fmt(self, f)
+    }
+}
+
+impl ufmt::uDebug for PathBuf {
+    fn fmt<W: ?Sized>(&self, f: &mut ufmt::Formatter<W>) -> core::result::Result<(), W::Error>
+    where
+        W: ufmt::uWrite
+    {
+        <Path as ufmt::uDebug>::fmt(self, f)
     }
 }
 
@@ -277,6 +352,8 @@ impl core::cmp::PartialEq for PathBuf {
         self == other
     }
 }
+
+impl core::cmp::Eq for PathBuf {}
 
 /// Errors that arise from converting byte buffers into paths
 #[derive(Clone, Copy, Debug)]
