@@ -154,7 +154,7 @@ pub struct Filesystem<'a, Storage: driver::Storage> {
 }
 
 /// Regular file vs directory
-#[derive(Clone,Copy,Debug,Eq,Hash,PartialEq)]
+#[derive(Clone,Copy,Debug,Eq,Hash,PartialEq,ufmt::derive::uDebug,serde::Serialize,serde::Deserialize)]
 pub enum FileType {
     File,
     Dir,
@@ -173,7 +173,7 @@ impl FileType {
 }
 
 /// File type (regular vs directory) and size of a file.
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone,Debug,Eq,PartialEq,ufmt::derive::uDebug,serde::Serialize,serde::Deserialize)]
 pub struct Metadata {
     file_type: FileType,
     size: usize,
@@ -960,7 +960,7 @@ impl<S: driver::Storage> io::Write for File<'_, '_, S>
     fn flush(&self) -> Result<()> { Ok(()) }
 }
 
-#[derive(Clone,Debug,PartialEq)]
+#[derive(Clone,Debug,PartialEq,Eq, ufmt::derive::uDebug,serde::Serialize,serde::Deserialize)]
 pub struct DirEntry {
     file_name: PathBuf,
     metadata: Metadata,
@@ -993,6 +993,14 @@ impl DirEntry {
     #[cfg(feature = "dir-entry-path")]
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    #[cfg(feature = "dir-entry-path")]
+    #[doc(hidden)]
+    // This is used in `crypto-service` to "namespace" paths
+    // by mutating a DirEntry in-place.
+    pub unsafe fn path_buf_mut(&mut self) -> &mut PathBuf {
+        &mut self.path
     }
 
 }
