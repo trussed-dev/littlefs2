@@ -1,6 +1,6 @@
 //! Paths
 
-use core::{convert::TryFrom, fmt, marker::PhantomData, mem::MaybeUninit, ops, ptr, slice, str};
+use core::{convert::TryFrom, fmt, marker::PhantomData, ops, ptr, slice, str};
 
 use cstr_core::CStr;
 use cty::{c_char, size_t};
@@ -76,6 +76,11 @@ impl Path {
     pub fn exists<S: crate::driver::Storage>(&self, fs: &crate::fs::Filesystem<S>) -> bool {
         fs.metadata(self).is_ok()
     }
+
+    // helpful for debugging wither the trailing nul is indeed a trailing nul.
+    pub fn as_str_ref_with_trailing_nul(&self) -> &str {
+        unsafe { str::from_utf8_unchecked(self.inner.to_bytes_with_nul()) }
+    }
 }
 
 impl AsRef<str> for Path {
@@ -87,7 +92,8 @@ impl AsRef<str> for Path {
 
 impl fmt::Debug for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.as_ref())
+        // helpful for debugging wither the trailing nul is indeed a trailing nul.
+        write!(f, "p{:?}", self.as_str_ref_with_trailing_nul())
     }
 }
 
@@ -245,12 +251,14 @@ impl PathBuf {
 
 impl From<&Path> for PathBuf {
     fn from(path: &Path) -> Self {
-        let mut buf = MaybeUninit::<[c_char; consts::PATH_MAX_PLUS_ONE]>::uninit();
         let bytes = path.as_ref().as_bytes();
+
+        let mut buf = [0; consts::PATH_MAX_PLUS_ONE];
         let len = bytes.len();
-        unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len) }
+        assert!(len <= consts::PATH_MAX);
+        unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len + 1) }
         Self {
-            buf: unsafe { buf.assume_init() },
+            buf,
             len: len + 1,
         }
     }
@@ -262,7 +270,7 @@ impl From<&[u8]> for PathBuf {
         let mut buf = [0; consts::PATH_MAX_PLUS_ONE];
         let len = bytes.len();
         assert!(len <= consts::PATH_MAX);
-        assert!(bytes.iter().position(|x| *x == 0).is_none());
+        assert!(bytes.is_ascii());
         unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len) }
         Self {
             buf,
@@ -349,11 +357,31 @@ impl fmt::Display for PathBuf {
 impl core::cmp::PartialEq for PathBuf {
     fn eq(&self, other: &Self) -> bool {
         // from cstr_core
-        self == other
+        self.as_ref() == other.as_ref()
+
+        // // use cortex_m_semihosting::hprintln;
+        // // hprintln!("inside PathBuf PartialEq");
+        // // hprintln!("self.len {}, other.len {}", self.len, other.len).ok();
+        // // hprintln!("self..len {:?}, other..len {:?}", &self.buf[..self.len], &other.buf[..other.len]).ok();
+        // self.len == other.len && self.buf[..self.len - 1] == other.buf[..other.len - 1]
     }
 }
 
 impl core::cmp::Eq for PathBuf {}
+
+// use core::cmp::Ordering;
+
+// impl Ord for PathBuf {
+//     fn cmp(&self, other: &Self) -> Ordering {
+//         self.len.cmp(&other.len)
+//     }
+// }
+
+// impl PartialOrd for PathBuf {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//         Some(self.cmp(other))
+//     }
+// }
 
 /// Errors that arise from converting byte buffers into paths
 #[derive(Clone, Copy, Debug)]
