@@ -81,6 +81,22 @@ impl Path {
     pub fn as_str_ref_with_trailing_nul(&self) -> &str {
         unsafe { str::from_utf8_unchecked(self.inner.to_bytes_with_nul()) }
     }
+
+    pub fn parent(&self) -> Option<PathBuf> {
+        let rk_path_bytes = self.as_ref()[..].as_bytes();
+        match rk_path_bytes.iter().rposition(|x| *x == b'/') {
+            Some(slash_index) => {
+                // if we have a directory that ends with `/`,
+                // still need to "go up" one parent
+                if slash_index + 1 == rk_path_bytes.len() {
+                    PathBuf::from(&rk_path_bytes[..slash_index]).parent()
+                } else {
+                    Some(PathBuf::from(&rk_path_bytes[..slash_index]))
+                }
+            }
+            None => None,
+        }
+    }
 }
 
 impl AsRef<str> for Path {
