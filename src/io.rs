@@ -5,11 +5,8 @@ pub mod prelude;
 use littlefs2_sys as ll;
 
 use crate::{
-    fs::{
-        Filesystem,
-        SeekFrom,
-    },
     driver::Storage,
+    fs::{Filesystem, SeekFrom},
 };
 
 /// The `Read` trait allows for reading bytes from a file.
@@ -28,12 +25,14 @@ pub trait Read<'alloc, S: Storage> {
         fs: &mut Filesystem<'alloc, S>,
         storage: &mut S,
         mut buf: &mut [u8],
-    ) -> Result<()>
-    {
+    ) -> Result<()> {
         while !buf.is_empty() {
             match self.read(fs, storage, buf) {
                 Ok(0) => break,
-                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; },
+                Ok(n) => {
+                    let tmp = buf;
+                    buf = &mut tmp[n..];
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -57,7 +56,10 @@ pub trait ReadWith {
         while !buf.is_empty() {
             match self.read(buf) {
                 Ok(0) => break,
-                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; },
+                Ok(n) => {
+                    let tmp = buf;
+                    buf = &mut tmp[n..];
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -90,12 +92,7 @@ pub trait Write<'alloc, S: Storage> {
     ) -> Result<usize>;
 
     /// Write out all pending writes to storage.
-    fn flush(
-        &mut self,
-        fs: &mut Filesystem<'alloc, S>,
-        storage: &mut S,
-    ) -> Result<()>;
-
+    fn flush(&mut self, fs: &mut Filesystem<'alloc, S>, storage: &mut S) -> Result<()>;
 }
 
 pub trait WriteWith {
@@ -107,15 +104,13 @@ pub trait WriteWith {
 
     /// Write out all pending writes to storage.
     fn flush(&mut self) -> Result<()>;
-
 }
 
 /** The `Seek` trait provides a cursor which can be moved within a file.
 
 It is possible to seek relative to either end or the current offset.
 */
-pub trait Seek<'alloc, S: Storage>
-{
+pub trait Seek<'alloc, S: Storage> {
     /// Seek to an offset in bytes.
     /// If successful, returns the new position from start of file.
     fn seek(
@@ -135,7 +130,7 @@ pub trait SeekWith {
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Definition of errors that might be returned by filesystem functionality.
-#[derive(Clone,Copy,Debug,PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Error {
     /// Input / output error occurred.
     Io,
@@ -204,4 +199,3 @@ impl Error {
         }
     }
 }
-

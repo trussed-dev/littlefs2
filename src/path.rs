@@ -1,26 +1,16 @@
 //! Path manipulation
 
 use core::convert::AsRef;
-use core::{
-    cmp,
-    fmt,
-};
+use core::{cmp, fmt};
 
-use generic_array::{
-    ArrayLength,
-    GenericArray,
-    typenum::marker_traits::Unsigned as _,
-};
+use generic_array::{typenum::marker_traits::Unsigned as _, ArrayLength, GenericArray};
 
-use crate::{
-    driver,
-};
+use crate::driver;
 
-pub struct Filename<S> (GenericArray<u8, S::FILENAME_MAX_PLUS_ONE>)
+pub struct Filename<S>(GenericArray<u8, S::FILENAME_MAX_PLUS_ONE>)
 where
     S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
-;
+    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>;
 
 // to compare filename
 impl<S> cmp::PartialEq for Filename<S>
@@ -60,7 +50,7 @@ where
 impl<S> Filename<S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>
+    <S as driver::Storage>::FILENAME_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     /// Silently truncates to maximum configured path length
     // pub fn new<F: AsRef<[u8]> + ?Sized>(f: &F) -> Self {
@@ -78,11 +68,10 @@ where
 /// A slice of a specification of the location of a [`File`](../fs/struct.File.html).
 ///
 /// This module is rather incomplete, compared to `std::path`.
-pub struct Path<S> (GenericArray<u8, S::PATH_MAX_PLUS_ONE>)
+pub struct Path<S>(GenericArray<u8, S::PATH_MAX_PLUS_ONE>)
 where
     S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
-;
+    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>;
 
 // to make `Metadata` Clone
 impl<S> Clone for Path<S>
@@ -111,7 +100,7 @@ where
 impl<S> Path<S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>
+    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     /// Silently truncates to maximum configured path length
     pub fn new<P: AsRef<[u8]> + ?Sized>(p: &P) -> Self {
@@ -138,7 +127,7 @@ where
 impl<S> From<&str> for Path<S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>
+    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     fn from(p: &str) -> Path<S> {
         Path::new(p.as_bytes())
@@ -148,10 +137,9 @@ where
 impl<S> From<&[u8]> for Path<S>
 where
     S: driver::Storage,
-    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>
+    <S as driver::Storage>::PATH_MAX_PLUS_ONE: ArrayLength<u8>,
 {
     fn from(p: &[u8]) -> Path<S> {
         Path::new(p)
     }
 }
-

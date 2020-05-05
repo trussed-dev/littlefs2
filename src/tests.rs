@@ -1,26 +1,10 @@
 use generic_array::typenum::consts;
 
 use crate::{
-    fs::{
-        Attribute,
-        File,
-        FileWith,
-        Filesystem,
-        FilesystemWith,
-        OpenOptions,
-        SeekFrom,
-    },
-    io::{
-        Error,
-        Result,
-        Read,
-        ReadWith,
-        Write,
-        WriteWith,
-        Seek,
-    },
-    path::Filename,
     driver,
+    fs::{Attribute, File, FileWith, Filesystem, FilesystemWith, OpenOptions, SeekFrom},
+    io::{Error, Read, ReadWith, Result, Seek, Write, WriteWith},
+    path::Filename,
 };
 
 ram_storage!(
@@ -70,7 +54,8 @@ fn format() {
     // should fail: FS is not formatted
     assert_eq!(
         Filesystem::mount(&mut alloc, &mut storage)
-            .map(drop).unwrap_err(),
+            .map(drop)
+            .unwrap_err(),
         Error::Corruption
     );
     // should succeed
@@ -107,7 +92,6 @@ fn borrow_fs_allocation() {
     let mut alloc_file = File::allocate();
     let _file = File::create("data.bin", &mut alloc_file, &mut fs, &mut storage).unwrap();
     File::create("data.bin", &mut alloc_file, &mut fs, &mut storage).unwrap();
-
 }
 
 #[test]
@@ -120,16 +104,21 @@ fn test_fs_with() -> Result<()> {
     // let mut fs = Filesystem::mount(&mut alloc_fs, &mut storage)?.with(&mut storage);
 
     assert_eq!(fs.total_blocks(), 512);
-    assert_eq!(fs.total_space(), 256*512);
+    assert_eq!(fs.total_space(), 256 * 512);
     // superblock
     assert_eq!(fs.available_blocks()?, 512 - 2);
     assert_eq!(fs.available_space()?, 130_560);
 
-    fs.create_dir("/tmp")?;       assert_eq!(fs.available_blocks()?, 512 - 4);
-    fs.create_dir("/mnt")?;       assert_eq!(fs.available_blocks()?, 512 - 6);
-    fs.rename("tmp", "mnt/tmp")?; assert_eq!(fs.available_blocks()?, 512 - 6);
-    fs.remove("/mnt/tmp")?;       assert_eq!(fs.available_blocks()?, 512 - 4);
-    fs.remove("/mnt")?;           assert_eq!(fs.available_blocks()?, 512 - 2);
+    fs.create_dir("/tmp")?;
+    assert_eq!(fs.available_blocks()?, 512 - 4);
+    fs.create_dir("/mnt")?;
+    assert_eq!(fs.available_blocks()?, 512 - 6);
+    fs.rename("tmp", "mnt/tmp")?;
+    assert_eq!(fs.available_blocks()?, 512 - 6);
+    fs.remove("/mnt/tmp")?;
+    assert_eq!(fs.available_blocks()?, 512 - 4);
+    fs.remove("/mnt")?;
+    assert_eq!(fs.available_blocks()?, 512 - 2);
 
     let mut alloc_file = File::allocate();
 
@@ -162,7 +151,7 @@ fn test_create() {
     let mut fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
 
     assert_eq!(fs.total_blocks(), 512);
-    assert_eq!(fs.total_space(), 256*512);
+    assert_eq!(fs.total_space(), 256 * 512);
     // superblock
     assert_eq!(fs.available_blocks(&mut storage).unwrap(), 512 - 2);
     assert_eq!(fs.available_space(&mut storage).unwrap(), 130_560);
@@ -170,10 +159,9 @@ fn test_create() {
     let mut alloc_file = File::allocate();
     // file does not exist yet, can't open for reading
     assert_eq!(
-        File::open(
-            "/test_open.txt",
-            &mut alloc_file, &mut fs, &mut storage
-        ).map(drop).unwrap_err(), // "real" contains_err is experimental
+        File::open("/test_open.txt", &mut alloc_file, &mut fs, &mut storage)
+            .map(drop)
+            .unwrap_err(), // "real" contains_err is experimental
         Error::NoSuchEntry
     );
 
@@ -181,10 +169,8 @@ fn test_create() {
     assert_eq!(fs.available_blocks(&mut storage).unwrap(), 512 - 2 - 2);
 
     // can create new files
-    let mut file = File::create(
-        "/tmp/test_open.txt",
-        &mut alloc_file, &mut fs, &mut storage,
-    ).unwrap();
+    let mut file =
+        File::create("/tmp/test_open.txt", &mut alloc_file, &mut fs, &mut storage).unwrap();
     // can write to files
     assert!(file.write(&mut fs, &mut storage, &[0u8, 1, 2]).unwrap() == 3);
     file.sync(&mut fs, &mut storage).unwrap();
@@ -193,14 +179,18 @@ fn test_create() {
     file.close(&mut fs, &mut storage).unwrap();
 
     // cannot remove non-empty directories
-    assert_eq!(fs.remove("/tmp", &mut storage).unwrap_err(), Error::DirNotEmpty);
+    assert_eq!(
+        fs.remove("/tmp", &mut storage).unwrap_err(),
+        Error::DirNotEmpty
+    );
 
     let metadata = fs.metadata("/tmp", &mut storage).unwrap();
     assert!(metadata.is_dir());
     assert_eq!(metadata.len(), 0);
 
     // can move files
-    fs.rename("/tmp/test_open.txt", "moved.txt", &mut storage).unwrap();
+    fs.rename("/tmp/test_open.txt", "moved.txt", &mut storage)
+        .unwrap();
     assert_eq!(fs.available_blocks(&mut storage).unwrap(), 512 - 2 - 2);
 
     let metadata = fs.metadata("/moved.txt", &mut storage).unwrap();
@@ -212,10 +202,7 @@ fn test_create() {
 
     // can read from existing files
     let mut alloc = File::allocate();
-    let mut file = File::open(
-        "/moved.txt",
-        &mut alloc, &mut fs, &mut storage,
-    ).unwrap();
+    let mut file = File::open("/moved.txt", &mut alloc, &mut fs, &mut storage).unwrap();
 
     assert!(file.len(&mut fs, &mut storage).unwrap() == 3);
     let mut contents: [u8; 3] = Default::default();
@@ -234,10 +221,7 @@ fn test_unbind() {
         let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
         let mut alloc = File::allocate();
-        let mut file = File::create(
-            "test_unbind.txt",
-            &mut alloc, &mut fs, &mut storage,
-        ).unwrap();
+        let mut file = File::create("test_unbind.txt", &mut alloc, &mut fs, &mut storage).unwrap();
         file.write(&mut fs, &mut storage, b"hello world").unwrap();
         assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 11);
         // w/o sync, won't see data below
@@ -248,10 +232,7 @@ fn test_unbind() {
     let mut alloc = Filesystem::allocate();
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
     let mut alloc = File::allocate();
-    let mut file = File::open(
-        "test_unbind.txt",
-        &mut alloc, &mut fs, &mut storage,
-    ).unwrap();
+    let mut file = File::open("test_unbind.txt", &mut alloc, &mut fs, &mut storage).unwrap();
     let mut buf = <[u8; 11]>::default();
     file.read(&mut fs, &mut storage, &mut buf).unwrap();
     assert_eq!(&buf, b"hello world");
@@ -266,20 +247,14 @@ fn test_seek() {
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
-    let mut file = File::create(
-        "test_seek.txt",
-        &mut alloc, &mut fs, &mut storage,
-    ).unwrap();
+    let mut file = File::create("test_seek.txt", &mut alloc, &mut fs, &mut storage).unwrap();
     file.write(&mut fs, &mut storage, b"hello world").unwrap();
     assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 11);
     // w/o sync, won't see data below
     file.sync(&mut fs, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
-    let mut file = File::open(
-        "test_seek.txt",
-        &mut alloc, &mut fs, &mut storage,
-    ).unwrap();
+    let mut file = File::open("test_seek.txt", &mut alloc, &mut fs, &mut storage).unwrap();
     file.seek(&mut fs, &mut storage, SeekFrom::End(-5)).unwrap();
 
     let mut buf = [0u8; 5];
@@ -300,11 +275,9 @@ fn test_file_set_len() {
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
-    let mut file = File::create(
-        "test_set_len.txt",
-        &mut alloc, &mut fs, &mut storage,
-    ).unwrap();
-    file.write(&mut fs, &mut storage, b"hello littlefs").unwrap();
+    let mut file = File::create("test_set_len.txt", &mut alloc, &mut fs, &mut storage).unwrap();
+    file.write(&mut fs, &mut storage, b"hello littlefs")
+        .unwrap();
     assert_eq!(file.len(&mut fs, &mut storage).unwrap(), 14);
 
     file.set_len(&mut fs, &mut storage, 10).unwrap();
@@ -313,7 +286,11 @@ fn test_file_set_len() {
     // note that:
     // a) "tell" can be implemented as follows,
     // b) truncating a file does not change the cursor position
-    assert_eq!(file.seek(&mut fs, &mut storage, SeekFrom::Current(0)).unwrap(), 14);
+    assert_eq!(
+        file.seek(&mut fs, &mut storage, SeekFrom::Current(0))
+            .unwrap(),
+        14
+    );
 }
 
 #[test]
@@ -338,7 +315,8 @@ fn test_fancy_open() {
     // don't need to sync in this case
     // file.sync(&mut fs, &mut storage).unwrap();
 
-    file.seek(&mut fs, &mut storage, SeekFrom::Start(6)).unwrap();
+    file.seek(&mut fs, &mut storage, SeekFrom::Start(6))
+        .unwrap();
 
     let mut buf = [0u8; 5];
     file.read(&mut fs, &mut storage, &mut buf).unwrap();
@@ -357,21 +335,25 @@ fn attributes() {
     let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let mut alloc = File::allocate();
-    let mut file = File::create(
-        "some.file",
-        &mut alloc, &mut fs, &mut storage,
-    ).unwrap();
+    let mut file = File::create("some.file", &mut alloc, &mut fs, &mut storage).unwrap();
     file.sync(&mut fs, &mut storage).unwrap();
 
-    assert!(fs.attribute("some.file", 37, &mut storage).unwrap().is_none());
+    assert!(fs
+        .attribute("some.file", 37, &mut storage)
+        .unwrap()
+        .is_none());
 
     let mut attribute = Attribute::<RamStorage>::new(37);
     attribute.set_data(b"top secret");
 
-    fs.set_attribute("some.file", &attribute, &mut storage).unwrap();
+    fs.set_attribute("some.file", &attribute, &mut storage)
+        .unwrap();
     assert_eq!(
         b"top secret",
-        fs.attribute("some.file", 37, &mut storage).unwrap().unwrap().data()
+        fs.attribute("some.file", 37, &mut storage)
+            .unwrap()
+            .unwrap()
+            .data()
     );
 
     // // not sure if we should have this method (may be quite expensive)
@@ -380,7 +362,10 @@ fn attributes() {
     // assert_eq!(attributes.iter().fold(0, |sum, i| sum + (*i as u8)), 1);
 
     fs.remove_attribute("some.file", 37, &mut storage).unwrap();
-    assert!(fs.attribute("some.file", 37, &mut storage).unwrap().is_none());
+    assert!(fs
+        .attribute("some.file", 37, &mut storage)
+        .unwrap()
+        .is_none());
 
     // Directories can have attributes too
     attribute.set_data(b"temporary directory");
@@ -388,7 +373,10 @@ fn attributes() {
     fs.set_attribute("/tmp", &attribute, &mut storage).unwrap();
     assert_eq!(
         b"temporary directory",
-        fs.attribute("/tmp", 37, &mut storage).unwrap().unwrap().data()
+        fs.attribute("/tmp", 37, &mut storage)
+            .unwrap()
+            .unwrap()
+            .data()
     );
     fs.remove_attribute("/tmp", 37, &mut storage).unwrap();
     assert!(fs.attribute("/tmp", 37, &mut storage).unwrap().is_none());
@@ -405,18 +393,12 @@ fn test_iter_dirs() {
     fs.create_dir("/tmp", &mut storage).unwrap();
 
     let mut alloc_a = File::allocate();
-    let mut file_a = File::create(
-        "/tmp/file.a",
-        &mut alloc_a, &mut fs, &mut storage,
-    ).unwrap();
+    let mut file_a = File::create("/tmp/file.a", &mut alloc_a, &mut fs, &mut storage).unwrap();
     file_a.set_len(&mut fs, &mut storage, 37).unwrap();
     file_a.sync(&mut fs, &mut storage).unwrap();
 
     let mut alloc_b = File::allocate();
-    let mut file_b = File::create(
-        "/tmp/file.b",
-        &mut alloc_b, &mut fs, &mut storage,
-    ).unwrap();
+    let mut file_b = File::create("/tmp/file.b", &mut alloc_b, &mut fs, &mut storage).unwrap();
     file_b.set_len(&mut fs, &mut storage, 42).unwrap();
     file_b.sync(&mut fs, &mut storage).unwrap();
 
@@ -446,7 +428,7 @@ fn test_iter_dirs() {
                 }
                 sizes[found_files] = x.metadata().len();
                 found_files += 1;
-            },
+            }
             None => break,
         }
     }
@@ -462,12 +444,19 @@ fn test_iter_dirs() {
         .enumerate()
     {
         let x = entry.unwrap();
-        if i == 0 { assert_eq!(x.file_name(), Filename::new(b".")); }
-        if i == 1 { assert_eq!(x.file_name(), Filename::new(b"..")); }
-        if i == 2 { assert_eq!(x.file_name(), Filename::new(b"file.a")); }
-        if i == 3 { assert_eq!(x.file_name(), Filename::new(b"file.b")); }
+        if i == 0 {
+            assert_eq!(x.file_name(), Filename::new(b"."));
+        }
+        if i == 1 {
+            assert_eq!(x.file_name(), Filename::new(b".."));
+        }
+        if i == 2 {
+            assert_eq!(x.file_name(), Filename::new(b"file.a"));
+        }
+        if i == 3 {
+            assert_eq!(x.file_name(), Filename::new(b"file.b"));
+        }
     }
-
 }
 
 // These are some tests that ensure our type constructions

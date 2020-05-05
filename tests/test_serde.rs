@@ -1,24 +1,22 @@
 use littlefs2::{
-    consts,
-    driver,
+    consts, driver,
     fs::{File, Filesystem},
-    io::{Result, prelude::*},
+    io::{prelude::*, Result},
     ram_storage,
 };
 
 // use heapless::Vec;
-use serde::{Deserialize,Serialize};
+use serde::{Deserialize, Serialize};
 use ssmarshal::{deserialize, serialize};
 // use desse::{Desse, DesseSized};
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Default/*, Desse, DesseSized*/)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct Entity {
-	z: [u8; 16],
+    z: [u8; 16],
     // x: u32,
     x: f32,
     y: u64,
 }
-
 
 ram_storage!(tiny);
 
@@ -45,7 +43,6 @@ fn main() {
     let mut file = File::open("entity.bin", &mut alloc, &mut fs, &mut storage).unwrap();
     file.read(&mut fs, &mut storage, &mut buf).unwrap();
     let read_entity: Entity = deserialize(&buf).unwrap().0;
-
 
     assert_eq!(read_entity, entity);
 
