@@ -52,6 +52,7 @@ version = "0.1.5"
 [dependencies.serde]
 version = "1.0"
 default-features = false
+features = ["derive"]
 optional = true
 
 [dev-dependencies]
