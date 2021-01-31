@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["littlefs2"] = [{"text":"impl Serialize for FileType","synthetic":false,"types":[]},{"text":"impl Serialize for Metadata","synthetic":false,"types":[]},{"text":"impl Serialize for DirEntry","synthetic":false,"types":[]},{"text":"impl Serialize for PathBuf","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

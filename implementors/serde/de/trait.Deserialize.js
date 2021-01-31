@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["littlefs2"] = [{"text":"impl&lt;'de&gt; Deserialize&lt;'de&gt; for FileType","synthetic":false,"types":[]},{"text":"impl&lt;'de&gt; Deserialize&lt;'de&gt; for Metadata","synthetic":false,"types":[]},{"text":"impl&lt;'de&gt; Deserialize&lt;'de&gt; for DirEntry","synthetic":false,"types":[]},{"text":"impl&lt;'de&gt; Deserialize&lt;'de&gt; for PathBuf","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

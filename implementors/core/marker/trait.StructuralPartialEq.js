@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["littlefs2"] = [{"text":"impl StructuralPartialEq for FileType","synthetic":false,"types":[]},{"text":"impl StructuralPartialEq for Metadata","synthetic":false,"types":[]},{"text":"impl&lt;S:&nbsp;Storage&gt; StructuralPartialEq for Attribute&lt;S&gt;","synthetic":false,"types":[]},{"text":"impl StructuralPartialEq for OpenOptions","synthetic":false,"types":[]},{"text":"impl StructuralPartialEq for DirEntry","synthetic":false,"types":[]},{"text":"impl StructuralPartialEq for SeekFrom","synthetic":false,"types":[]},{"text":"impl StructuralPartialEq for Error","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

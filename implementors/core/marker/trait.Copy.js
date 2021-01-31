@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["littlefs2"] = [{"text":"impl Copy for FileType","synthetic":false,"types":[]},{"text":"impl Copy for SeekFrom","synthetic":false,"types":[]},{"text":"impl Copy for Error","synthetic":false,"types":[]},{"text":"impl Copy for Error","synthetic":false,"types":[]},{"text":"impl Copy for Version","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
