@@ -19,9 +19,9 @@
       alt="API docs" />
   </a>
   <!-- Continuous build -->
-  <a href="https://builds.sr.ht/~nickray/littlefs2">
-    <img src="https://builds.sr.ht/~nickray/littlefs2.svg"
-      alt="CI" />
+  <a href="https://github.com/nickray/littlefs2/actions?query=branch%3Amain">
+    <img src="https://img.shields.io/github/workflow/status/nickray/littlefs2/CI/main?style=for-the-badge"
+      alt="CI" height="20"/>
   </a>
 </div>
 
