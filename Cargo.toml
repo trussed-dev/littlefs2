@@ -1,7 +1,7 @@
 [package]
 name = "littlefs2"
 description = "Idiomatic Rust API for littlefs"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Nicolas Stalder <n@stalder.io>", "Brandon Edens <brandonedens@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0 OR MIT"
@@ -43,7 +43,9 @@ default-features = false
 # older version of `cstr_core` that depends on version of "1" of `memchr`. This
 # way the bug won't enable the "std" of `memchr` "1" (because `memchr` "1" and
 # `memchr` "2" are considered different crates)
-version = "=0.1.2"
+#
+# NB: It really has to be 0.1.0, both 0.1.1 and 0.1.2 don't work
+version = "=0.1.0"
 
 [dependencies.littlefs2-sys]
 version = "0.1.6"
