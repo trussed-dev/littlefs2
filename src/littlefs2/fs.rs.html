@@ -1535,6 +1535,7 @@
 <span id="1532">1532</span>
 <span id="1533">1533</span>
 <span id="1534">1534</span>
+<span id="1535">1535</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Experimental Filesystem version using closures.</span>
 
@@ -1543,6 +1544,7 @@
 <span class="kw">use</span> <span class="ident">bitflags</span>::<span class="ident">bitflags</span>;
 <span class="kw">use</span> <span class="ident">generic_array</span>::<span class="ident">typenum</span>::<span class="ident">marker_traits</span>::<span class="ident">Unsigned</span>;
 <span class="kw">use</span> <span class="ident">littlefs2_sys</span> <span class="kw">as</span> <span class="ident">ll</span>;
+<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 
 <span class="comment">// so far, don&#39;t need `heapless-bytes`.</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Bytes</span><span class="op">&lt;</span><span class="ident">SIZE</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">generic_array</span>::<span class="ident">GenericArray</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">SIZE</span><span class="op">&gt;</span>;
@@ -1692,7 +1694,7 @@
 }
 
 <span class="doccomment">/// Regular file vs directory</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Copy</span>,<span class="ident">Debug</span>,<span class="ident">Eq</span>,<span class="ident">Hash</span>,<span class="ident">PartialEq</span>,<span class="ident">ufmt</span>::<span class="ident">derive</span>::<span class="ident">uDebug</span>,<span class="ident">serde</span>::<span class="ident">Serialize</span>,<span class="ident">serde</span>::<span class="ident">Deserialize</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Copy</span>,<span class="ident">Debug</span>,<span class="ident">Eq</span>,<span class="ident">Hash</span>,<span class="ident">PartialEq</span>,<span class="ident">Serialize</span>,<span class="ident">Deserialize</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">FileType</span> {
     <span class="ident">File</span>,
     <span class="ident">Dir</span>,
@@ -1711,7 +1713,7 @@
 }
 
 <span class="doccomment">/// File type (regular vs directory) and size of a file.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Debug</span>,<span class="ident">Eq</span>,<span class="ident">PartialEq</span>,<span class="ident">ufmt</span>::<span class="ident">derive</span>::<span class="ident">uDebug</span>,<span class="ident">serde</span>::<span class="ident">Serialize</span>,<span class="ident">serde</span>::<span class="ident">Deserialize</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Debug</span>,<span class="ident">Eq</span>,<span class="ident">PartialEq</span>,<span class="ident">Serialize</span>,<span class="ident">Deserialize</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Metadata</span> {
     <span class="ident">file_type</span>: <span class="ident">FileType</span>,
     <span class="ident">size</span>: <span class="ident">usize</span>,
@@ -2498,7 +2500,7 @@
     <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> { <span class="prelude-val">Ok</span>(()) }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Debug</span>,<span class="ident">PartialEq</span>,<span class="ident">Eq</span>, <span class="ident">ufmt</span>::<span class="ident">derive</span>::<span class="ident">uDebug</span>,<span class="ident">serde</span>::<span class="ident">Serialize</span>,<span class="ident">serde</span>::<span class="ident">Deserialize</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Debug</span>,<span class="ident">PartialEq</span>,<span class="ident">Eq</span>,<span class="ident">Serialize</span>,<span class="ident">Deserialize</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DirEntry</span> {
     <span class="ident">file_name</span>: <span class="ident">PathBuf</span>,
     <span class="ident">metadata</span>: <span class="ident">Metadata</span>,

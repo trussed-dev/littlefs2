@@ -162,14 +162,12 @@
 <span id="159">159</span>
 <span id="160">160</span>
 <span id="161">161</span>
-<span id="162">162</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Traits and types for core I/O functionality.</span>
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">prelude</span>;
 
 <span class="kw">use</span> <span class="ident">littlefs2_sys</span> <span class="kw">as</span> <span class="ident">ll</span>;
-<span class="kw">use</span> <span class="ident">ufmt</span>::<span class="ident">derive</span>::<span class="ident">uDebug</span>;
 
 <span class="doccomment">/// The `Read` trait allows for reading bytes from a file.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Read</span> {
@@ -225,7 +223,7 @@ flush has no effect.
 
 Use the [`Seek`](../io/trait.Seek.html) trait.
 */</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Copy</span>,<span class="ident">Debug</span>,<span class="ident">Eq</span>,<span class="ident">PartialEq</span>,<span class="ident">uDebug</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Copy</span>,<span class="ident">Debug</span>,<span class="ident">Eq</span>,<span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SeekFrom</span> {
     <span class="ident">Start</span>(<span class="ident">u32</span>),
     <span class="ident">End</span>(<span class="ident">i32</span>),
@@ -263,7 +261,7 @@ It is possible to seek relative to either end or the current offset.
 <span class="kw">pub</span> <span class="kw">type</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">core</span>::<span class="ident">result</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 
 <span class="doccomment">/// Definition of errors that might be returned by filesystem functionality.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Copy</span>,<span class="ident">Debug</span>,<span class="ident">PartialEq</span>,<span class="ident">uDebug</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>,<span class="ident">Copy</span>,<span class="ident">Debug</span>,<span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
     <span class="doccomment">/// Input / output error occurred.</span>
     <span class="ident">Io</span>,
