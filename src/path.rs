@@ -281,8 +281,20 @@ impl From<&Path> for PathBuf {
 }
 
 impl From<&[u8]> for PathBuf {
+    /// Accepts byte string, with or without trailing nul.
+    ///
+    /// PANICS: when there are embedded nuls
     fn from(bytes: &[u8]) -> Self {
-        // NB: This needs to set the final NUL byte
+        // NB: This needs to set the final NUL byte, unless it already has one
+        // It also checks that there are no inner NUL bytes
+        let bytes = if bytes.len() > 0 && bytes[bytes.len() - 1] == b'\0' {
+            &bytes[..bytes.len() - 1]
+        } else {
+            bytes
+        };
+        let has_no_embedded_nul = bytes.iter().find(|&&byte| byte == b'\0').is_none();
+        assert!(has_no_embedded_nul);
+
         let mut buf = [0; consts::PATH_MAX_PLUS_ONE];
         let len = bytes.len();
         assert!(len <= consts::PATH_MAX);
@@ -292,6 +304,12 @@ impl From<&[u8]> for PathBuf {
             buf,
             len: len + 1,
         }
+    }
+}
+
+impl From<&str> for PathBuf {
+    fn from(s: &str) -> Self {
+        PathBuf::from(s.as_bytes())
     }
 }
 
@@ -413,9 +431,9 @@ pub enum Error {
 /// Result type that has its Error variant set to `path::Error`
 pub type Result<T> = core::result::Result<T, Error>;
 
-#[cfg(tests)]
+#[cfg(test)]
 mod tests {
-    use super::Path;
+    use super::{Path, PathBuf};
 
     #[test]
     fn join() {
@@ -443,5 +461,15 @@ mod tests {
         assert_eq!(b.join(slash).as_ref(), "/");
         assert_eq!(b.join(a).as_ref(), "b/a");
         assert_eq!(b.join(b).as_ref(), "b/b");
+    }
+
+    #[test]
+    fn nulls() {
+        assert!(Path::from_bytes_with_nul(b"abc\0def").is_err());
+    }
+
+    #[test]
+    fn trailing_nuls() {
+        assert_eq!(PathBuf::from("abc"), PathBuf::from("abc\0"));
     }
 }
