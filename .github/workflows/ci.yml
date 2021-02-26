@@ -36,9 +36,7 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: >
           cargo test &&
-          cargo test --features ui-tests &&
-          cargo test --release &&
-          cargo test --release --features ui-tests
+          cargo test --release
 
       - name: Build Documentation
         run: cargo doc --no-deps
