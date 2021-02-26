@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [v0.2.1] - 2021-02-02
+
+### Changed
+- PathBuf::from errors on embedded nuls, and prevents ending
+  with nuls
+
 ## [v0.2.0] - 2021-02-02
 
 ### Changed
