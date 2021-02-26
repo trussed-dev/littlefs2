@@ -3,7 +3,6 @@
 pub mod prelude;
 
 use littlefs2_sys as ll;
-use ufmt::derive::uDebug;
 
 /// The `Read` trait allows for reading bytes from a file.
 pub trait Read {
@@ -59,7 +58,7 @@ pub trait Write {
 
 Use the [`Seek`](../io/trait.Seek.html) trait.
 */
-#[derive(Clone,Copy,Debug,Eq,PartialEq,uDebug)]
+#[derive(Clone,Copy,Debug,Eq,PartialEq)]
 pub enum SeekFrom {
     Start(u32),
     End(i32),
@@ -97,7 +96,7 @@ pub trait Seek {
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Definition of errors that might be returned by filesystem functionality.
-#[derive(Clone,Copy,Debug,PartialEq,uDebug)]
+#[derive(Clone,Copy,Debug,PartialEq)]
 pub enum Error {
     /// Input / output error occurred.
     Io,
