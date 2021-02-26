@@ -4,7 +4,6 @@ use core::{convert::TryFrom, fmt, marker::PhantomData, ops, ptr, slice, str};
 
 use cstr_core::CStr;
 use cty::{c_char, size_t};
-use ufmt::uwrite;
 
 use crate::consts;
 
@@ -116,15 +115,6 @@ impl fmt::Debug for Path {
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_ref())
-    }
-}
-
-impl ufmt::uDebug for Path {
-    fn fmt<W: ?Sized>(&self, f: &mut ufmt::Formatter<W>) -> core::result::Result<(), W::Error>
-    where
-        W: ufmt::uWrite
-    {
-        uwrite!(f, "{:?}", self.as_ref().as_bytes())
     }
 }
 
@@ -370,15 +360,6 @@ impl<'de> serde::Deserialize<'de> for PathBuf
 impl fmt::Debug for PathBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         <Path as fmt::Debug>::fmt(self, f)
-    }
-}
-
-impl ufmt::uDebug for PathBuf {
-    fn fmt<W: ?Sized>(&self, f: &mut ufmt::Formatter<W>) -> core::result::Result<(), W::Error>
-    where
-        W: ufmt::uWrite
-    {
-        <Path as ufmt::uDebug>::fmt(self, f)
     }
 }
 
