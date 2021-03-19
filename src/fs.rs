@@ -311,29 +311,39 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// Whyy?
     #[cfg(feature = "dir-entry-path")]
     pub fn remove_dir_all(&self, path: &Path) -> Result<()> {
+        self.remove_dir_all_where(path, &|_| true).map(|_| ())
+    }
 
+    #[cfg(feature = "dir-entry-path")]
+    pub fn remove_dir_all_where<P>(&self, path: &Path, predicate: &P) -> Result<usize>
+    where
+        P: Fn(&DirEntry) -> bool,
+    {
+        let mut skipped_any = false;
+        let mut files_removed = 0;
         self.read_dir_and_then(path, |read_dir| {
-            for (i, entry) in read_dir.enumerate() {
+            // skip "." and ".."
+            for entry in read_dir.skip(2) {
                 let entry = entry?;
-                #[cfg(test)]
-                println!("entry = {:?}", &entry);
 
-                // skip "." and ".."
-                if i < 2 {
-                    // #[cfg(test)] println!("skipping {:?}", entry.path());
-                    continue;
-                }
                 if entry.file_type().is_file() {
-                    self.remove(entry.path())?;
+                    if predicate(&entry) {
+                        self.remove(entry.path())?;
+                        files_removed += 1;
+                    } else {
+                        skipped_any = true;
+                    }
                 }
                 if entry.file_type().is_dir() {
-                    self.remove_dir_all(entry.path())?;
+                    files_removed += self.remove_dir_all_where(entry.path(), predicate)?;
                 }
             }
             Ok(())
         })?;
-        self.remove_dir(path)?;
-        Ok(())
+        if !skipped_any {
+            self.remove_dir(path)?;
+        }
+        Ok(files_removed)
     }
 
     /// Rename or move a file or directory.
@@ -1395,7 +1405,7 @@ mod tests {
                 // (...)
                 // fs.remove_dir_all(&PathBuf::from(b"/tmp\0"))?;
                 // fs.remove_dir_all(&PathBuf::from(b"/tmp"))?;
-                fs.remove_dir_all(b"/tmp\0".try_into().unwrap())?;
+                fs.remove_dir_all(&PathBuf::from("/tmp"))?;
             }
 
             Ok(())
@@ -1404,7 +1414,7 @@ mod tests {
         let mut alloc = Allocation::new();
         let fs = Filesystem::mount(&mut alloc, &mut test_storage).unwrap();
         // fs.write(b"/z.txt\0".try_into().unwrap(), &jackson5).unwrap();
-        fs.write(&PathBuf::from(b"/z.txt"), &jackson5).unwrap();
+        fs.write(&PathBuf::from("z.txt"), &jackson5).unwrap();
     }
 
     #[cfg(feature = "dir-entry-path")]
