@@ -149,6 +149,10 @@
 <span id="146">146</span>
 <span id="147">147</span>
 <span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">not</span>(<span class="ident">test</span>), <span class="ident">no_std</span>)]</span>
 
@@ -267,6 +271,10 @@ assert_eq!(&amp;buf, b&quot;black smoke&quot;);
 
 <span class="doccomment">/// Low-level bindings</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">littlefs2_sys</span> <span class="kw">as</span> <span class="ident">ll</span>;
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">delog</span>;
+<span class="macro">generate_macros</span><span class="macro">!</span>();
 
 <span class="doccomment">/// cf. Macros documentation</span>
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
