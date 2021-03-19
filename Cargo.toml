@@ -1,7 +1,7 @@
 [package]
 name = "littlefs2"
 description = "Idiomatic Rust API for littlefs"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Nicolas Stalder <n@stalder.io>", "Brandon Edens <brandonedens@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0 OR MIT"
@@ -12,6 +12,7 @@ repository = "https://github.com/nickray/littlefs2"
 [dependencies]
 bitflags = "1"
 cty = "0.2.1"
+delog = "0.1.0"
 generic-array = "0.14.2"
 heapless = "0.6"
 
@@ -61,6 +62,13 @@ dir-entry-path = []
 ll-assertions = ["littlefs2-sys/assertions"]
 # enable trace in backend C code
 ll-trace = ["littlefs2-sys/trace"]
+
+log-all = []
+log-none = []
+log-info = []
+log-debug = []
+log-warn = []
+log-error = []
 
 # TODO: LFS_NAME_MAX (and maybe other sizes) are baked into the
 # compiled C library. For instance, the `lfs_info` struct has a

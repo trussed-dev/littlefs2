@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [v0.2.2] - 2021-03-20
+
+### Changed
+- Added `remove_dir_all_when`, allowing to filter "rm -rf <path>"
+
 ## [v0.2.1] - 2021-02-26
 
 ### Changed

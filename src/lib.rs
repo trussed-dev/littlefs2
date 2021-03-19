@@ -116,6 +116,10 @@ assert_eq!(&buf, b"black smoke");
 /// Low-level bindings
 pub use littlefs2_sys as ll;
 
+#[macro_use]
+extern crate delog;
+generate_macros!();
+
 /// cf. Macros documentation
 #[macro_use]
 pub mod macros;

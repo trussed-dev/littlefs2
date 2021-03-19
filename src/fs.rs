@@ -319,8 +319,13 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     where
         P: Fn(&DirEntry) -> bool,
     {
+        if !path.exists(self) {
+            debug_now!("no such directory {}, early return", path);
+            return Ok(0);
+        }
         let mut skipped_any = false;
         let mut files_removed = 0;
+        debug_now!("starting to remove_dir_all_where in {}", path);
         self.read_dir_and_then(path, |read_dir| {
             // skip "." and ".."
             for entry in read_dir.skip(2) {
@@ -328,20 +333,27 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
                 if entry.file_type().is_file() {
                     if predicate(&entry) {
+                        debug_now!("removing file {}", &entry.path());
                         self.remove(entry.path())?;
+                        debug_now!("...done");
                         files_removed += 1;
                     } else {
+                        debug_now!("skipping file {}", &entry.path());
                         skipped_any = true;
                     }
                 }
                 if entry.file_type().is_dir() {
+                    debug_now!("recursing into directory {}", &entry.path());
                     files_removed += self.remove_dir_all_where(entry.path(), predicate)?;
+                    debug_now!("...back");
                 }
             }
             Ok(())
         })?;
         if !skipped_any {
+            debug_now!("removing directory {} too", &path);
             self.remove_dir(path)?;
+            debug_now!("..worked");
         }
         Ok(files_removed)
     }
