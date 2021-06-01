@@ -98,6 +98,8 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// Definition of errors that might be returned by filesystem functionality.
 #[derive(Clone,Copy,Debug,PartialEq)]
 pub enum Error {
+    /// Error code was >=0, operation was successful.
+    Success,
     /// Input / output error occurred.
     Io,
     /// File or filesystem was corrupt.
@@ -136,26 +138,35 @@ impl From<crate::path::Error> for Error {
     }
 }
 
-pub fn result_from(error_code: ll::lfs_error) -> Result<u32> {
-    match error_code {
-        n if n >= 0 => Ok(n as u32),
-        // negative codes
-        ll::lfs_error_LFS_ERR_IO => Err(Error::Io),
-        ll::lfs_error_LFS_ERR_CORRUPT => Err(Error::Corruption),
-        ll::lfs_error_LFS_ERR_NOENT => Err(Error::NoSuchEntry),
-        ll::lfs_error_LFS_ERR_EXIST => Err(Error::EntryAlreadyExisted),
-        ll::lfs_error_LFS_ERR_NOTDIR => Err(Error::PathNotDir),
-        ll::lfs_error_LFS_ERR_ISDIR => Err(Error::PathIsDir),
-        ll::lfs_error_LFS_ERR_NOTEMPTY => Err(Error::DirNotEmpty),
-        ll::lfs_error_LFS_ERR_BADF => Err(Error::BadFileDescriptor),
-        ll::lfs_error_LFS_ERR_FBIG => Err(Error::FileTooBig),
-        ll::lfs_error_LFS_ERR_INVAL => Err(Error::Invalid),
-        ll::lfs_error_LFS_ERR_NOSPC => Err(Error::NoSpace),
-        ll::lfs_error_LFS_ERR_NOMEM => Err(Error::NoMemory),
-        ll::lfs_error_LFS_ERR_NOATTR => Err(Error::NoAttribute),
-        ll::lfs_error_LFS_ERR_NAMETOOLONG => Err(Error::FilenameTooLong),
-        // positive codes should always indicate success
-        _ => Err(Error::Unknown(error_code)),
+impl From<i32> for Error {
+    fn from(error_code: i32) -> Error {
+        match error_code {
+            n if n >= 0 => Error::Success,
+            // negative codes
+            ll::lfs_error_LFS_ERR_IO => Error::Io,
+            ll::lfs_error_LFS_ERR_CORRUPT => Error::Corruption,
+            ll::lfs_error_LFS_ERR_NOENT => Error::NoSuchEntry,
+            ll::lfs_error_LFS_ERR_EXIST => Error::EntryAlreadyExisted,
+            ll::lfs_error_LFS_ERR_NOTDIR => Error::PathNotDir,
+            ll::lfs_error_LFS_ERR_ISDIR => Error::PathIsDir,
+            ll::lfs_error_LFS_ERR_NOTEMPTY => Error::DirNotEmpty,
+            ll::lfs_error_LFS_ERR_BADF => Error::BadFileDescriptor,
+            ll::lfs_error_LFS_ERR_FBIG => Error::FileTooBig,
+            ll::lfs_error_LFS_ERR_INVAL => Error::Invalid,
+            ll::lfs_error_LFS_ERR_NOSPC => Error::NoSpace,
+            ll::lfs_error_LFS_ERR_NOMEM => Error::NoMemory,
+            ll::lfs_error_LFS_ERR_NOATTR => Error::NoAttribute,
+            ll::lfs_error_LFS_ERR_NAMETOOLONG => Error::FilenameTooLong,
+            // positive codes should always indicate success
+            _ => Error::Unknown(error_code),
+        }
     }
 }
 
+pub fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {
+    let error: Error = error_code.into();
+    match error {
+        Error::Success => Ok(return_value),
+        _ => Err(error)
+    }
+}
