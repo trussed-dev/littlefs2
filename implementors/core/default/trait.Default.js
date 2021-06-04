@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["littlefs2"] = [{"text":"impl Default for OpenOptions","synthetic":false,"types":[]}];
+implementors["littlefs2"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"littlefs2/fs/struct.OpenOptions.html\" title=\"struct littlefs2::fs::OpenOptions\">OpenOptions</a>","synthetic":false,"types":["littlefs2::fs::OpenOptions"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

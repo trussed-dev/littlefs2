@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["littlefs2"] = [{"text":"impl !<a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html\" title=\"trait core::marker::Sized\">Sized</a> for <a class=\"struct\" href=\"littlefs2/path/struct.Path.html\" title=\"struct littlefs2::path::Path\">Path</a>","synthetic":true,"types":["littlefs2::path::Path"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
