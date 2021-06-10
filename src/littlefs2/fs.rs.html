@@ -1570,7 +1570,6 @@
 <span id="1567">1567</span>
 <span id="1568">1568</span>
 <span id="1569">1569</span>
-<span id="1570">1570</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Experimental Filesystem version using closures.</span>
 
@@ -1809,7 +1808,7 @@
         <span class="kw">let</span> <span class="ident">fs</span> <span class="op">=</span> <span class="ident">Filesystem</span>::<span class="ident">new</span>(<span class="ident">alloc</span>, <span class="ident">storage</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">alloc</span> <span class="op">=</span> <span class="ident">fs</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>();
         <span class="kw">let</span> <span class="ident">return_code</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">ll</span>::<span class="ident">lfs_format</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">alloc</span>.<span class="ident">state</span>, <span class="kw-2">&amp;</span><span class="ident">alloc</span>.<span class="ident">config</span>) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)
     }
 
     <span class="comment">// TODO: check if this is equivalent to `is_formatted`.</span>
@@ -1856,7 +1855,7 @@
     <span class="doccomment">/// by this method available, at any given time.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">available_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">return_code</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">ll</span>::<span class="ident">lfs_fs_size</span>( <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">blocks</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">total_blocks</span>() <span class="op">-</span> <span class="ident">blocks</span> <span class="kw">as</span> <span class="ident">usize</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>, <span class="ident">return_code</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">blocks</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">total_blocks</span>() <span class="op">-</span> <span class="ident">blocks</span> <span class="kw">as</span> <span class="ident">usize</span>)
     }
 
     <span class="doccomment">/// Available number of unused bytes in the filesystem</span>
@@ -1874,7 +1873,7 @@
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
             <span class="ident">path</span>.<span class="ident">as_ptr</span>(),
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)
     }
 
     <span class="doccomment">/// Remove a file or directory.</span>
@@ -1940,7 +1939,7 @@
             <span class="ident">from</span>.<span class="ident">as_ptr</span>(),
             <span class="ident">to</span>.<span class="ident">as_ptr</span>(),
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((),<span class="ident">return_code</span>)
     }
 
     <span class="doccomment">/// Given a path, query the filesystem to get information about a file or directory.</span>
@@ -1964,7 +1963,7 @@
             )
         };
 
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">info</span>.<span class="ident">into</span>())
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">info</span>.<span class="ident">into</span>())
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_file_and_then</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>(
@@ -2030,7 +2029,7 @@
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
         }
 
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)<span class="question-mark">?</span>;
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)<span class="question-mark">?</span>;
         <span class="comment">// TODO: get rid of this</span>
         <span class="macro">unreachable</span><span class="macro">!</span>();
     }
@@ -2046,7 +2045,7 @@
             <span class="ident">path</span>.<span class="ident">as_ptr</span>(),
             <span class="ident">id</span>,
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)
     }
 
     <span class="doccomment">/// Set attribute.</span>
@@ -2065,7 +2064,7 @@
             <span class="ident">attribute</span>.<span class="ident">size</span> <span class="kw">as</span> <span class="ident">u32</span>,
         ) };
 
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)
     }
 
 
@@ -2327,7 +2326,7 @@
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">fs</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
         );
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)
     }
 
     <span class="doccomment">/// Synchronize file contents to storage.</span>
@@ -2336,7 +2335,7 @@
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">fs</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)
     }
 
     <span class="doccomment">/// Size of the file in bytes.</span>
@@ -2345,7 +2344,7 @@
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">fs</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span> <span class="kw">as</span> <span class="ident">usize</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">return_code</span>)
     }
 
     <span class="doccomment">/// Truncates or extends the underlying file, updating the size of this file to become size.</span>
@@ -2359,7 +2358,7 @@
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
             <span class="ident">size</span> <span class="kw">as</span> <span class="ident">u32</span>,
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)
     }
 
     <span class="comment">// This belongs in `io::Read` but really don&#39;t want that to have a generic parameter</span>
@@ -2444,7 +2443,7 @@
             <span class="ident">fs</span>,
         };
 
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">file</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">file</span>, <span class="ident">return_code</span>)
     }
 
     <span class="doccomment">/// (Hopefully) safe abstraction around `open`.</span>
@@ -2532,7 +2531,7 @@
             <span class="ident">buf</span>.<span class="ident">as_mut_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">cty</span>::<span class="ident">c_void</span>,
             <span class="ident">buf</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u32</span>,
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">read</span><span class="op">|</span> <span class="ident">read</span> <span class="kw">as</span> <span class="ident">usize</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">return_code</span>)
     }
 }
 
@@ -2545,7 +2544,7 @@
             <span class="ident">pos</span>.<span class="ident">off</span>(),
             <span class="ident">pos</span>.<span class="ident">whence</span>(),
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">position</span><span class="op">|</span> <span class="ident">position</span> <span class="kw">as</span> <span class="ident">usize</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">return_code</span>)
     }
 }
 
@@ -2558,7 +2557,7 @@
             <span class="ident">buf</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">cty</span>::<span class="ident">c_void</span>,
             <span class="ident">buf</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u32</span>,
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">written</span><span class="op">|</span> <span class="ident">written</span> <span class="kw">as</span> <span class="ident">usize</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">return_code</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> { <span class="prelude-val">Ok</span>(()) }
@@ -2673,7 +2672,7 @@
             <span class="kw">return</span> <span class="prelude-val">None</span>
         }
 
-        <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>).<span class="ident">unwrap_err</span>()))
+        <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>).<span class="ident">unwrap_err</span>()))
     }
 }
 
@@ -2699,7 +2698,7 @@
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">fs</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)
     }
 }
 
@@ -2744,7 +2743,7 @@
             <span class="ident">path</span>: <span class="ident">PathBuf</span>::<span class="ident">from</span>(<span class="ident">path</span>),
         };
 
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">read_dir</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">read_dir</span>, <span class="ident">return_code</span>)
     }
 
 }
@@ -2756,12 +2755,11 @@
         <span class="ident">alloc</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Allocation</span><span class="op">&lt;</span><span class="ident">Storage</span><span class="op">&gt;</span>,
         <span class="ident">storage</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Storage</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-
         <span class="kw">let</span> <span class="ident">fs</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">new</span>(<span class="ident">alloc</span>, <span class="ident">storage</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">alloc</span> <span class="op">=</span> <span class="ident">fs</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>();
         <span class="kw">let</span> <span class="ident">return_code</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">ll</span>::<span class="ident">lfs_mount</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">alloc</span>.<span class="ident">state</span>, <span class="kw-2">&amp;</span><span class="ident">alloc</span>.<span class="ident">config</span>) };
         <span class="ident">drop</span>(<span class="ident">alloc</span>);
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>).<span class="ident">map</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw">_</span><span class="op">|</span> { <span class="ident">fs</span> } )
+        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">fs</span>, <span class="ident">return_code</span>)
     }
 
     <span class="comment">// Not public, user should use `mount`, possibly after `format`</span>
@@ -2793,7 +2791,7 @@
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">alloc</span>.<span class="ident">borrow_mut</span>().<span class="ident">state</span>,
             <span class="ident">path</span>.<span class="ident">as_ptr</span>(),
         ) };
-        <span class="ident">io</span>::<span class="ident">result_from</span>(<span class="ident">return_code</span>).<span class="ident">map</span>(<span class="ident">drop</span>)
+        <span class="ident">io</span>::<span class="ident">result_from</span>((), <span class="ident">return_code</span>)
     }
 
     <span class="doccomment">/// Recursively create a directory and all of its parent components if they are missing.</span>
