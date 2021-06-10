@@ -67,11 +67,11 @@ pub trait Storage {
     ///// to the C backend.
     //type FILENAME_MAX_PLUS_ONE: ArrayLength<u8>;
 
-    /// Maximum length of a path plus one. Necessary to convert Rust string slices
-    /// to C strings, which requires an allocation for the terminating
-    /// zero-byte. If in doubt, set to `FILENAME_MAX_PLUS_ONE`.
-    /// Must be larger than `FILENAME_MAX_PLUS_ONE`.
-    type PATH_MAX_PLUS_ONE: ArrayLength<u8>;
+    // /// Maximum length of a path plus one. Necessary to convert Rust string slices
+    // /// to C strings, which requires an allocation for the terminating
+    // /// zero-byte. If in doubt, set to `FILENAME_MAX_PLUS_ONE`.
+    // /// Must be larger than `FILENAME_MAX_PLUS_ONE`.
+    // type PATH_MAX_PLUS_ONE: ArrayLength<u8>;
 
     ///// Maximum size of file. Stored in superblock.
     ///// Defaults to 2_147_483_647 (or u31, to avoid sign issues in the C code).
@@ -136,8 +136,6 @@ mod future {
         // TODO: this supposedly influences whether files are inlined or not. Clarify
         type CACHE_SIZE;
         type LOOKAHEADWORDS_SIZE;
-        // not part of littlefs
-        type PATH_MAX_PLUS_ONE;
     }
 
     pub trait RuntimeParameters {
