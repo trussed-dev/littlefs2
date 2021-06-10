@@ -48,6 +48,11 @@ pub struct Allocation<Storage: driver::Storage> {
 
 // pub fn check_storage_requirements(
 
+impl<Storage: driver::Storage> Default for Allocation<Storage> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl<Storage: driver::Storage> Allocation<Storage> {
 
     pub fn new() -> Allocation<Storage> {
@@ -86,8 +91,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
 
         let cache = Cache::new();
 
-        let filename_max_plus_one: u32 =
-            <Storage as driver::Storage>::FILENAME_MAX_PLUS_ONE::to_u32();
+        let filename_max_plus_one: u32 = crate::consts::FILENAME_MAX_PLUS_ONE;
         debug_assert!(filename_max_plus_one > 1);
         debug_assert!(filename_max_plus_one <= 1_022+1);
         // limitation of ll-bindings
@@ -95,12 +99,12 @@ impl<Storage: driver::Storage> Allocation<Storage> {
         let path_max_plus_one: u32 = <Storage as driver::Storage>::PATH_MAX_PLUS_ONE::to_u32();
         // TODO: any upper limit?
         debug_assert!(path_max_plus_one >= filename_max_plus_one);
-        let file_max = Storage::FILEBYTES_MAX as u32;
+        let file_max = crate::consts::FILEBYTES_MAX;
         assert!(file_max > 0);
         assert!(file_max <= 2_147_483_647);
         // limitation of ll-bindings
         assert!(file_max == 2_147_483_647);
-        let attr_max: u32 = <Storage as driver::Storage>::ATTRBYTES_MAX::to_u32();
+        let attr_max: u32 = crate::consts::ATTRBYTES_MAX;
         assert!(attr_max > 0);
         assert!(attr_max <= 1_022);
         // limitation of ll-bindings
@@ -130,7 +134,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
 
             name_max: filename_max_plus_one.wrapping_sub(1),
             file_max,
-            attr_max: attr_max,
+            attr_max,
         };
 
         Self {
@@ -237,10 +241,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     // TODO: check if this is equivalent to `is_formatted`.
     pub fn is_mountable(storage: &mut Storage) -> bool {
         let alloc = &mut Allocation::new();
-        match Filesystem::mount(alloc, storage) {
-            Ok(_) => true,
-            _ => false,
-        }
+        matches!(Filesystem::mount(alloc, storage), Ok(_))
     }
 
     // Can BorrowMut be implemented "unsafely" instead?
@@ -434,10 +435,10 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         path: &Path,
         id: u8,
     ) ->
-        Result<Option<Attribute<Storage>>>
+        Result<Option<Attribute>>
     {
         let mut attribute = Attribute::new(id);
-        let attr_max = <Storage as driver::Storage>::ATTRBYTES_MAX::to_u32();
+        let attr_max = crate::consts::ATTRBYTES_MAX;
 
         let return_code = unsafe { ll::lfs_getattr(
             &mut self.alloc.borrow_mut().state,
@@ -478,7 +479,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     pub fn set_attribute(
         &self,
         path: &Path,
-        attribute: &Attribute<Storage>
+        attribute: &Attribute,
     ) ->
         Result<()>
     {
@@ -571,13 +572,13 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 /// Use [`Filesystem::attribute`](struct.Filesystem.html#method.attribute),
 /// [`Filesystem::set_attribute`](struct.Filesystem.html#method.set_attribute), and
 /// [`Filesystem::clear_attribute`](struct.Filesystem.html#method.clear_attribute).
-pub struct Attribute<S: driver::Storage> {
+pub struct Attribute {
     id: u8,
-    data: Bytes<S::ATTRBYTES_MAX>,
+    data: Bytes<crate::consts::ATTRBYTES_MAX_TYPE>,
     size: usize,
 }
 
-impl<S: driver::Storage> Attribute<S> {
+impl Attribute {
     pub fn new(id: u8) -> Self {
         Attribute {
             id,
@@ -591,13 +592,13 @@ impl<S: driver::Storage> Attribute<S> {
     }
 
     pub fn data(&self) -> &[u8] {
-        let attr_max = <S as driver::Storage>::ATTRBYTES_MAX::to_usize();
+        let attr_max = crate::consts::ATTRBYTES_MAX as _;
         let len = cmp::min(attr_max, self.size);
         &self.data[..len]
     }
 
     pub fn set_data(&mut self, data: &[u8]) -> &mut Self {
-        let attr_max = <S as driver::Storage>::ATTRBYTES_MAX::to_usize();
+        let attr_max = crate::consts::ATTRBYTES_MAX as _;
         let len = cmp::min(attr_max, data.len());
         self.data[..len].copy_from_slice(&data[..len]);
         self.size = len;
@@ -636,6 +637,12 @@ pub struct FileAllocation<S: driver::Storage>
     cache: Bytes<S::CACHE_SIZE>,
     state: ll::lfs_file_t,
     config: ll::lfs_file_config,
+}
+
+impl<S: driver::Storage> Default for FileAllocation<S> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<S: driver::Storage> FileAllocation<S> {
@@ -782,7 +789,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     }
 
     // This belongs in `io::Read` but really don't want that to have a generic parameter
-    pub fn read_to_end<N: heapless::ArrayLength<u8>>(&self, buf: &mut heapless::Vec<u8, N>) -> Result<usize> {
+    pub fn read_to_end<const N: usize>(&self, buf: &mut heapless::Vec<u8, N>) -> Result<usize> {
         // My understanding of
         // https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2816
         // is that littlefs keeps reading until either the buffer is full, or the file is exhausted
@@ -1032,6 +1039,12 @@ pub struct ReadDirAllocation {
     state: ll::lfs_dir_t,
 }
 
+impl Default for ReadDirAllocation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReadDirAllocation {
     pub fn new() -> Self {
         unsafe { mem::MaybeUninit::zeroed().assume_init() }
@@ -1258,7 +1271,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     }
 
     /// Read the entire contents of a file into a bytes vector.
-    pub fn read<N: generic_array::ArrayLength<u8>>(
+    pub fn read<const N: usize>(
         &self,
         path: &Path,
     )
@@ -1375,7 +1388,7 @@ mod tests {
                     println!("\nfile {}: {:?}", i, entry.file_name());
 
                     if entry.file_type().is_file() {
-                        let content: heapless::Vec::<u8, heapless::consts::U256> = fs.read(entry.path())?;
+                        let content: heapless::Vec::<u8, 256> = fs.read(entry.path())?;
                         println!("content:\n{:?}", core::str::from_utf8(&content).unwrap());
                         // println!("and now the removal");
                         // fs.remove(entry.path())?;
@@ -1476,7 +1489,7 @@ mod tests {
                 }
             )?;
 
-            let content: heapless::Vec<_, consts::U256> = fs.read(filename)?;
+            let content: heapless::Vec<_, 256> = fs.read(filename)?;
             assert_eq!(content, b"first part - second part");
             // println!("content: {:?}", core::str::from_utf8(&content).unwrap());
             Ok(())

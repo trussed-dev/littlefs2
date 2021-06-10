@@ -1,44 +1,25 @@
 [package]
 name = "littlefs2"
 description = "Idiomatic Rust API for littlefs"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Nicolas Stalder <n@stalder.io>", "Brandon Edens <brandonedens@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0 OR MIT"
 readme = "README.md"
 categories = ["embedded", "filesystem", "no-std"]
 repository = "https://github.com/nickray/littlefs2"
+resolver = "2"
 
 [dependencies]
 bitflags = "1"
 cty = "0.2.1"
 delog = "0.1.0"
-generic-array = "0.14.2"
-heapless = "0.6"
+generic-array = "0.14"
+heapless = "0.7"
 
 [dependencies.cstr_core]
 default-features = false
-# Update: we are just waiting for stabilization of
-# https://doc.rust-lang.org/beta/cargo/reference/unstable.html#resolver
-
-# HACK TL;DR :sadface: we are using an older version here to avoid
-# rust-lang/cargo#4361 which has been fixed in nightly but lives behind a
-# unstable flag as of Rust 1.42.0
-#
-# longer explanation: this crate depends on bindgen (build dependency) and
-# bindgen depends on `memchr` "2" with default features enabled, which include a
-# "std" feature that makes the crate depend on `std`. `cstr_core` ">0.1.1" and
-# "0.2" also depend on "memchr" but with default features disabled. As this
-# crate depends on both it ends up enabling the "std" of the `memchr` crate
-# (that's the bug because that shouldn't happen).
-#
-# To avoid `bindgen` enabling the "std" dependency of `memchr` "2" we use an
-# older version of `cstr_core` that depends on version of "1" of `memchr`. This
-# way the bug won't enable the "std" of `memchr` "1" (because `memchr` "1" and
-# `memchr` "2" are considered different crates)
-#
-# NB: It really has to be 0.1.0, both 0.1.1 and 0.1.2 don't work
-version = "=0.1.0"
+version = "0.2"
 
 [dependencies.littlefs2-sys]
 version = "0.1.6"

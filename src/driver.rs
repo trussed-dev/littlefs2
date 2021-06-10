@@ -59,13 +59,13 @@ pub trait Storage {
     type LOOKAHEADWORDS_SIZE: ArrayLength<u32>;
     // type LOOKAHEAD_SIZE: ArrayLength<u8>;
 
-    /// Maximum length of a filename plus one. Stored in superblock.
-    /// Should default to 255+1, but associated type defaults don't exist currently.
-    /// At most 1_022+1.
-    ///
-    /// TODO: We can't actually change this - need to pass on as compile flag
-    /// to the C backend.
-    type FILENAME_MAX_PLUS_ONE: ArrayLength<u8>;
+    ///// Maximum length of a filename plus one. Stored in superblock.
+    ///// Should default to 255+1, but associated type defaults don't exist currently.
+    ///// At most 1_022+1.
+    /////
+    ///// TODO: We can't actually change this - need to pass on as compile flag
+    ///// to the C backend.
+    //type FILENAME_MAX_PLUS_ONE: ArrayLength<u8>;
 
     /// Maximum length of a path plus one. Necessary to convert Rust string slices
     /// to C strings, which requires an allocation for the terminating
@@ -73,21 +73,21 @@ pub trait Storage {
     /// Must be larger than `FILENAME_MAX_PLUS_ONE`.
     type PATH_MAX_PLUS_ONE: ArrayLength<u8>;
 
-    /// Maximum size of file. Stored in superblock.
-    /// Defaults to 2_147_483_647 (or u31, to avoid sign issues in the C code).
-    /// At most 2_147_483_647.
-    ///
-    /// TODO: We can't actually change this - need to pass on as compile flag
-    /// to the C backend.
-    const FILEBYTES_MAX: usize = ll::LFS_FILE_MAX as _;
+    ///// Maximum size of file. Stored in superblock.
+    ///// Defaults to 2_147_483_647 (or u31, to avoid sign issues in the C code).
+    ///// At most 2_147_483_647.
+    /////
+    ///// TODO: We can't actually change this - need to pass on as compile flag
+    ///// to the C backend.
+    //const FILEBYTES_MAX: usize = ll::LFS_FILE_MAX as _;
 
-    /// Maximum size of custom attributes.
-    /// Should default to 1_022, but associated type defaults don't exists currently.
-    /// At most 1_022.
-    ///
-    /// TODO: We can't actually change this - need to pass on as compile flag
-    /// to the C backend.
-    type ATTRBYTES_MAX: ArrayLength<u8>;
+    ///// Maximum size of custom attributes.
+    ///// Should default to 1_022, but associated type defaults don't exists currently.
+    ///// At most 1_022.
+    /////
+    ///// TODO: We can't actually change this - need to pass on as compile flag
+    ///// to the C backend.
+    //type ATTRBYTES_MAX: ArrayLength<u8>;
 
     /// Read data from the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of READ_SIZE.
