@@ -96,7 +96,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
         debug_assert!(filename_max_plus_one <= 1_022+1);
         // limitation of ll-bindings
         debug_assert!(filename_max_plus_one == 255+1);
-        let path_max_plus_one: u32 = <Storage as driver::Storage>::PATH_MAX_PLUS_ONE::to_u32();
+        let path_max_plus_one: u32 = crate::consts::PATH_MAX_PLUS_ONE as _;
         // TODO: any upper limit?
         debug_assert!(path_max_plus_one >= filename_max_plus_one);
         let file_max = crate::consts::FILEBYTES_MAX;

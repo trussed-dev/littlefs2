@@ -50,7 +50,6 @@ macro_rules! ram_storage { (
             const BLOCK_SIZE: usize = $block_size;
             const BLOCK_COUNT: usize = $block_count;
             type LOOKAHEADWORDS_SIZE = $lookaheadwords_size;
-            type PATH_MAX_PLUS_ONE = $path_max_plus_one;
 
             fn read(&self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
                 let read_size: usize = Self::READ_SIZE;
@@ -180,7 +179,6 @@ macro_rules! const_ram_storage { (
             const BLOCK_SIZE: usize = $block_size;
             const BLOCK_COUNT: usize = $block_count;
             type LOOKAHEADWORDS_SIZE = $lookaheadwords_size;
-            type PATH_MAX_PLUS_ONE = $path_max_plus_one;
 
             fn read(&self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
                 let read_size: usize = Self::READ_SIZE;
