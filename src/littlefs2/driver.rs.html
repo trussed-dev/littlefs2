@@ -209,13 +209,13 @@
     <span class="kw">type</span> <span class="ident">LOOKAHEADWORDS_SIZE</span>: <span class="ident">ArrayLength</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;
     <span class="comment">// type LOOKAHEAD_SIZE: ArrayLength&lt;u8&gt;;</span>
 
-    <span class="doccomment">/// Maximum length of a filename plus one. Stored in superblock.</span>
-    <span class="doccomment">/// Should default to 255+1, but associated type defaults don&#39;t exist currently.</span>
-    <span class="doccomment">/// At most 1_022+1.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// TODO: We can&#39;t actually change this - need to pass on as compile flag</span>
-    <span class="doccomment">/// to the C backend.</span>
-    <span class="kw">type</span> <span class="ident">FILENAME_MAX_PLUS_ONE</span>: <span class="ident">ArrayLength</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>;
+    <span class="comment">///// Maximum length of a filename plus one. Stored in superblock.</span>
+    <span class="comment">///// Should default to 255+1, but associated type defaults don&#39;t exist currently.</span>
+    <span class="comment">///// At most 1_022+1.</span>
+    <span class="comment">/////</span>
+    <span class="comment">///// TODO: We can&#39;t actually change this - need to pass on as compile flag</span>
+    <span class="comment">///// to the C backend.</span>
+    <span class="comment">//type FILENAME_MAX_PLUS_ONE: ArrayLength&lt;u8&gt;;</span>
 
     <span class="doccomment">/// Maximum length of a path plus one. Necessary to convert Rust string slices</span>
     <span class="doccomment">/// to C strings, which requires an allocation for the terminating</span>
@@ -223,21 +223,21 @@
     <span class="doccomment">/// Must be larger than `FILENAME_MAX_PLUS_ONE`.</span>
     <span class="kw">type</span> <span class="ident">PATH_MAX_PLUS_ONE</span>: <span class="ident">ArrayLength</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>;
 
-    <span class="doccomment">/// Maximum size of file. Stored in superblock.</span>
-    <span class="doccomment">/// Defaults to 2_147_483_647 (or u31, to avoid sign issues in the C code).</span>
-    <span class="doccomment">/// At most 2_147_483_647.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// TODO: We can&#39;t actually change this - need to pass on as compile flag</span>
-    <span class="doccomment">/// to the C backend.</span>
-    <span class="kw">const</span> <span class="ident">FILEBYTES_MAX</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">ll</span>::<span class="ident">LFS_FILE_MAX</span> <span class="kw">as</span> <span class="kw">_</span>;
+    <span class="comment">///// Maximum size of file. Stored in superblock.</span>
+    <span class="comment">///// Defaults to 2_147_483_647 (or u31, to avoid sign issues in the C code).</span>
+    <span class="comment">///// At most 2_147_483_647.</span>
+    <span class="comment">/////</span>
+    <span class="comment">///// TODO: We can&#39;t actually change this - need to pass on as compile flag</span>
+    <span class="comment">///// to the C backend.</span>
+    <span class="comment">//const FILEBYTES_MAX: usize = ll::LFS_FILE_MAX as _;</span>
 
-    <span class="doccomment">/// Maximum size of custom attributes.</span>
-    <span class="doccomment">/// Should default to 1_022, but associated type defaults don&#39;t exists currently.</span>
-    <span class="doccomment">/// At most 1_022.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// TODO: We can&#39;t actually change this - need to pass on as compile flag</span>
-    <span class="doccomment">/// to the C backend.</span>
-    <span class="kw">type</span> <span class="ident">ATTRBYTES_MAX</span>: <span class="ident">ArrayLength</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>;
+    <span class="comment">///// Maximum size of custom attributes.</span>
+    <span class="comment">///// Should default to 1_022, but associated type defaults don&#39;t exists currently.</span>
+    <span class="comment">///// At most 1_022.</span>
+    <span class="comment">/////</span>
+    <span class="comment">///// TODO: We can&#39;t actually change this - need to pass on as compile flag</span>
+    <span class="comment">///// to the C backend.</span>
+    <span class="comment">//type ATTRBYTES_MAX: ArrayLength&lt;u8&gt;;</span>
 
     <span class="doccomment">/// Read data from the storage device.</span>
     <span class="doccomment">/// Guaranteed to be called only with bufs of length a multiple of READ_SIZE.</span>
