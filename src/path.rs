@@ -23,7 +23,7 @@ impl Path {
     ///
     /// The buffer will be first interpreted as a `CStr` and then checked to be comprised only of
     /// ASCII characters.
-    pub fn from_bytes_with_nul<'b>(bytes: &'b [u8]) -> Result<&'b Self> {
+    pub fn from_bytes_with_nul(bytes: &[u8]) -> Result<&Self> {
         let cstr = CStr::from_bytes_with_nul(bytes).map_err(|_| Error::NotCStr)?;
         Self::from_cstr(cstr)
     }
@@ -40,7 +40,7 @@ impl Path {
     ///
     /// The string will be checked to be comprised only of ASCII characters
     // XXX should we reject empty paths (`""`) here?
-    pub fn from_cstr<'s>(cstr: &'s CStr) -> Result<&'s Self> {
+    pub fn from_cstr(cstr: &CStr) -> Result<&Self> {
         let bytes = cstr.to_bytes();
         let n = cstr.to_bytes().len();
         if n > consts::PATH_MAX {
@@ -277,7 +277,7 @@ impl From<&[u8]> for PathBuf {
     fn from(bytes: &[u8]) -> Self {
         // NB: This needs to set the final NUL byte, unless it already has one
         // It also checks that there are no inner NUL bytes
-        let bytes = if bytes.len() > 0 && bytes[bytes.len() - 1] == b'\0' {
+        let bytes = if !bytes.is_empty() && bytes[bytes.len() - 1] == b'\0' {
             &bytes[..bytes.len() - 1]
         } else {
             bytes
@@ -347,7 +347,7 @@ impl<'de> serde::Deserialize<'de> for PathBuf
                 E: serde::de::Error,
             {
                 if v.len() > consts::PATH_MAX {
-                    return Err(E::invalid_length(v.len(), &self))?;
+                    return Err(E::invalid_length(v.len(), &self));
                 }
                 Ok(PathBuf::from(v))
             }

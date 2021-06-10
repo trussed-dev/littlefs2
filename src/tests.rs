@@ -245,7 +245,7 @@ fn test_create() {
 
             // alternative approach
             file.seek(SeekFrom::Start(0))?;
-            let mut contents_vec = heapless::Vec::<u8, consts::U3>::new();
+            let mut contents_vec = heapless::Vec::<u8, 3>::new();
             assert!(file.read_to_end(&mut contents_vec).unwrap() == 3);
             Ok(())
         })?;
@@ -273,7 +273,7 @@ fn test_unbind() {
 
     let mut storage = RamStorage::new(&mut backend);
     Filesystem::mount_and_then(&mut storage, |fs| {
-        let contents: heapless::Vec<_, consts::U37> = fs.read(b"test_unbind.txt\0".try_into().unwrap())?;
+        let contents: heapless::Vec<_, 37> = fs.read(b"test_unbind.txt\0".try_into().unwrap())?;
         assert_eq!(contents, b"hello world");
         Ok(())
     }).unwrap();
@@ -358,7 +358,7 @@ fn attributes() {
         fs.write(filename, &[])?;
         assert!(fs.attribute(filename, 37)?.is_none());
 
-        let mut attribute = Attribute::<RamStorage>::new(37);
+        let mut attribute = Attribute::new(37);
         attribute.set_data(b"top secret");
 
         fs.set_attribute(filename, &attribute).unwrap();
