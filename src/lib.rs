@@ -54,6 +54,16 @@ terms of actual and `typenum` constants, and an implementation supplies methods 
 The filesystem and each open file need memory for state and caching, this has to be allocated
 beforehand and passed to constructors.
 
+### `no_std`
+
+This library is `no_std` compatible, but there are two gotchas.
+
+- The dev-dependency `memchr` of `littlefs2-sys` has its `std` features activated. To prevent this, upgrade to at least Rust 1.51
+  and add `resolver = "2"` in the consuming code's `[package]` section. This will be the default in Rust 2021 edition.
+
+- At link time, `lfs.c` has a dependency on `strcpy`. When not linking to a `libc` with this symbol, activate the `c-stubs` feature
+  to provide an implementation.
+
 ### Design notes
 
 All operations on the filesystem require passing a `&mut Storage`, which guarantees by Rust's
@@ -123,6 +133,9 @@ generate_macros!();
 /// cf. Macros documentation
 #[macro_use]
 pub mod macros;
+
+#[cfg(feature = "c-stubs")]
+mod c_stubs;
 
 pub mod consts;
 pub mod driver;
