@@ -150,6 +150,19 @@
 <span id="150">150</span>
 <span id="151">151</span>
 <span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">not</span>(<span class="ident">test</span>), <span class="ident">no_std</span>)]</span>
 
@@ -206,6 +219,16 @@ terms of actual and `typenum` constants, and an implementation supplies methods 
 
 The filesystem and each open file need memory for state and caching, this has to be allocated
 beforehand and passed to constructors.
+
+### `no_std`
+
+This library is `no_std` compatible, but there are two gotchas.
+
+- The dev-dependency `memchr` of `littlefs2-sys` has its `std` features activated. To prevent this, upgrade to at least Rust 1.51
+  and add `resolver = &quot;2&quot;` in the consuming code&#39;s `[package]` section. This will be the default in Rust 2021 edition.
+
+- At link time, `lfs.c` has a dependency on `strcpy`. When not linking to a `libc` with this symbol, activate the `c-stubs` feature
+  to provide an implementation.
 
 ### Design notes
 
@@ -276,6 +299,9 @@ assert_eq!(&amp;buf, b&quot;black smoke&quot;);
 <span class="doccomment">/// cf. Macros documentation</span>
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">macros</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;c-stubs&quot;</span>)]</span>
+<span class="kw">mod</span> <span class="ident">c_stubs</span>;
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">consts</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">driver</span>;
