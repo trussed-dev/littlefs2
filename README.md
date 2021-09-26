@@ -44,6 +44,16 @@ Upstream release: [v2.1.4][upstream-release]
 [littlefs2-sys]: https://lib.rs/littlefs2-sys
 [upstream-release]: https://github.com/ARMmbed/littlefs/releases/tag/v2.1.4
 
+## `no_std`
+
+This library is `no_std` compatible, but there are two gotchas.
+
+- The dev-dependency `memchr` of `littlefs2-sys` has its `std` features activated. To prevent this, upgrade to at least Rust 1.51
+  and add `resolver = "2"` in the consuming code's `[package]` section. This will be the default in Rust 2021 edition.
+
+- At link time, `lfs.c` has a dependency on `strcpy`. When not linking to a `libc` with this symbol, activate the `c-stubs` feature
+  to provide an implementation.
+
 #### License
 
 <sup>littlefs is licensed under [BSD-3-Clause](https://github.com/ARMmbed/littlefs/blob/master/LICENSE.md).</sup>
