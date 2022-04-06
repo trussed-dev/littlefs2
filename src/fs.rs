@@ -505,7 +505,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         size: ll::lfs_size_t,
     ) -> cty::c_int {
         // println!("in lfs_config_read for {} bytes", size);
-        let storage = unsafe { &*((*c).context as *const Storage) };
+        let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
         let block_size = unsafe { c.read().block_size };
         let off = (block * block_size + off) as usize;

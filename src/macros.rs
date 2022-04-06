@@ -51,7 +51,7 @@ macro_rules! ram_storage { (
             const BLOCK_COUNT: usize = $block_count;
             type LOOKAHEADWORDS_SIZE = $lookaheadwords_size;
 
-            fn read(&self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
+            fn read(&mut self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
                 let read_size: usize = Self::READ_SIZE;
                 debug_assert!(offset % read_size == 0);
                 debug_assert!(buf.len() % read_size == 0);
@@ -180,7 +180,7 @@ macro_rules! const_ram_storage { (
             const BLOCK_COUNT: usize = $block_count;
             type LOOKAHEADWORDS_SIZE = $lookaheadwords_size;
 
-            fn read(&self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
+            fn read(&mut self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
                 let read_size: usize = Self::READ_SIZE;
                 debug_assert!(offset % read_size == 0);
                 debug_assert!(buf.len() % read_size == 0);
