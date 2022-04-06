@@ -91,7 +91,7 @@ pub trait Storage {
 
     /// Read data from the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of READ_SIZE.
-    fn read(&self, off: usize, buf: &mut [u8]) -> Result<usize>;
+    fn read(&mut self, off: usize, buf: &mut [u8]) -> Result<usize>;
     /// Write data to the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of WRITE_SIZE.
     fn write(&mut self, off: usize, data: &[u8]) -> Result<usize>;
