@@ -14,6 +14,7 @@ use crate::consts;
 /// This assumption is not needed for littlefs itself (it works like Linux and
 /// accepts arbitrary C strings), but the assumption makes `AsRef<str>` trivial
 /// to implement.
+#[derive(PartialEq, Eq)]
 pub struct Path {
     inner: CStr,
 }
