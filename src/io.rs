@@ -138,6 +138,29 @@ impl From<crate::path::Error> for Error {
     }
 }
 
+impl From<Error> for ll::lfs_error {
+    fn from(error: Error) -> Self {
+        match error {
+            Error::Success => ll::lfs_error_LFS_ERR_OK,
+            Error::Io => ll::lfs_error_LFS_ERR_IO,
+            Error::Corruption => ll::lfs_error_LFS_ERR_CORRUPT,
+            Error::NoSuchEntry => ll::lfs_error_LFS_ERR_NOENT,
+            Error::EntryAlreadyExisted => ll::lfs_error_LFS_ERR_EXIST,
+            Error::PathNotDir => ll::lfs_error_LFS_ERR_NOTDIR,
+            Error::PathIsDir => ll::lfs_error_LFS_ERR_ISDIR,
+            Error::DirNotEmpty => ll::lfs_error_LFS_ERR_NOTEMPTY,
+            Error::BadFileDescriptor => ll::lfs_error_LFS_ERR_BADF,
+            Error::FileTooBig => ll::lfs_error_LFS_ERR_FBIG,
+            Error::Invalid => ll::lfs_error_LFS_ERR_INVAL,
+            Error::NoSpace => ll::lfs_error_LFS_ERR_NOSPC,
+            Error::NoMemory => ll::lfs_error_LFS_ERR_NOMEM,
+            Error::NoAttribute => ll::lfs_error_LFS_ERR_NOATTR,
+            Error::FilenameTooLong => ll::lfs_error_LFS_ERR_NAMETOOLONG,
+            Error::Unknown(error_code) => error_code,
+        }
+    }
+}
+
 impl From<i32> for Error {
     fn from(error_code: i32) -> Error {
         match error_code {
@@ -161,6 +184,10 @@ impl From<i32> for Error {
             _ => Error::Unknown(error_code),
         }
     }
+}
+
+pub fn error_code_from<T>(result: Result<T>) -> ll::lfs_error {
+    result.err().unwrap_or(Error::Success).into()
 }
 
 pub fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {

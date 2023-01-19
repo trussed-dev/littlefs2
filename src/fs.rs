@@ -511,9 +511,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let off = (block * block_size + off) as usize;
         let buf: &mut [u8] = unsafe { slice::from_raw_parts_mut(buffer as *mut u8, size as usize) };
 
-        // TODO
-        storage.read(off, buf).unwrap();
-        0
+        io::error_code_from(storage.read(off, buf))
     }
 
     /// C callback interface used by LittleFS to program data with the lower level system below the
@@ -533,9 +531,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let off = (block * block_size + off) as usize;
         let buf: &[u8] = unsafe { slice::from_raw_parts(buffer as *const u8, size as usize) };
 
-        // TODO
-        storage.write(off, buf).unwrap();
-        0
+        io::error_code_from(storage.write(off, buf))
     }
 
     /// C callback interface used by LittleFS to erase data with the lower level system below the
@@ -548,9 +544,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         let off = block as usize * Storage::BLOCK_SIZE as usize;
 
-        // TODO
-        storage.erase(off, Storage::BLOCK_SIZE as usize).unwrap();
-        0
+        io::error_code_from(storage.erase(off, Storage::BLOCK_SIZE as usize))
     }
 
     /// C callback interface used by LittleFS to sync data with the lower level interface below the
