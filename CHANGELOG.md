@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - Made `Path::from_bytes_with_nul_unchecked` `const`.
 
+### Fixed
+- Fixed the lookahead size reported to `littlefs2-sys`.  Previously, the
+  reported size was too large by the factor of 8, potentially leading to a
+  buffer overflow causing filesystem corruption.  Fixing this means that
+  `Storage::LOOKAHEADWORD_SIZE` values that are not a multiple of 2 can now
+  lead to an error.  Fixes [#16].
+
+[#16]: https://github.com/trussed-dev/littlefs2/issues/16
+
 ## [v0.2.2] - 2021-03-20
 
 ### Changed

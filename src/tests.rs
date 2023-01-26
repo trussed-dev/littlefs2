@@ -26,7 +26,7 @@ ram_storage!(
     cache_size_ty=consts::U32,
     block_size=256,
     block_count=512,
-    lookaheadwords_size_ty=consts::U1,
+    lookaheadwords_size_ty=consts::U2,
     filename_max_plus_one_ty=consts::U256,
     path_max_plus_one_ty=consts::U256,
     result=Result,
