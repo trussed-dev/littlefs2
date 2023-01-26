@@ -52,10 +52,9 @@ pub trait Storage {
     /// Must be a factor of `BLOCK_SIZE`.
     type CACHE_SIZE: ArrayLength<u8>;
 
-    /// littlefs itself has a `LOOKAHEAD_SIZE`, which must be a multiple of 8,
-    /// as it stores data in a bitmap. It also asks for 4-byte aligned buffers.
-    /// Hence, we further restrict `LOOKAHEAD_SIZE` to be a multiple of 32.
-    /// Our LOOKAHEADWORDS_SIZE is this multiple.
+    /// littlefs itself has a `LOOKAHEAD_SIZE`, which must be a multiple of 8 bytes.  For
+    /// historical reasons, `LOOKAHEADWORDS_SIZE` is measured in 4 bytes.  This means that users
+    /// must always provide a multiple of 2 here.
     type LOOKAHEADWORDS_SIZE: ArrayLength<u32>;
     // type LOOKAHEAD_SIZE: ArrayLength<u8>;
 

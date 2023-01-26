@@ -20,6 +20,7 @@ struct Cache<Storage: driver::Storage> {
     read: Bytes<Storage::CACHE_SIZE>,
     write: Bytes<Storage::CACHE_SIZE>,
     // lookahead: aligned::Aligned<aligned::A4, Bytes<Storage::LOOKAHEAD_SIZE>>,
+    // lookahead buffer must be aligned to 32 bytes
     lookahead: generic_array::GenericArray<u32, Storage::LOOKAHEADWORDS_SIZE>,
 }
 
@@ -28,7 +29,6 @@ impl<S: driver::Storage> Cache<S> {
         Self {
             read: Default::default(),
             write: Default::default(),
-            // lookahead: aligned::Aligned(Default::default()),
             lookahead: Default::default(),
         }
     }
@@ -60,8 +60,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
         let write_size: u32 = Storage::WRITE_SIZE as _;
         let block_size: u32 = Storage::BLOCK_SIZE as _;
         let cache_size: u32 = <Storage as driver::Storage>::CACHE_SIZE::U32;
-        let lookahead_size: u32 =
-            32 * <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE::U32;
+        let lookahead_size: u32 = 4 * <Storage as driver::Storage>::LOOKAHEADWORDS_SIZE::U32;
         let block_cycles: i32 = Storage::BLOCK_CYCLES as _;
         let block_count: u32 = Storage::BLOCK_COUNT as _;
 
@@ -88,6 +87,10 @@ impl<Storage: driver::Storage> Allocation<Storage> {
         // block must be multiple of cache
         debug_assert!(cache_size <= block_size);
         debug_assert!(block_size % cache_size == 0);
+
+        // lookahead words size (measured in 4 bytes) must be a multiple of 2 so that the actual
+        // lookahead size is a multiple of 8 bytes
+        debug_assert!(lookahead_size % 2 == 0);
 
         let cache = Cache::new();
 
