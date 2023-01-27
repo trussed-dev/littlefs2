@@ -20,13 +20,9 @@ jobs:
       - uses: fiam/arm-none-eabi-gcc@v1
         with:
           release: "9-2020-q2"
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
-          components: llvm-tools-preview
+
+      - name: Install rust
+        run: rustup show
 
       - uses: actions/checkout@v2
       - name: Build
