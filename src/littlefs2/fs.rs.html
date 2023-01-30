@@ -1561,12 +1561,6 @@
 <span id="1561">1561</span>
 <span id="1562">1562</span>
 <span id="1563">1563</span>
-<span id="1564">1564</span>
-<span id="1565">1565</span>
-<span id="1566">1566</span>
-<span id="1567">1567</span>
-<span id="1568">1568</span>
-<span id="1569">1569</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Experimental Filesystem version using closures.
 
 </span><span class="kw">use </span>core::{cell::RefCell, cmp, mem, slice};
@@ -2080,10 +2074,8 @@
         <span class="kw">let </span>off = (block * block_size + off) <span class="kw">as </span>usize;
         <span class="kw">let </span>buf: <span class="kw-2">&amp;mut </span>[u8] = <span class="kw">unsafe </span>{ slice::from_raw_parts_mut(buffer <span class="kw">as </span><span class="kw-2">*mut </span>u8, size <span class="kw">as </span>usize) };
 
-        <span class="comment">// TODO
-        </span>storage.read(off, buf).unwrap();
-        <span class="number">0
-    </span>}
+        io::error_code_from(storage.read(off, buf))
+    }
 
     <span class="doccomment">/// C callback interface used by LittleFS to program data with the lower level system below the
     /// filesystem.
@@ -2102,10 +2094,8 @@
         <span class="kw">let </span>off = (block * block_size + off) <span class="kw">as </span>usize;
         <span class="kw">let </span>buf: <span class="kw-2">&amp;</span>[u8] = <span class="kw">unsafe </span>{ slice::from_raw_parts(buffer <span class="kw">as </span><span class="kw-2">*const </span>u8, size <span class="kw">as </span>usize) };
 
-        <span class="comment">// TODO
-        </span>storage.write(off, buf).unwrap();
-        <span class="number">0
-    </span>}
+        io::error_code_from(storage.write(off, buf))
+    }
 
     <span class="doccomment">/// C callback interface used by LittleFS to erase data with the lower level system below the
     /// filesystem.
@@ -2117,10 +2107,8 @@
         </span><span class="kw">let </span>storage = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>((<span class="kw-2">*</span>c).context <span class="kw">as </span><span class="kw-2">*mut </span>Storage) };
         <span class="kw">let </span>off = block <span class="kw">as </span>usize * Storage::BLOCK_SIZE <span class="kw">as </span>usize;
 
-        <span class="comment">// TODO
-        </span>storage.erase(off, Storage::BLOCK_SIZE <span class="kw">as </span>usize).unwrap();
-        <span class="number">0
-    </span>}
+        io::error_code_from(storage.erase(off, Storage::BLOCK_SIZE <span class="kw">as </span>usize))
+    }
 
     <span class="doccomment">/// C callback interface used by LittleFS to sync data with the lower level interface below the
     /// filesystem. Note that this function currently does nothing.

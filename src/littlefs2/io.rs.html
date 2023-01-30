@@ -170,6 +170,33 @@
 <span id="170">170</span>
 <span id="171">171</span>
 <span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Traits and types for core I/O functionality.
 
 </span><span class="kw">pub mod </span>prelude;
@@ -310,6 +337,29 @@ It is possible to seek relative to either end or the current offset.
     }
 }
 
+<span class="kw">impl </span>From&lt;Error&gt; <span class="kw">for </span>ll::lfs_error {
+    <span class="kw">fn </span>from(error: Error) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>error {
+            Error::Success =&gt; ll::lfs_error_LFS_ERR_OK,
+            Error::Io =&gt; ll::lfs_error_LFS_ERR_IO,
+            Error::Corruption =&gt; ll::lfs_error_LFS_ERR_CORRUPT,
+            Error::NoSuchEntry =&gt; ll::lfs_error_LFS_ERR_NOENT,
+            Error::EntryAlreadyExisted =&gt; ll::lfs_error_LFS_ERR_EXIST,
+            Error::PathNotDir =&gt; ll::lfs_error_LFS_ERR_NOTDIR,
+            Error::PathIsDir =&gt; ll::lfs_error_LFS_ERR_ISDIR,
+            Error::DirNotEmpty =&gt; ll::lfs_error_LFS_ERR_NOTEMPTY,
+            Error::BadFileDescriptor =&gt; ll::lfs_error_LFS_ERR_BADF,
+            Error::FileTooBig =&gt; ll::lfs_error_LFS_ERR_FBIG,
+            Error::Invalid =&gt; ll::lfs_error_LFS_ERR_INVAL,
+            Error::NoSpace =&gt; ll::lfs_error_LFS_ERR_NOSPC,
+            Error::NoMemory =&gt; ll::lfs_error_LFS_ERR_NOMEM,
+            Error::NoAttribute =&gt; ll::lfs_error_LFS_ERR_NOATTR,
+            Error::FilenameTooLong =&gt; ll::lfs_error_LFS_ERR_NAMETOOLONG,
+            Error::Unknown(error_code) =&gt; error_code,
+        }
+    }
+}
+
 <span class="kw">impl </span>From&lt;i32&gt; <span class="kw">for </span>Error {
     <span class="kw">fn </span>from(error_code: i32) -&gt; Error {
         <span class="kw">match </span>error_code {
@@ -333,6 +383,10 @@ It is possible to seek relative to either end or the current offset.
             </span><span class="kw">_ </span>=&gt; Error::Unknown(error_code),
         }
     }
+}
+
+<span class="kw">pub fn </span>error_code_from&lt;T&gt;(result: <span class="prelude-ty">Result</span>&lt;T&gt;) -&gt; ll::lfs_error {
+    result.err().unwrap_or(Error::Success).into()
 }
 
 <span class="kw">pub fn </span>result_from&lt;T&gt;(return_value: T, error_code: ll::lfs_error) -&gt; <span class="prelude-ty">Result</span>&lt;T&gt; {
