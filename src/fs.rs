@@ -1305,7 +1305,6 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 mod tests {
     use super::*;
     use core::convert::TryInto;
-    use generic_array::typenum::consts;
     use driver::Storage as LfsStorage;
     use io::Result as LfsResult;
     const_ram_storage!(TestStorage, 4096);

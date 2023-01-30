@@ -1,5 +1,4 @@
 use littlefs2::{
-    consts,
     driver,
     fs::Filesystem,
     io::Result,
