@@ -161,5 +161,35 @@ pub struct Version {
     pub backend: (u32, u32),
 }
 
+/// Creates a path from a string without a trailing null.
+///
+/// Panics if the string contains null bytes or non-ascii characters.
+///
+/// # Examples
+///
+/// ```
+/// use littlefs2::{path, path::Path};
+///
+/// const HOME: &Path = path!("/home");
+/// ```
+///
+/// Illegal values:
+///
+/// ```compile_fail
+/// # use littlefs2::{path, path::Path};
+/// const WITH_NULL: &Path = path!("/h\0me");  // does not compile
+/// ```
+///
+/// ```compile_fail
+/// # use littlefs2::{path, path::Path};
+/// const WITH_UTF8: &Path = path!("/höme");  // does not compile
+/// ```
+#[macro_export]
+macro_rules! path {
+    ($path:literal) => {
+        Path::from_str_with_nul(::core::concat!($path, "\0"))
+    };
+}
+
 #[cfg(test)]
 mod tests;
