@@ -2068,7 +2068,7 @@
         size: ll::lfs_size_t,
     ) -&gt; cty::c_int {
         <span class="comment">// println!(&quot;in lfs_config_read for {} bytes&quot;, size);
-        </span><span class="kw">let </span>storage = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span>((<span class="kw-2">*</span>c).context <span class="kw">as </span><span class="kw-2">*const </span>Storage) };
+        </span><span class="kw">let </span>storage = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>((<span class="kw-2">*</span>c).context <span class="kw">as </span><span class="kw-2">*mut </span>Storage) };
         <span class="macro">debug_assert!</span>(!c.is_null());
         <span class="kw">let </span>block_size = <span class="kw">unsafe </span>{ c.read().block_size };
         <span class="kw">let </span>off = (block * block_size + off) <span class="kw">as </span>usize;

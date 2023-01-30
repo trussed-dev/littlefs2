@@ -235,7 +235,7 @@
 
     </span><span class="doccomment">/// Read data from the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of READ_SIZE.
-    </span><span class="kw">fn </span>read(<span class="kw-2">&amp;</span><span class="self">self</span>, off: usize, buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt;;
+    </span><span class="kw">fn </span>read(<span class="kw-2">&amp;mut </span><span class="self">self</span>, off: usize, buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt;;
     <span class="doccomment">/// Write data to the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of WRITE_SIZE.
     </span><span class="kw">fn </span>write(<span class="kw-2">&amp;mut </span><span class="self">self</span>, off: usize, data: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt;;
