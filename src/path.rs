@@ -441,14 +441,26 @@ mod tests {
     const EMPTY: &Path = path!("");
     const SLASH: &Path = path!("/");
 
+    #[test]
+    fn path_macro() {
+        assert_eq!(EMPTY, &*PathBuf::from(""));
+        assert_eq!(SLASH, &*PathBuf::from("/"));
+    }
+
     // does not compile:
     // const NON_ASCII: &Path = path!("über");
     // const NULL: &Path = path!("ub\0er");
 
     #[test]
-    fn path_macro() {
-        assert_eq!(EMPTY, &*PathBuf::from(""));
-        assert_eq!(SLASH, &*PathBuf::from("/"));
+    #[should_panic]
+    fn nul_in_from_str_with_nul() {
+        Path::from_str_with_nul("ub\0er");
+    }
+
+    #[test]
+    #[should_panic]
+    fn non_ascii_in_from_str_with_nul() {
+        Path::from_str_with_nul("über");
     }
 
     #[test]
