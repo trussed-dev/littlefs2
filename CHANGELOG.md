@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Added `Path::from_str_with_nul` and `path!` to create `Path` instances from
+  `str`.
+
+### Changed
+- Made `Path::from_bytes_with_nul_unchecked` `const`.
+
 ## [v0.2.2] - 2021-03-20
 
 ### Changed

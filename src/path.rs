@@ -20,6 +20,26 @@ pub struct Path {
 }
 
 impl Path {
+    /// Creates a path from a string.
+    ///
+    /// The string must only consist of ASCII characters, expect for the last character which must
+    /// be null.  If these conditions are not met, this function panics.
+    pub const fn from_str_with_nul(s: &str) -> &Self {
+        let bytes = s.as_bytes();
+        let mut i = 0;
+        while i < bytes.len().saturating_sub(1) {
+            assert!(bytes[i] != 0, "must not contain null");
+            assert!(bytes[i].is_ascii(), "must be ASCII");
+            i += 1;
+        }
+        assert!(!bytes.is_empty(), "must not be empty");
+        assert!(bytes[i] == 0, "last byte must be null");
+        unsafe {
+            Self::from_bytes_with_nul_unchecked(bytes)
+        }
+
+    }
+
     /// Creates a path from a byte buffer
     ///
     /// The buffer will be first interpreted as a `CStr` and then checked to be comprised only of
@@ -33,7 +53,7 @@ impl Path {
     ///
     /// # Safety
     /// `bytes` must be null terminated string comprised of only ASCII characters
-    pub unsafe fn from_bytes_with_nul_unchecked(bytes: &[u8]) -> &Self {
+    pub const unsafe fn from_bytes_with_nul_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes as *const [u8] as *const Path)
     }
 
@@ -415,7 +435,21 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[cfg(test)]
 mod tests {
+    use crate::path;
     use super::{Path, PathBuf};
+
+    const EMPTY: &Path = path!("");
+    const SLASH: &Path = path!("/");
+
+    // does not compile:
+    // const NON_ASCII: &Path = path!("über");
+    // const NULL: &Path = path!("ub\0er");
+
+    #[test]
+    fn path_macro() {
+        assert_eq!(EMPTY, &*PathBuf::from(""));
+        assert_eq!(SLASH, &*PathBuf::from("/"));
+    }
 
     #[test]
     fn join() {
