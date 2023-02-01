@@ -1560,7 +1560,6 @@
 <span id="1560">1560</span>
 <span id="1561">1561</span>
 <span id="1562">1562</span>
-<span id="1563">1563</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Experimental Filesystem version using closures.
 
 </span><span class="kw">use </span>core::{cell::RefCell, cmp, mem, slice};
@@ -2868,7 +2867,6 @@
 </span><span class="kw">mod </span>tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span>core::convert::TryInto;
-    <span class="kw">use </span>generic_array::typenum::consts;
     <span class="kw">use </span>driver::Storage <span class="kw">as </span>LfsStorage;
     <span class="kw">use </span>io::Result <span class="kw">as </span>LfsResult;
     <span class="macro">const_ram_storage!</span>(TestStorage, <span class="number">4096</span>);

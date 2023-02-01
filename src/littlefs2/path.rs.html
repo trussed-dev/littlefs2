@@ -455,6 +455,52 @@
 <span id="455">455</span>
 <span id="456">456</span>
 <span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Paths
 
 </span><span class="kw">use </span>core::{convert::TryFrom, fmt, marker::PhantomData, ops, ptr, slice, str};
@@ -477,6 +523,26 @@
 }
 
 <span class="kw">impl </span>Path {
+    <span class="doccomment">/// Creates a path from a string.
+    ///
+    /// The string must only consist of ASCII characters, expect for the last character which must
+    /// be null.  If these conditions are not met, this function panics.
+    </span><span class="kw">pub const fn </span>from_str_with_nul(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="kw-2">&amp;</span><span class="self">Self </span>{
+        <span class="kw">let </span>bytes = s.as_bytes();
+        <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
+        <span class="kw">while </span>i &lt; bytes.len().saturating_sub(<span class="number">1</span>) {
+            <span class="macro">assert!</span>(bytes[i] != <span class="number">0</span>, <span class="string">&quot;must not contain null&quot;</span>);
+            <span class="macro">assert!</span>(bytes[i].is_ascii(), <span class="string">&quot;must be ASCII&quot;</span>);
+            i += <span class="number">1</span>;
+        }
+        <span class="macro">assert!</span>(!bytes.is_empty(), <span class="string">&quot;must not be empty&quot;</span>);
+        <span class="macro">assert!</span>(bytes[i] == <span class="number">0</span>, <span class="string">&quot;last byte must be null&quot;</span>);
+        <span class="kw">unsafe </span>{
+            <span class="self">Self</span>::from_bytes_with_nul_unchecked(bytes)
+        }
+
+    }
+
     <span class="doccomment">/// Creates a path from a byte buffer
     ///
     /// The buffer will be first interpreted as a `CStr` and then checked to be comprised only of
@@ -490,7 +556,7 @@
     ///
     /// # Safety
     /// `bytes` must be null terminated string comprised of only ASCII characters
-    </span><span class="kw">pub unsafe fn </span>from_bytes_with_nul_unchecked(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="kw-2">&amp;</span><span class="self">Self </span>{
+    </span><span class="kw">pub const unsafe fn </span>from_bytes_with_nul_unchecked(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="kw-2">&amp;</span><span class="self">Self </span>{
         <span class="kw-2">&amp;*</span>(bytes <span class="kw">as </span><span class="kw-2">*const </span>[u8] <span class="kw">as </span><span class="kw-2">*const </span>Path)
     }
 
@@ -872,7 +938,33 @@
 
 <span class="attribute">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
+    <span class="kw">use </span><span class="kw">crate</span>::path;
     <span class="kw">use super</span>::{Path, PathBuf};
+
+    <span class="kw">const </span>EMPTY: <span class="kw-2">&amp;</span>Path = <span class="macro">path!</span>(<span class="string">&quot;&quot;</span>);
+    <span class="kw">const </span>SLASH: <span class="kw-2">&amp;</span>Path = <span class="macro">path!</span>(<span class="string">&quot;/&quot;</span>);
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>path_macro() {
+        <span class="macro">assert_eq!</span>(EMPTY, <span class="kw-2">&amp;*</span>PathBuf::from(<span class="string">&quot;&quot;</span>));
+        <span class="macro">assert_eq!</span>(SLASH, <span class="kw-2">&amp;*</span>PathBuf::from(<span class="string">&quot;/&quot;</span>));
+    }
+
+    <span class="comment">// does not compile:
+    // const NON_ASCII: &amp;Path = path!(&quot;über&quot;);
+    // const NULL: &amp;Path = path!(&quot;ub\0er&quot;);
+
+    </span><span class="attribute">#[test]
+    #[should_panic]
+    </span><span class="kw">fn </span>nul_in_from_str_with_nul() {
+        Path::from_str_with_nul(<span class="string">&quot;ub\0er&quot;</span>);
+    }
+
+    <span class="attribute">#[test]
+    #[should_panic]
+    </span><span class="kw">fn </span>non_ascii_in_from_str_with_nul() {
+        Path::from_str_with_nul(<span class="string">&quot;über&quot;</span>);
+    }
 
     <span class="attribute">#[test]
     </span><span class="kw">fn </span>join() {
