@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 - Made `Path::from_bytes_with_nul_unchecked` `const`.
+- Replaced `LOOKAHEADWORDS_SIZE` (measured in multiples of four bytes) with
+  `LOOKAHEAD_SIZE` (measured in multiples of eight bytes) in `driver::Storage`
+  so that all possible values are valid.  (See the lookahead size fix below for
+  context.)
 
 ### Fixed
 - Fixed the lookahead size reported to `littlefs2-sys`.  Previously, the

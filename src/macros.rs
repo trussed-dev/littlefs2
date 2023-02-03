@@ -14,7 +14,7 @@ macro_rules! ram_storage { (
     cache_size_ty=$cache_size:path,
     block_size=$block_size:expr,
     block_count=$block_count:expr,
-    lookaheadwords_size_ty=$lookaheadwords_size:path,
+    lookahead_size_ty=$lookahead_size:path,
     filename_max_plus_one_ty=$filename_max_plus_one:path,
     path_max_plus_one_ty=$path_max_plus_one:path,
     result=$Result:ident,
@@ -49,7 +49,7 @@ macro_rules! ram_storage { (
             type CACHE_SIZE = $cache_size;
             const BLOCK_SIZE: usize = $block_size;
             const BLOCK_COUNT: usize = $block_count;
-            type LOOKAHEADWORDS_SIZE = $lookaheadwords_size;
+            type LOOKAHEAD_SIZE = $lookahead_size;
 
             fn read(&mut self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
                 let read_size: usize = Self::READ_SIZE;
@@ -93,7 +93,7 @@ macro_rules! ram_storage { (
             cache_size_ty=$crate::consts::U32,
             block_size=128,
             block_count=$bytes/128,
-            lookaheadwords_size_ty=$crate::consts::U2,
+            lookahead_size_ty=$crate::consts::U1,
             filename_max_plus_one_ty=$crate::consts::U256,
             path_max_plus_one_ty=$crate::consts::U256,
             result=LfsResult,
@@ -110,7 +110,7 @@ macro_rules! ram_storage { (
             cache_size_ty=$crate::consts::U32,
             block_size=128,
             block_count=8,
-            lookaheadwords_size_ty=$crate::consts::U2,
+            lookahead_size_ty=$crate::consts::U1,
             filename_max_plus_one_ty=$crate::consts::U256,
             path_max_plus_one_ty=$crate::consts::U256,
             result=Result,
@@ -127,7 +127,7 @@ macro_rules! ram_storage { (
             cache_size_ty=$crate::consts::U32,
             block_size=256,
             block_count=512,
-            lookaheadwords_size_ty=$crate::consts::U4,
+            lookahead_size_ty=$crate::consts::U4,
             filename_max_plus_one_ty=$crate::consts::U256,
             path_max_plus_one_ty=$crate::consts::U256,
             result=Result,
@@ -146,7 +146,7 @@ macro_rules! const_ram_storage { (
     cache_size_ty=$cache_size:path,
     block_size=$block_size:expr,
     block_count=$block_count:expr,
-    lookaheadwords_size_ty=$lookaheadwords_size:path,
+    lookahead_size_ty=$lookahead_size:path,
     filename_max_plus_one_ty=$filename_max_plus_one:path,
     path_max_plus_one_ty=$path_max_plus_one:path,
     result=$Result:ident,
@@ -178,7 +178,7 @@ macro_rules! const_ram_storage { (
             type CACHE_SIZE = $cache_size;
             const BLOCK_SIZE: usize = $block_size;
             const BLOCK_COUNT: usize = $block_count;
-            type LOOKAHEADWORDS_SIZE = $lookaheadwords_size;
+            type LOOKAHEAD_SIZE = $lookahead_size;
 
             fn read(&mut self, offset: usize, buf: &mut [u8]) -> $Result<usize> {
                 let read_size: usize = Self::READ_SIZE;
@@ -221,7 +221,7 @@ macro_rules! const_ram_storage { (
             cache_size_ty=$crate::consts::U512,
             block_size=512,
             block_count=$bytes/512,
-            lookaheadwords_size_ty=$crate::consts::U2,
+            lookahead_size_ty=$crate::consts::U1,
             filename_max_plus_one_ty=$crate::consts::U256,
             path_max_plus_one_ty=$crate::consts::U256,
             result=LfsResult,
