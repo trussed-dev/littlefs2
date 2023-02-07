@@ -5,18 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [v0.4.0] - 2023-02-07
+
+This release fixes an overflow of the lookahead buffer.  Users are advised to
+upgrade from previous releases to avoid filesystem corruption.
 
 ### Added
 - Added `Path::from_str_with_nul` and `path!` to create `Path` instances from
   `str`.
+- Added `Eq` and `PartialEq` implementations for `Path`.
 
 ### Changed
 - Made `Path::from_bytes_with_nul_unchecked` `const`.
-- Replaced `LOOKAHEADWORDS_SIZE` (measured in multiples of four bytes) with
-  `LOOKAHEAD_SIZE` (measured in multiples of eight bytes) in `driver::Storage`
-  so that all possible values are valid.  (See the lookahead size fix below for
-  context.)
+- [breaking] Replaced `LOOKAHEADWORDS_SIZE` (measured in multiples of four
+  bytes) with `LOOKAHEAD_SIZE` (measured in multiples of eight bytes) in
+  `driver::Storage` so that all possible values are valid.  (See the lookahead
+  size fix below for context.)
+- [breaking] Require `&mut self` in `driver::Storage::read` for compatibility
+  with `embedded_storage`.
 
 ### Fixed
 - Fixed the lookahead size reported to `littlefs2-sys`.  Previously, the
@@ -24,8 +30,28 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   buffer overflow causing filesystem corruption.  Fixing this means that
   `Storage::LOOKAHEADWORD_SIZE` values that are not a multiple of 2 can now
   lead to an error.  Fixes [#16].
+- Propagate errors in littlefs callbacks instead of panicking.
 
 [#16]: https://github.com/trussed-dev/littlefs2/issues/16
+
+## [v0.3.2] - 2021-09-16
+
+### Added
+- Added the `c-stubs` feature for improved `no-std` compatiblity.
+
+## [v0.3.1] - 2021-06-10
+
+### Changed
+- Removed the `PATH_MAX_PLUS_ONE` type from the `driver::Storage` trait.
+
+## [v0.3.0] - 2021-06-10
+
+*Yanked.*
+
+### Changed
+- Removed the `FILEBYTES_MAX`, `ATTRBYTES_MAX` and `FILENAME_MAX_PLUS_ONE`
+  types from the `driver::Storage` trait as they determined by the backend.
+- Updated to use resolver v2 to fix a dependency issue.
 
 ## [v0.2.2] - 2021-03-20
 
@@ -52,3 +78,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 
 - `std`-triggering regression
+
+[Unreleased]: https://github.com/trussed-dev/littlefs2/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/trussed-dev/littlefs2/releases/tag/0.4.0
+[0.3.2]: https://github.com/trussed-dev/littlefs2/releases/tag/0.3.2
+[0.3.1]: https://github.com/trussed-dev/littlefs2/releases/tag/0.3.1
+[0.3.0]: https://github.com/trussed-dev/littlefs2/releases/tag/0.3.0
+[0.2.2]: https://github.com/trussed-dev/littlefs2/releases/tag/0.2.2
+[0.2.1]: https://github.com/trussed-dev/littlefs2/releases/tag/0.2.1
+[0.2.0]: https://github.com/trussed-dev/littlefs2/releases/tag/0.2.0
+[0.1.1]: https://github.com/trussed-dev/littlefs2/releases/tag/0.1.0
