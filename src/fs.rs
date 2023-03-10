@@ -719,6 +719,10 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
         io::result_from(return_code as usize, return_code)
     }
 
+    pub fn is_empty(&self) -> Result<bool> {
+        self.len().map(|l| l == 0)
+    }
+
     /// Truncates or extends the underlying file, updating the size of this file to become size.
     ///
     /// If the size is less than the current file's size, then the file will be shrunk. If it is

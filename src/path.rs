@@ -202,6 +202,12 @@ unsafe fn strlen(mut s: *const c_char) -> size_t {
     n
 }
 
+impl Default for PathBuf {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PathBuf {
     pub fn new() -> Self {
         Self {
