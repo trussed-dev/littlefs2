@@ -1,4 +1,6 @@
 #![cfg_attr(not(test), no_std)]
+// FIXME
+#![allow(clippy::missing_safety_doc)]
 
 /*!
 
