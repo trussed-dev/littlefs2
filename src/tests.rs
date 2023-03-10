@@ -2,18 +2,9 @@ use core::convert::TryInto;
 use generic_array::typenum::consts;
 
 use crate::{
-    fs::{
-        Attribute,
-        File,
-        Filesystem,
-    },
-    io::{
-        Error,
-        Result,
-        Read,
-        SeekFrom,
-    },
     driver,
+    fs::{Attribute, File, Filesystem},
+    io::{Error, Read, Result, SeekFrom},
 };
 
 ram_storage!(
@@ -63,7 +54,8 @@ fn format() {
     // should fail: FS is not formatted
     assert_eq!(
         Filesystem::mount(&mut alloc, &mut storage)
-            .map(drop).unwrap_err(),
+            .map(drop)
+            .unwrap_err(),
         Error::Corruption
     );
     // should succeed
@@ -97,8 +89,10 @@ fn borrow_fs_allocation() {
     // previous `_fs` is fine as it's masked, due to NLL
     let fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
 
-    fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| { Ok(()) }).unwrap();
-    fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| { Ok(()) }).unwrap();
+    fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| Ok(()))
+        .unwrap();
+    fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| Ok(()))
+        .unwrap();
 }
 
 #[test]
@@ -112,11 +106,14 @@ fn borrow_fs_allocation2() {
     // previous `_fs` is fine as it's masked, due to NLL
 
     Filesystem::mount_and_then(&mut storage, |fs| {
-        fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| { Ok(()) }).unwrap();
-        fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| { Ok(()) }).unwrap();
+        fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| Ok(()))
+            .unwrap();
+        fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| Ok(()))
+            .unwrap();
         // where is boats when you need him lol
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 #[test]
@@ -125,16 +122,17 @@ fn borrow_fs_allocation3() {
     let mut storage = OtherRamStorage::new(&mut backend);
 
     Filesystem::format(&mut storage).unwrap();
-    Filesystem::mount_and_then(&mut storage, |_| {
-        Ok(())
-    }).unwrap();
+    Filesystem::mount_and_then(&mut storage, |_| Ok(())).unwrap();
 
     Filesystem::mount_and_then(&mut storage, |fs| {
-        fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| { Ok(()) }).unwrap();
-        fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| { Ok(()) }).unwrap();
+        fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| Ok(()))
+            .unwrap();
+        fs.create_file_and_then(b"data.bin\0".try_into().unwrap(), |_| Ok(()))
+            .unwrap();
         // where is boats when you need him lol
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 #[test]
@@ -144,25 +142,31 @@ fn test_fs_with() -> Result<()> {
 
     Filesystem::format(&mut storage).unwrap();
     Filesystem::mount_and_then(&mut storage, |fs| {
-
         assert_eq!(fs.total_blocks(), 512);
-        assert_eq!(fs.total_space(), 256*512);
+        assert_eq!(fs.total_space(), 256 * 512);
         // superblock
         assert_eq!(fs.available_blocks()?, 512 - 2);
         assert_eq!(fs.available_space()?, 130_560);
 
-        fs.create_dir(b"/tmp\0".try_into().unwrap())?;       assert_eq!(fs.available_blocks()?, 512 - 4);
-        fs.create_dir(b"/mnt\0".try_into().unwrap())?;       assert_eq!(fs.available_blocks()?, 512 - 6);
+        fs.create_dir(b"/tmp\0".try_into().unwrap())?;
+        assert_eq!(fs.available_blocks()?, 512 - 4);
+        fs.create_dir(b"/mnt\0".try_into().unwrap())?;
+        assert_eq!(fs.available_blocks()?, 512 - 6);
         fs.rename(
             b"tmp\0".try_into().unwrap(),
-            b"mnt/tmp\0".try_into().unwrap())?;              assert_eq!(fs.available_blocks()?, 512 - 6);
-        fs.remove(b"/mnt/tmp\0".try_into().unwrap())?;     assert_eq!(fs.available_blocks()?, 512 - 4);
-        fs.remove(b"/mnt\0".try_into().unwrap())?;         assert_eq!(fs.available_blocks()?, 512 - 2);
+            b"mnt/tmp\0".try_into().unwrap(),
+        )?;
+        assert_eq!(fs.available_blocks()?, 512 - 6);
+        fs.remove(b"/mnt/tmp\0".try_into().unwrap())?;
+        assert_eq!(fs.available_blocks()?, 512 - 4);
+        fs.remove(b"/mnt\0".try_into().unwrap())?;
+        assert_eq!(fs.available_blocks()?, 512 - 2);
 
         fs.create_file_and_then(b"/test_with.txt\0".try_into().unwrap(), |file| {
             assert!(file.write(&[0u8, 1, 2])? == 3);
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
 
         let mut buf = [0u8; 3];
         fs.open_file_and_then(b"/test_with.txt\0".try_into().unwrap(), |file| {
@@ -170,7 +174,8 @@ fn test_fs_with() -> Result<()> {
             assert!(file.read_exact(&mut buf).is_ok());
             assert_eq!(&buf, &[0, 1, 2]);
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
 
         // surprise surprise, inline files!
         assert_eq!(fs.available_blocks()?, 512 - 2);
@@ -187,7 +192,7 @@ fn test_create() {
     Filesystem::format(&mut storage).unwrap();
     Filesystem::mount_and_then(&mut storage, |fs| {
         assert_eq!(fs.total_blocks(), 512);
-        assert_eq!(fs.total_space(), 256*512);
+        assert_eq!(fs.total_space(), 256 * 512);
         // superblock
         assert_eq!(fs.available_blocks().unwrap(), 512 - 2);
         assert_eq!(fs.available_space().unwrap(), 130_560);
@@ -207,7 +212,6 @@ fn test_create() {
         // can create new files
         assert!(!crate::path::PathBuf::from(b"/tmp/test_open.txt").exists(&fs));
         fs.create_file_and_then(b"/tmp/test_open.txt\0".try_into().unwrap(), |file| {
-
             // can write to files
             assert!(file.write(&[0u8, 1, 2]).unwrap() == 3);
             file.sync()?;
@@ -220,14 +224,20 @@ fn test_create() {
         assert!(crate::path::PathBuf::from(b"/tmp/test_open.txt").exists(&fs));
 
         // // cannot remove non-empty directories
-        assert_eq!(fs.remove(b"/tmp\0".try_into().unwrap()).unwrap_err(), Error::DirNotEmpty);
+        assert_eq!(
+            fs.remove(b"/tmp\0".try_into().unwrap()).unwrap_err(),
+            Error::DirNotEmpty
+        );
 
         let metadata = fs.metadata(b"/tmp\0".try_into().unwrap())?;
         assert!(metadata.is_dir());
         assert_eq!(metadata.len(), 0);
 
         // can move files
-        fs.rename(b"/tmp/test_open.txt\0".try_into().unwrap(), b"moved.txt\0".try_into().unwrap())?;
+        fs.rename(
+            b"/tmp/test_open.txt\0".try_into().unwrap(),
+            b"moved.txt\0".try_into().unwrap(),
+        )?;
         assert_eq!(fs.available_blocks().unwrap(), 512 - 2 - 2);
 
         let metadata = fs.metadata(b"/moved.txt\0".try_into().unwrap())?;
@@ -251,8 +261,8 @@ fn test_create() {
         })?;
 
         Ok(())
-
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 #[test]
@@ -268,7 +278,8 @@ fn test_unbind() {
                 assert_eq!(file.len()?, 11);
                 Ok(())
             })
-        }).unwrap();
+        })
+        .unwrap();
     }
 
     let mut storage = RamStorage::new(&mut backend);
@@ -276,7 +287,8 @@ fn test_unbind() {
         let contents: heapless::Vec<_, 37> = fs.read(b"test_unbind.txt\0".try_into().unwrap())?;
         assert_eq!(contents, b"hello world");
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 #[test]
@@ -295,7 +307,8 @@ fn test_seek() {
             assert_eq!(&buf, b"world");
             Ok(())
         })
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 #[test]
@@ -318,7 +331,8 @@ fn test_file_set_len() {
             assert_eq!(file.seek(SeekFrom::Current(0))?, 14);
             Ok(())
         })
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 #[test]
@@ -340,9 +354,10 @@ fn test_fancy_open() {
                 file.seek(SeekFrom::Start(6))?;
 
                 file.read(&mut buf)
-            }
+            },
         )
-    }).unwrap();
+    })
+    .unwrap();
 
     assert_eq!(&buf, b"world");
 }
@@ -353,7 +368,6 @@ fn attributes() {
     let mut storage = RamStorage::new(&mut backend);
     Filesystem::format(&mut storage).unwrap();
     Filesystem::mount_and_then(&mut storage, |fs| {
-
         let filename = b"some.file\0".try_into().unwrap();
         fs.write(filename, &[])?;
         assert!(fs.attribute(filename, 37)?.is_none());
@@ -362,10 +376,7 @@ fn attributes() {
         attribute.set_data(b"top secret");
 
         fs.set_attribute(filename, &attribute).unwrap();
-        assert_eq!(
-            b"top secret",
-            fs.attribute(filename, 37)?.unwrap().data()
-        );
+        assert_eq!(b"top secret", fs.attribute(filename, 37)?.unwrap().data());
 
         // // not sure if we should have this method (may be quite expensive)
         // let attributes = unsafe { fs.attributes("some.file", &mut storage).unwrap() };
@@ -391,8 +402,8 @@ fn attributes() {
         assert!(fs.attribute(tmp_dir, 37)?.is_none());
 
         Ok(())
-
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 #[test]
@@ -401,15 +412,12 @@ fn test_iter_dirs() {
     let mut storage = RamStorage::new(&mut backend);
     Filesystem::format(&mut storage).unwrap();
     Filesystem::mount_and_then(&mut storage, |fs| {
-
         fs.create_dir(b"/tmp\0".try_into()?)?;
 
         // TODO: we might want "multi-open"
         fs.create_file_and_then(b"/tmp/file.a\0".try_into()?, |file| {
             file.set_len(37)?;
-            fs.create_file_and_then(b"/tmp/file.b\0".try_into()?, |file| {
-                file.set_len(42)
-            })
+            fs.create_file_and_then(b"/tmp/file.b\0".try_into()?, |file| file.set_len(42))
         })?;
 
         fs.read_dir_and_then(b"/tmp\0".try_into()?, |dir| {
@@ -436,7 +444,8 @@ fn test_iter_dirs() {
 
             Ok(())
         })
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 // // These are some tests that ensure our type constructions

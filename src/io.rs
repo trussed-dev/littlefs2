@@ -20,7 +20,6 @@ pub trait Read {
             Err(Error::Io)
         }
     }
-
 }
 
 /** The `Write` trait allows for writing bytes to a file.
@@ -44,7 +43,7 @@ pub trait Write {
             match self.write(buf) {
                 Ok(0) => {
                     // failed to write whole buffer
-                    return Err(Error::Io)
+                    return Err(Error::Io);
                 }
                 Ok(n) => buf = &buf[n..],
                 Err(e) => return Err(e),
@@ -58,7 +57,7 @@ pub trait Write {
 
 Use the [`Seek`](../io/trait.Seek.html) trait.
 */
-#[derive(Clone,Copy,Debug,Eq,PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SeekFrom {
     Start(u32),
     End(i32),
@@ -96,7 +95,7 @@ pub trait Seek {
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Definition of errors that might be returned by filesystem functionality.
-#[derive(Clone,Copy,Debug,PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Error {
     /// Error code was >=0, operation was successful.
     Success,
@@ -194,6 +193,6 @@ pub fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {
     let error: Error = error_code.into();
     match error {
         Error::Success => Ok(return_value),
-        _ => Err(error)
+        _ => Err(error),
     }
 }

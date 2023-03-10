@@ -1,17 +1,11 @@
-use littlefs2::{
-    driver,
-    fs::Filesystem,
-    io::Result,
-    path::Path,
-    ram_storage,
-};
+use littlefs2::{driver, fs::Filesystem, io::Result, path::Path, ram_storage};
 
-use serde::{Deserialize,Serialize};
+use serde::{Deserialize, Serialize};
 use ssmarshal::{deserialize, serialize};
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Default/*, Desse, DesseSized*/)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Default /*, Desse, DesseSized*/)]
 struct Entity {
-	z: [u8; 16],
+    z: [u8; 16],
     // x: u32,
     x: f32,
     y: u64,
@@ -35,10 +29,16 @@ fn main() {
     let size = serialize(&mut buf, &entity).unwrap();
     assert_eq!(size, 28);
 
-    fs.write(Path::from_bytes_with_nul(b"entity.bin\0").unwrap(), &buf[..size]).unwrap();
-    fs.open_file_and_then(Path::from_bytes_with_nul(b"entity.bin\0").unwrap(), |file| {
-        file.read(&mut buf)
-    }).unwrap();
+    fs.write(
+        Path::from_bytes_with_nul(b"entity.bin\0").unwrap(),
+        &buf[..size],
+    )
+    .unwrap();
+    fs.open_file_and_then(
+        Path::from_bytes_with_nul(b"entity.bin\0").unwrap(),
+        |file| file.read(&mut buf),
+    )
+    .unwrap();
     // let mut alloc = File::allocate();
     // let mut file = File::create("entity.bin", &mut alloc, &mut fs, &mut storage).unwrap();
     // file.write(&mut fs, &mut storage, &buf[..size]).unwrap();

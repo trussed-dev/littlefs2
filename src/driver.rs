@@ -4,9 +4,7 @@
 use generic_array::ArrayLength;
 use littlefs2_sys as ll;
 
-use crate::{
-    io::Result,
-};
+use crate::io::Result;
 
 /// Users of this library provide a "storage driver" by implementing this trait.
 ///
@@ -23,7 +21,6 @@ use crate::{
 /// Once that's done, we can get rid of `generic-array`s, and replace the
 /// `*_SIZE` types with `usize`s.
 pub trait Storage {
-
     // /// Error type for user-provided read/write/erase methods
     // type Error = usize;
 

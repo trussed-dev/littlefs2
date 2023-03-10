@@ -153,11 +153,11 @@ pub fn version() -> Version {
 }
 
 /// Information about the C backend
-#[derive(Clone,Copy,Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Version {
-	/// On-disk format (currently: 2.0)
+    /// On-disk format (currently: 2.0)
     pub format: (u32, u32),
-	/// Backend release (currently: 2.1)
+    /// Backend release (currently: 2.1)
     pub backend: (u32, u32),
 }
 
