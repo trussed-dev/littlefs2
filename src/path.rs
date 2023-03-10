@@ -300,7 +300,7 @@ impl From<&[u8]> for PathBuf {
         } else {
             bytes
         };
-        let has_no_embedded_nul = bytes.iter().find(|&&byte| byte == b'\0').is_none();
+        let has_no_embedded_nul = !bytes.iter().any(|&byte| byte == b'\0');
         assert!(has_no_embedded_nul);
 
         let mut buf = [0; consts::PATH_MAX_PLUS_ONE];

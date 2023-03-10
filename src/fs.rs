@@ -506,9 +506,9 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     extern "C" fn lfs_config_erase(c: *const ll::lfs_config, block: ll::lfs_block_t) -> cty::c_int {
         // println!("in lfs_config_erase");
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
-        let off = block as usize * Storage::BLOCK_SIZE as usize;
+        let off = block as usize * Storage::BLOCK_SIZE;
 
-        io::error_code_from(storage.erase(off, Storage::BLOCK_SIZE as usize))
+        io::error_code_from(storage.erase(off, Storage::BLOCK_SIZE))
     }
 
     /// C callback interface used by LittleFS to sync data with the lower level interface below the
@@ -673,7 +673,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
 
     // Safety-hatch to experiment with missing parts of API
     pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c Filesystem<'a, Storage> {
-        &self.fs
+        self.fs
     }
 
     /// Sync the file and drop it from the internal linked list.
@@ -1052,7 +1052,7 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S> {
 impl<'a, 'b, S: driver::Storage> ReadDir<'a, 'b, S> {
     // Safety-hatch to experiment with missing parts of API
     pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c Filesystem<'a, S> {
-        &self.fs
+        self.fs
     }
 }
 
@@ -1367,7 +1367,7 @@ mod tests {
         let mut alloc = Allocation::new();
         let fs = Filesystem::mount(&mut alloc, &mut test_storage).unwrap();
         // fs.write(b"/z.txt\0".try_into().unwrap(), &jackson5).unwrap();
-        fs.write(&PathBuf::from("z.txt"), &jackson5).unwrap();
+        fs.write(&PathBuf::from("z.txt"), jackson5).unwrap();
     }
 
     #[cfg(feature = "dir-entry-path")]
@@ -1446,7 +1446,7 @@ mod tests {
                     // One usecase is to read data from the files iterated over.
                     //
                     if entry.metadata.is_file() {
-                        fs.write(&entry.file_name(), b"wowee zowie")?;
+                        fs.write(entry.file_name(), b"wowee zowie")?;
                     }
                 }
                 Ok(())
@@ -1477,11 +1477,11 @@ mod tests {
             })?;
 
             let mut a1 = File::allocate();
-            let f1 = unsafe { File::open(&fs, &mut a1, b"a.txt\0".try_into().unwrap())? };
+            let f1 = unsafe { File::open(fs, &mut a1, b"a.txt\0".try_into().unwrap())? };
             f1.write(b"some text")?;
 
             let mut a2 = File::allocate();
-            let f2 = unsafe { File::open(&fs, &mut a2, b"b.txt\0".try_into().unwrap())? };
+            let f2 = unsafe { File::open(fs, &mut a2, b"b.txt\0".try_into().unwrap())? };
             f2.write(b"more text")?;
 
             unsafe { f1.close()? }; // program hangs here
