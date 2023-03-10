@@ -34,10 +34,7 @@ impl Path {
         }
         assert!(!bytes.is_empty(), "must not be empty");
         assert!(bytes[i] == 0, "last byte must be null");
-        unsafe {
-            Self::from_bytes_with_nul_unchecked(bytes)
-        }
-
+        unsafe { Self::from_bytes_with_nul_unchecked(bytes) }
     }
 
     /// Creates a path from a byte buffer
@@ -182,8 +179,8 @@ macro_rules! array_impls {
 }
 
 array_impls!(
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
-    28, 29, 30, 31, 32
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31, 32
 );
 
 /// An owned, mutable path
@@ -207,7 +204,10 @@ unsafe fn strlen(mut s: *const c_char) -> size_t {
 
 impl PathBuf {
     pub fn new() -> Self {
-        Self { buf: [0; consts::PATH_MAX_PLUS_ONE], len: 1 }
+        Self {
+            buf: [0; consts::PATH_MAX_PLUS_ONE],
+            len: 1,
+        }
     }
 
     pub fn clear(&mut self) {
@@ -284,10 +284,7 @@ impl From<&Path> for PathBuf {
         let len = bytes.len();
         assert!(len <= consts::PATH_MAX);
         unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len + 1) }
-        Self {
-            buf,
-            len: len + 1,
-        }
+        Self { buf, len: len + 1 }
     }
 }
 
@@ -311,10 +308,7 @@ impl From<&[u8]> for PathBuf {
         assert!(len <= consts::PATH_MAX);
         assert!(bytes.is_ascii());
         unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len) }
-        Self {
-            buf,
-            len: len + 1,
-        }
+        Self { buf, len: len + 1 }
     }
 }
 
@@ -337,7 +331,6 @@ impl ops::Deref for PathBuf {
     }
 }
 
-
 impl serde::Serialize for PathBuf {
     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
@@ -347,16 +340,14 @@ impl serde::Serialize for PathBuf {
     }
 }
 
-impl<'de> serde::Deserialize<'de> for PathBuf
-{
+impl<'de> serde::Deserialize<'de> for PathBuf {
     fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         struct ValueVisitor<'de>(PhantomData<&'de ()>);
 
-        impl<'de> serde::de::Visitor<'de> for ValueVisitor<'de>
-        {
+        impl<'de> serde::de::Visitor<'de> for ValueVisitor<'de> {
             type Value = PathBuf;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -435,8 +426,8 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[cfg(test)]
 mod tests {
-    use crate::path;
     use super::{Path, PathBuf};
+    use crate::path;
 
     const EMPTY: &Path = path!("");
     const SLASH: &Path = path!("/");

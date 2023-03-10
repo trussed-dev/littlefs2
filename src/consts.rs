@@ -12,4 +12,3 @@ pub const FILEBYTES_MAX: u32 = crate::ll::LFS_FILE_MAX as _;
 pub const ATTRBYTES_MAX: u32 = 1_022;
 pub type ATTRBYTES_MAX_TYPE = U1022;
 pub const LOOKAHEADWORDS_SIZE: u32 = 16;
-
