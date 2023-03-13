@@ -4,7 +4,9 @@ use generic_array::typenum::consts;
 use crate::{
     fs::{Attribute, File, Filesystem},
     io::{Error, OpenSeekFrom, Read, Result, SeekFrom},
-    path, BACKEND_VERSION, DISK_VERSION,
+    path,
+    path::PathBuf,
+    BACKEND_VERSION, DISK_VERSION,
 };
 
 ram_storage!(
@@ -492,31 +494,56 @@ fn test_iter_dirs() {
             file.set_len(37)?;
             fs.create_file_and_then(path!("/tmp/file.b"), |file| file.set_len(42))
         })?;
+        let mut tells = Vec::new();
 
-        fs.read_dir_and_then(path!("/tmp"), |dir| {
+        fs.read_dir_and_then(path!("/tmp"), |mut dir| {
             let mut found_files: usize = 0;
             let mut sizes = [0usize; 4];
+            let mut i = 0;
 
-            for (i, entry) in dir.enumerate() {
+            tells.push(dir.tell()?);
+            while let Some(entry) = dir.next() {
+                tells.push(dir.tell()?);
                 let entry = entry?;
 
-                // assert_eq!(entry.file_name(), match i {
-                //     0 => b".\0",
-                //     1 => b"..\0",
-                //     2 => b"file.a\0",
-                //     3 => b"file.b\0",
-                //     _ => panic!("oh noes"),
-                // });
+                let expected_name = match i {
+                    0 => PathBuf::from(path!(".")),
+                    1 => PathBuf::from(path!("..")),
+                    2 => PathBuf::from(path!("file.a")),
+                    3 => PathBuf::from(path!("file.b")),
+                    _ => panic!("oh noes"),
+                };
+
+                assert_eq!(entry.file_name(), &*expected_name);
 
                 sizes[i] = entry.metadata().len();
                 found_files += 1;
+                i += 1;
             }
 
             assert_eq!(sizes, [0, 0, 37, 42]);
             assert_eq!(found_files, 4);
+            assert_eq!(tells.len(), 5);
 
+            for (i, tell) in tells.iter().enumerate() {
+                dir.rewind().unwrap();
+                let mut found_files: usize = 0;
+                let mut sizes = Vec::new();
+                dir.seek(*tell)?;
+
+                for entry in &mut dir {
+                    let entry = entry?;
+                    sizes.push(entry.metadata().len());
+                    found_files += 1;
+                }
+
+                assert_eq!(sizes, [0, 0, 37, 42][i..]);
+                assert_eq!(found_files, 4 - i);
+            }
             Ok(())
         })
+        .unwrap();
+        Ok(())
     })
     .unwrap();
 }

@@ -932,12 +932,76 @@ impl ReadDirAllocation {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct DirIterationTell {
+    tell_result: ll::lfs_off_t,
+}
+
 pub struct ReadDir<'a, 'b, S: driver::Storage> {
     // We must store a raw pointer here since the FFI retains a copy of a pointer
     // to the field alloc.state, so we cannot assert unique mutable access.
     alloc: RefCell<*mut ReadDirAllocation>,
     fs: &'b Filesystem<'a, S>,
     path: &'b Path,
+}
+
+impl<S: driver::Storage> ReadDir<'_, '_, S> {
+    /// Return the position of the directory
+    ///
+    /// The returned offset is only meant to be consumed by seek and may not make
+    /// sense, but does indicate the current position in the directory iteration.
+    ///
+    /// Returns the position of the directory, which can be returned to using [`seek`](Self::seek).
+    pub fn tell(&self) -> Result<DirIterationTell> {
+        let value = unsafe {
+            ll::lfs_dir_tell(
+                &mut self.fs.alloc.borrow_mut().state,
+                &mut (**self.alloc.borrow_mut()).state,
+            )
+        };
+        if let Ok(value_positive) = value.try_into() {
+            Ok(DirIterationTell {
+                tell_result: value_positive,
+            })
+        } else {
+            Err(result_from((), value as _).unwrap_err())
+        }
+    }
+
+    /// Change the position of the directory
+    ///
+    /// The new off must be a value previous returned from [`tell`](Self::tell) and specifies
+    /// an absolute offset in the directory seek.
+    pub fn seek(&mut self, state: DirIterationTell) -> Result<()> {
+        let value = unsafe {
+            ll::lfs_dir_seek(
+                &mut self.fs.alloc.borrow_mut().state,
+                &mut (**self.alloc.borrow_mut()).state,
+                state.tell_result,
+            )
+        };
+        if value < 0 {
+            Err(result_from((), value as _).unwrap_err())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Change the position of the directory to the beginning of the directory
+    pub fn rewind(&mut self) -> Result<()> {
+        let res = unsafe {
+            ll::lfs_dir_rewind(
+                &mut self.fs.alloc.borrow_mut().state,
+                &mut (**self.alloc.borrow_mut()).state,
+            )
+        };
+
+        if res < 0 {
+            Err(result_from((), res).unwrap_err())
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl<S: driver::Storage> Iterator for ReadDir<'_, '_, S> {
