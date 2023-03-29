@@ -12,7 +12,7 @@ pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 
 use crate::{
     driver,
-    io::{self, Result},
+    io::{self, OpenSeekFrom, Result},
     path::{Path, PathBuf},
 };
 
@@ -1248,6 +1248,24 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         Ok(contents)
     }
 
+    /// Read a chunk of a file into a bytes vector
+    /// Returns the data and the size of the file
+    pub fn read_chunk<const N: usize>(
+        &self,
+        path: &Path,
+        pos: OpenSeekFrom,
+    ) -> Result<(heapless::Vec<u8, N>, usize)> {
+        let mut contents: heapless::Vec<u8, N> = Default::default();
+        contents.resize_default(contents.capacity()).unwrap();
+        let file_len = File::open_and_then(self, path, |file| {
+            file.seek(pos.into())?;
+            let read_n = file.read(&mut contents)?;
+            contents.truncate(read_n);
+            file.len()
+        })?;
+        Ok((contents, file_len))
+    }
+
     /// Write a slice as the entire contents of a file.
     ///
     /// This function will create a file if it does not exist,
@@ -1257,6 +1275,21 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         println!("writing {:?}", path);
         File::create_and_then(self, path, |file| {
             use io::Write;
+            file.write_all(contents)
+        })?;
+        Ok(())
+    }
+
+    /// Write a slice as a chunk of a file.
+    ///
+    /// This function will not create a file if it does not exist,
+    /// it will fail if the file is not already large enough with regard to the `pos` parameter
+    pub fn write_chunk(&self, path: &Path, contents: &[u8], pos: OpenSeekFrom) -> Result<()> {
+        #[cfg(test)]
+        println!("writing {:?}", path);
+        File::open_and_then(self, path, |file| {
+            use io::Write;
+            file.seek(pos.into())?;
             file.write_all(contents)
         })?;
         Ok(())

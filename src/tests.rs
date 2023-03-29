@@ -4,8 +4,7 @@ use generic_array::typenum::consts;
 use crate::{
     driver,
     fs::{Attribute, File, Filesystem},
-    io::{Error, Read, Result, SeekFrom},
-    path::Path,
+    io::{Error, OpenSeekFrom, Read, Result, SeekFrom},
 };
 
 ram_storage!(
@@ -62,10 +61,8 @@ fn format() {
     // should succeed
     assert!(Filesystem::format(&mut storage).is_ok());
     // should succeed now that storage is formatted
-    let fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
+    let _fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
     // check there are no segfaults
-    drop(fs);
-    drop(storage);
 }
 
 // #[macro_use]
@@ -308,6 +305,40 @@ fn test_seek() {
             assert_eq!(&buf, b"world");
             Ok(())
         })
+    })
+    .unwrap();
+}
+
+#[test]
+fn test_chunked() {
+    let mut backend = OtherRam::default();
+    let mut storage = OtherRamStorage::new(&mut backend);
+    let path = b"test_chunked.txt\0".try_into().unwrap();
+    let hello = b"hello world";
+    let more = b"but wait, there's more";
+
+    Filesystem::format(&mut storage).unwrap();
+    Filesystem::mount_and_then(&mut storage, |fs| {
+        fs.write(path, hello)?;
+        let (data, len) = fs.read_chunk::<1024>(path, OpenSeekFrom::Start(0)).unwrap();
+        assert_eq!(&data, hello);
+        assert_eq!(len, hello.len());
+        let (data, len) = fs.read_chunk::<1024>(path, OpenSeekFrom::Start(3)).unwrap();
+        assert_eq!(&data, &hello[3..]);
+        assert_eq!(len, hello.len());
+        fs.write_chunk(path, more, OpenSeekFrom::End(0)).unwrap();
+        let (data, len) = fs
+            .read_chunk::<1024>(path, OpenSeekFrom::Start(hello.len() as u32))
+            .unwrap();
+        assert_eq!(&data, more);
+        assert_eq!(len, hello.len() + more.len());
+        let (data, len) = fs
+            .read_chunk::<1024>(path, OpenSeekFrom::End(-(more.len() as i32)))
+            .unwrap();
+        assert_eq!(&data, more);
+        assert_eq!(len, hello.len() + more.len());
+
+        Ok(())
     })
     .unwrap();
 }

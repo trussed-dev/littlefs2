@@ -82,6 +82,24 @@ impl SeekFrom {
     }
 }
 
+/// Enumeration of possible methods to seek within an file that was just opened
+/// Used in the [`read_chunk`](crate::fs::Filesystem::read_chunk) and [`write_chunk`](crate::fs::Filesystem::write_chunk) methods,
+/// Where [`SeekFrom::Current`](SeekFrom::Current) would not make sense.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OpenSeekFrom {
+    Start(u32),
+    End(i32),
+}
+
+impl From<OpenSeekFrom> for SeekFrom {
+    fn from(value: OpenSeekFrom) -> Self {
+        match value {
+            OpenSeekFrom::Start(o) => Self::Start(o),
+            OpenSeekFrom::End(o) => Self::End(o),
+        }
+    }
+}
+
 /** The `Seek` trait provides a cursor which can be moved within a file.
 
 It is possible to seek relative to either end or the current offset.
