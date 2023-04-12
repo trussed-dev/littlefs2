@@ -15,6 +15,7 @@ use crate::consts;
 /// accepts arbitrary C strings), but the assumption makes `AsRef<str>` trivial
 /// to implement.
 #[derive(PartialEq, Eq)]
+#[repr(transparent)]
 pub struct Path {
     inner: CStr,
 }

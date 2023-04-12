@@ -5,6 +5,7 @@ use crate::{
     driver,
     fs::{Attribute, File, Filesystem},
     io::{Error, Read, Result, SeekFrom},
+    path::Path,
 };
 
 ram_storage!(
@@ -360,6 +361,35 @@ fn test_fancy_open() {
     .unwrap();
 
     assert_eq!(&buf, b"world");
+}
+
+#[test]
+fn remove_dir_all_where() {
+    let mut backend = Ram::default();
+    let mut storage = RamStorage::new(&mut backend);
+
+    Filesystem::format(&mut storage).unwrap();
+
+    Filesystem::mount_and_then(&mut storage, |fs| {
+        fs.write(path!("test_file"), b"some data").unwrap();
+        fs.create_dir(path!("test_dir")).unwrap();
+        fs.write(path!("test_dir/test_file"), b"some_inner_data")
+            .unwrap();
+        fs.write(path!("test_dir/test_file2"), b"some_inner_data")
+            .unwrap();
+        fs.remove_dir_all_where(path!(""), &|entry| {
+            entry.path() != path!("test_dir/test_file")
+        })
+        .unwrap();
+        assert!(fs.metadata(path!("test_dir/test_file")).unwrap().is_file());
+        assert_eq!(fs.metadata(path!("test_file")), Err(Error::NoSuchEntry));
+        assert_eq!(
+            fs.metadata(path!("test_dir/test_file2")),
+            Err(Error::NoSuchEntry)
+        );
+        Ok(())
+    })
+    .unwrap();
 }
 
 #[test]
