@@ -69,7 +69,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
 
         debug_assert!(read_size > 0);
         debug_assert!(write_size > 0);
-        // https://github.com/ARMmbed/littlefs/issues/264
+        // https://github.com/littlefs-project/littlefs/issues/264
         // Technically, 104 is enough.
         debug_assert!(block_size >= 128);
         debug_assert!(cache_size > 0);
@@ -732,8 +732,8 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     /// TODO: check if this can be closed >1 times, if so make it safe
     ///
     /// Update: It seems like there's an assertion on a flag called `LFS_F_OPENED`:
-    /// https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2549
-    /// https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2566
+    /// https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2549
+    /// https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2566
     ///
     /// - On second call, shouldn't find ourselves in the "mlist of mdirs"
     /// - Since we don't have dynamically allocated buffers, at least we don't hit the double-free.
@@ -783,7 +783,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage>
     // This belongs in `io::Read` but really don't want that to have a generic parameter
     pub fn read_to_end<const N: usize>(&self, buf: &mut heapless::Vec<u8, N>) -> Result<usize> {
         // My understanding of
-        // https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2816
+        // https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2816
         // is that littlefs keeps reading until either the buffer is full, or the file is exhausted
 
         let had = buf.len();

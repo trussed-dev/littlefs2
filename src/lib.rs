@@ -2,19 +2,19 @@
 
 /*!
 
-[littlefs](https://github.com/ARMmbed/littlefs) is a filesystem for microcontrollers
+[littlefs](https://github.com/littlefs-project/littlefs) is a filesystem for microcontrollers
 written in C, that claims to be *fail-safe*:
 - power-loss resilience, by virtue of copy-on-write guarantees
 - bounded RAM/ROM, with stack-allocated buffers
 
-Since [version 2](https://github.com/ARMmbed/littlefs/releases/tag/v2.0.0), it has
+Since [version 2](https://github.com/littlefs-project/littlefs/releases/tag/v2.0.0), it has
 some nifty features such as:
 - dynamic wear-leveling, including detection of bad Flash blocks
 - custom user attributes
 - inline files, avoiding block waste
 
-For more background, see its [design notes](https://github.com/ARMmbed/littlefs/blob/master/DESIGN.md)
-and the [specification](https://github.com/ARMmbed/littlefs/blob/master/SPEC.md) of its format.
+For more background, see its [design notes](https://github.com/littlefs-project/littlefs/blob/master/DESIGN.md)
+and the [specification](https://github.com/littlefs-project/littlefs/blob/master/SPEC.md) of its format.
 
 ### What is this?
 
@@ -29,8 +29,8 @@ constants associated to traits will be treated as constants by the compiler.
 
 Another complication is the fact that files (and directories) need to be closed before they go out of scope,
 since the main littlefs state structure contains a linked list which would exhibit UB (undefined behaviour)
-otherwise, see [issue #3](https://github.com/nickray/littlefs2/issues/3) and
-[issue #5](https://github.com/nickray/littlefs2/issues/5). We choose *not* to call `close` in `drop` (as
+otherwise, see [issue #3](https://github.com/trussed-dev/littlefs2/issues/3) and
+[issue #5](https://github.com/trussed-dev/littlefs2/issues/5). We choose *not* to call `close` in `drop` (as
 `std::fs` does), since these operations could panic if for instance `littlefs` detects Flash corruption
 (from which the application might otherwise recover).
 
