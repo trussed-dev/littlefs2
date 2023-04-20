@@ -19,8 +19,8 @@
       alt="API docs" />
   </a>
   <!-- Continuous build -->
-  <a href="https://github.com/nickray/littlefs2/actions?query=branch%3Amain">
-    <img src="https://img.shields.io/github/workflow/status/nickray/littlefs2/CI/main?style=for-the-badge"
+  <a href="https://github.com/trussed-dev/littlefs2/actions?query=branch%3Amain">
+    <img src="https://img.shields.io/github/actions/workflow/status/trussed-dev/littlefs2/ci.yml?branch=main&style=for-the-badge"
       alt="CI" height="20"/>
   </a>
 </div>
@@ -35,14 +35,14 @@ We follow [`std::fs`][std-fs] as much as reasonable.
 
 The low-level bindings are provided by the [littlefs2-sys][littlefs2-sys] library.
 
-Upstream release: [v2.1.4][upstream-release]
+Upstream release: [v2.2.1][upstream-release]
 
 [geky]: https://github.com/geky
-[littlefs]: https://github.com/ARMmbed/littlefs
-[release-notes-2]: https://github.com/ARMmbed/littlefs/releases/tag/v2.0.0
+[littlefs]: https://github.com/littlefs-project/littlefs
+[release-notes-2]: https://github.com/littlefs-project/littlefs/releases/tag/v2.0.0
 [std-fs]: https://doc.rust-lang.org/std/fs/index.html
 [littlefs2-sys]: https://lib.rs/littlefs2-sys
-[upstream-release]: https://github.com/ARMmbed/littlefs/releases/tag/v2.1.4
+[upstream-release]: https://github.com/littlefs-project/littlefs/releases/tag/v2.2.1
 
 ## `no_std`
 
@@ -56,7 +56,7 @@ This library is `no_std` compatible, but there are two gotchas.
 
 #### License
 
-<sup>littlefs is licensed under [BSD-3-Clause](https://github.com/ARMmbed/littlefs/blob/master/LICENSE.md).</sup>
+<sup>littlefs is licensed under [BSD-3-Clause](https://github.com/littlefs-project/littlefs/blob/master/LICENSE.md).</sup>
 <sup>This API for littlefs is licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT License](LICENSE-MIT) at your option.</sup>
 <sup>Previous bindings exist in the [rust-littlefs](https://github.com/brandonedens/rust-littlefs) repository, also dual-licensed under Apache-2.0 and MIT.</sup>
 <br>
