@@ -187,7 +187,7 @@ pub struct Version {
 #[macro_export]
 macro_rules! path {
     ($path:literal) => {
-        Path::from_str_with_nul(::core::concat!($path, "\0"))
+        $crate::path::Path::from_str_with_nul(::core::concat!($path, "\0"))
     };
 }
 

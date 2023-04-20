@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+## Fixed
+- Fixed macro hygiene for `path!`.
+
 ## [v0.4.0] - 2023-02-07
 
 This release fixes an overflow of the lookahead buffer.  Users are advised to
