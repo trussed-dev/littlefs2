@@ -7,8 +7,8 @@ This also avoids the need to import OpenOptions`.</p>
 Not doing this is UB, which is why we have all the closure-based APIs.</p>
 <p>TODO: check if this can be closed &gt;1 times, if so make it safe</p>
 <p>Update: It seems like there’s an assertion on a flag called <code>LFS_F_OPENED</code>:
-https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2549
-https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2566</p>
+https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2549
+https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2566</p>
 <ul>
 <li>On second call, shouldn’t find ourselves in the “mlist of mdirs”</li>
 <li>Since we don’t have dynamically allocated buffers, at least we don’t hit the double-free.</li>

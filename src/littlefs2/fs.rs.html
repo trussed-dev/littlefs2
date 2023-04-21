@@ -1629,7 +1629,7 @@
 
         <span class="macro">debug_assert!</span>(read_size &gt; <span class="number">0</span>);
         <span class="macro">debug_assert!</span>(write_size &gt; <span class="number">0</span>);
-        <span class="comment">// https://github.com/ARMmbed/littlefs/issues/264
+        <span class="comment">// https://github.com/littlefs-project/littlefs/issues/264
         // Technically, 104 is enough.
         </span><span class="macro">debug_assert!</span>(block_size &gt;= <span class="number">128</span>);
         <span class="macro">debug_assert!</span>(cache_size &gt; <span class="number">0</span>);
@@ -2292,8 +2292,8 @@
     /// TODO: check if this can be closed &gt;1 times, if so make it safe
     ///
     /// Update: It seems like there&#39;s an assertion on a flag called `LFS_F_OPENED`:
-    /// https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2549
-    /// https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2566
+    /// https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2549
+    /// https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2566
     ///
     /// - On second call, shouldn&#39;t find ourselves in the &quot;mlist of mdirs&quot;
     /// - Since we don&#39;t have dynamically allocated buffers, at least we don&#39;t hit the double-free.
@@ -2343,7 +2343,7 @@
     <span class="comment">// This belongs in `io::Read` but really don&#39;t want that to have a generic parameter
     </span><span class="kw">pub fn </span>read_to_end&lt;<span class="kw">const </span>N: usize&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>heapless::Vec&lt;u8, N&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
         <span class="comment">// My understanding of
-        // https://github.com/ARMmbed/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2816
+        // https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2816
         // is that littlefs keeps reading until either the buffer is full, or the file is exhausted
 
         </span><span class="kw">let </span>had = buf.len();
