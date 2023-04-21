@@ -5,7 +5,6 @@ use core::{cell::RefCell, cmp, mem, slice};
 use bitflags::bitflags;
 use generic_array::typenum::marker_traits::Unsigned;
 use littlefs2_sys as ll;
-use ll::lfs_type;
 use serde::{Deserialize, Serialize};
 
 // so far, don't need `heapless-bytes`.
@@ -209,7 +208,7 @@ impl Metadata
 impl From<ll::lfs_info> for Metadata
 {
     fn from(info: ll::lfs_info) -> Self {
-        let file_type = match info.type_ as lfs_type {
+        let file_type = match info.type_ as ll::lfs_type {
             ll::lfs_type_LFS_TYPE_DIR => FileType::Dir,
             ll::lfs_type_LFS_TYPE_REG => FileType::File,
             _ => { unreachable!(); }
