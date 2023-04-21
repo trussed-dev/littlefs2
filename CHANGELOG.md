@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Fixed
 - Fixed macro hygiene for `path!`.
+- Fixed build error that would occur on Windows systems.
 
 ## [v0.4.0] - 2023-02-07
 
