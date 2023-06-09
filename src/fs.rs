@@ -132,6 +132,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
             name_max: filename_max_plus_one.wrapping_sub(1),
             file_max,
             attr_max,
+            metadata_max: 0,
         };
 
         Self {
