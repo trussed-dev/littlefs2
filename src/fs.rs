@@ -61,6 +61,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
         let lookahead_size: u32 = 8 * <Storage as driver::Storage>::LOOKAHEAD_SIZE::U32;
         let block_cycles: i32 = Storage::BLOCK_CYCLES as _;
         let block_count: u32 = Storage::BLOCK_COUNT as _;
+        let metadata_max = Storage::METADATA_MAX;
 
         debug_assert!(block_cycles >= -1);
         debug_assert!(block_cycles != 0);
@@ -132,7 +133,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
             name_max: filename_max_plus_one.wrapping_sub(1),
             file_max,
             attr_max,
-            metadata_max: 0,
+            metadata_max,
         };
 
         Self {
