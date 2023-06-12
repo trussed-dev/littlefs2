@@ -196,6 +196,24 @@
 <a href="#196" id="196">196</a>
 <a href="#197" id="197">197</a>
 <a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Traits and types for core I/O functionality.
 
 </span><span class="kw">pub mod </span>prelude;
@@ -276,6 +294,24 @@ Use the [`Seek`](../io/trait.Seek.html) trait.
             SeekFrom::Start(<span class="kw">_</span>) =&gt; <span class="number">0</span>,
             SeekFrom::End(<span class="kw">_</span>) =&gt; <span class="number">2</span>,
             SeekFrom::Current(<span class="kw">_</span>) =&gt; <span class="number">1</span>,
+        }
+    }
+}
+
+<span class="doccomment">/// Enumeration of possible methods to seek within an file that was just opened
+/// Used in the [`read_chunk`](crate::fs::Filesystem::read_chunk) and [`write_chunk`](crate::fs::Filesystem::write_chunk) methods,
+/// Where [`SeekFrom::Current`](SeekFrom::Current) would not make sense.
+</span><span class="attr">#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+</span><span class="kw">pub enum </span>OpenSeekFrom {
+    Start(u32),
+    End(i32),
+}
+
+<span class="kw">impl </span>From&lt;OpenSeekFrom&gt; <span class="kw">for </span>SeekFrom {
+    <span class="kw">fn </span>from(value: OpenSeekFrom) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>value {
+            OpenSeekFrom::Start(o) =&gt; <span class="self">Self</span>::Start(o),
+            OpenSeekFrom::End(o) =&gt; <span class="self">Self</span>::End(o),
         }
     }
 }
