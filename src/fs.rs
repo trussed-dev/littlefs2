@@ -1287,11 +1287,15 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     pub fn write_chunk(&self, path: &Path, contents: &[u8], pos: OpenSeekFrom) -> Result<()> {
         #[cfg(test)]
         println!("writing {:?}", path);
-        File::open_and_then(self, path, |file| {
-            use io::Write;
-            file.seek(pos.into())?;
-            file.write_all(contents)
-        })?;
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open_and_then(self, path, |file| {
+                use io::Write;
+                file.seek(pos.into())?;
+                file.write_all(contents)
+            })?;
         Ok(())
     }
 }
@@ -1540,11 +1544,11 @@ mod tests {
             })?;
 
             let mut a1 = File::allocate();
-            let f1 = unsafe { File::open(fs, &mut a1, b"a.txt\0".try_into().unwrap())? };
+            let f1 = unsafe { File::create(fs, &mut a1, b"a.txt\0".try_into().unwrap())? };
             f1.write(b"some text")?;
 
             let mut a2 = File::allocate();
-            let f2 = unsafe { File::open(fs, &mut a2, b"b.txt\0".try_into().unwrap())? };
+            let f2 = unsafe { File::create(fs, &mut a2, b"b.txt\0".try_into().unwrap())? };
             f2.write(b"more text")?;
 
             unsafe { f1.close()? }; // program hangs here
