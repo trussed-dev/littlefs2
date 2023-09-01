@@ -13,6 +13,7 @@ pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 use crate::{
     driver,
     io::{self, OpenSeekFrom, Result},
+    path,
     path::{Path, PathBuf},
 };
 
@@ -358,7 +359,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             }
             Ok(())
         })?;
-        if !skipped_any {
+        if !skipped_any && path != path!("") && path != path!("/") {
             debug_now!("removing directory {} too", &path);
             self.remove_dir(path)?;
             debug_now!("..worked");
