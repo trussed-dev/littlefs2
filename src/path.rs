@@ -84,6 +84,19 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 impl Path {
+    pub fn file_name(&self) -> Option<&Path> {
+        let this = self.as_str_ref_with_trailing_nul();
+        match this.rsplit_once('/') {
+            Some((_, path)) if path == "\x00" => None,
+            None if this != "\x00" => Some(self),
+            None => None,
+            Some((_, path)) => {
+                debug_assert!(path.ends_with('\x00'));
+                Some(unsafe { &Path::from_bytes_with_nul_unchecked(path.as_bytes()) })
+            }
+        }
+    }
+
     pub fn ancestors(&self) -> Ancestors {
         Ancestors {
             path: self.as_str(),
@@ -661,5 +674,20 @@ mod tests {
         assert_eq!(&*ancestors.next().unwrap(), path!("."));
         assert_eq!(&*ancestors.next().unwrap(), path!("file.extension"));
         assert!(ancestors.next().is_none());
+    }
+
+    #[test]
+    fn file_name() {
+        let path = path!("/some/path/.././file.extension");
+        assert_eq!(path.file_name(), Some(path!("file.extension")));
+
+        let path = path!("/");
+        assert_eq!(path.file_name(), None);
+
+        let path = path!("");
+        assert_eq!(path.file_name(), None);
+
+        let path = path!("/some/path/.././file.extension/");
+        assert_eq!(path.file_name(), None);
     }
 }
