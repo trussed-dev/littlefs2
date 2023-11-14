@@ -1,6 +1,6 @@
 //! Paths
 
-use core::{convert::TryFrom, fmt, marker::PhantomData, ops, ptr, slice, str};
+use core::{convert::TryFrom, fmt, iter::FusedIterator, marker::PhantomData, ops, ptr, slice, str};
 
 use cstr_core::CStr;
 use cty::{c_char, size_t};
@@ -20,7 +20,82 @@ pub struct Path {
     inner: CStr,
 }
 
+pub struct Ancestors<'a> {
+    path: &'a str,
+}
+
+impl<'a> Iterator for Ancestors<'a> {
+    type Item = PathBuf;
+    fn next(&mut self) -> Option<PathBuf> {
+        if self.path.is_empty() {
+            return None;
+        } else if self.path == "/" {
+            self.path = "";
+            return Some("/".into());
+        }
+
+        let item = self.path;
+
+        let Some((rem, item_name)) = self.path.rsplit_once('/') else {
+            self.path = "";
+            return Some(item.into());
+        };
+
+        if self.path.starts_with('/') && rem.is_empty() {
+            self.path = "/";
+        } else {
+            self.path = rem;
+        }
+
+        // Case of a path ending with a trailing `/`
+        if item_name.is_empty() {
+            self.next();
+        }
+        Some(item.into())
+    }
+}
+
+impl<'a> FusedIterator for Ancestors<'a> {}
+
+pub struct Iter<'a> {
+    path: &'a str,
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = PathBuf;
+    fn next(&mut self) -> Option<PathBuf> {
+        if self.path.is_empty() {
+            return None;
+        }
+        if self.path.starts_with('/') {
+            self.path = &self.path[1..];
+            return Some("/".into());
+        }
+
+        let Some((path, rem)) = self.path.split_once('/') else {
+            let ret_val = Some(self.path.into());
+            self.path = "";
+            return ret_val;
+        };
+
+        self.path = rem;
+        Some(path.into())
+    }
+}
+
 impl Path {
+    pub fn ancestors(&self) -> Ancestors {
+        Ancestors {
+            path: self.as_str(),
+        }
+    }
+
+    pub fn iter(&self) -> Iter {
+        Iter {
+            path: self.as_str(),
+        }
+    }
+
     /// Creates a path from a string.
     ///
     /// The string must only consist of ASCII characters, expect for the last character which must
@@ -97,12 +172,21 @@ impl Path {
 
     // helpful for debugging wither the trailing nul is indeed a trailing nul.
     pub fn as_str_ref_with_trailing_nul(&self) -> &str {
+        // SAFTEY: ASCII is valid UTF-8
         unsafe { str::from_utf8_unchecked(self.inner.to_bytes_with_nul()) }
+    }
+
+    pub fn as_str(&self) -> &str {
+        // SAFTEY: ASCII is valid UTF-8
+        unsafe { str::from_utf8_unchecked(self.inner.to_bytes()) }
     }
 
     pub fn parent(&self) -> Option<PathBuf> {
         let rk_path_bytes = self.as_ref()[..].as_bytes();
         match rk_path_bytes.iter().rposition(|x| *x == b'/') {
+            Some(0) if rk_path_bytes.len() != 1 => {
+                return Some(PathBuf::from("/"));
+            }
             Some(slash_index) => {
                 // if we have a directory that ends with `/`,
                 // still need to "go up" one parent
@@ -119,8 +203,7 @@ impl Path {
 
 impl AsRef<str> for Path {
     fn as_ref(&self) -> &str {
-        // NOTE(unsafe) ASCII is valid UTF-8
-        unsafe { str::from_utf8_unchecked(self.inner.to_bytes()) }
+        self.as_str()
     }
 }
 
@@ -497,5 +580,86 @@ mod tests {
     #[test]
     fn trailing_nuls() {
         assert_eq!(PathBuf::from("abc"), PathBuf::from("abc\0"));
+    }
+
+    #[test]
+    fn ancestors() {
+        fn assert_ancestor_parent(path: &Path) {
+            let mut ancestors = path.ancestors();
+            if !path.as_str().is_empty() {
+                assert_eq!(&*ancestors.next().unwrap(), path);
+            }
+            let mut buf = PathBuf::from(path);
+            loop {
+                let parent = buf.parent();
+                assert_eq!(parent, ancestors.next());
+                match parent {
+                    Some(p) => buf = p,
+                    None => return,
+                }
+            }
+        }
+
+        let path = path!("/some/path/.././file.extension");
+        assert_ancestor_parent(path);
+        let mut ancestors = path.ancestors();
+        assert_eq!(
+            &*ancestors.next().unwrap(),
+            path!("/some/path/.././file.extension")
+        );
+        assert_eq!(&*ancestors.next().unwrap(), path!("/some/path/../."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("/some/path/.."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("/some/path"));
+        assert_eq!(&*ancestors.next().unwrap(), path!("/some"));
+        assert_eq!(&*ancestors.next().unwrap(), path!("/"));
+        assert!(ancestors.next().is_none());
+
+        let path = path!("/some/path/.././file.extension/");
+        assert_ancestor_parent(path);
+        let mut ancestors = path.ancestors();
+        assert_eq!(
+            &*ancestors.next().unwrap(),
+            path!("/some/path/.././file.extension/")
+        );
+        assert_eq!(&*ancestors.next().unwrap(), path!("/some/path/../."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("/some/path/.."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("/some/path"));
+        assert_eq!(&*ancestors.next().unwrap(), path!("/some"));
+        assert_eq!(&*ancestors.next().unwrap(), path!("/"));
+        assert!(ancestors.next().is_none());
+
+        let path = path!("some/path/.././file.extension");
+        assert_ancestor_parent(path);
+        let mut ancestors = path.ancestors();
+        assert_eq!(
+            &*ancestors.next().unwrap(),
+            path!("some/path/.././file.extension")
+        );
+        assert_eq!(&*ancestors.next().unwrap(), path!("some/path/../."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("some/path/.."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("some/path"));
+        assert_eq!(&*ancestors.next().unwrap(), path!("some"));
+        assert!(ancestors.next().is_none());
+    }
+
+    #[test]
+    fn iter() {
+        let path = path!("/some/path/.././file.extension");
+        let mut ancestors = path.iter();
+        assert_eq!(&*ancestors.next().unwrap(), path!("/"));
+        assert_eq!(&*ancestors.next().unwrap(), path!("some"));
+        assert_eq!(&*ancestors.next().unwrap(), path!("path"));
+        assert_eq!(&*ancestors.next().unwrap(), path!(".."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("file.extension"));
+        assert!(ancestors.next().is_none());
+        let path = path!("some/path/.././file.extension/");
+        let mut ancestors = path.iter();
+        assert_eq!(&*ancestors.next().unwrap(), path!("some"));
+        assert_eq!(&*ancestors.next().unwrap(), path!("path"));
+        assert_eq!(&*ancestors.next().unwrap(), path!(".."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("."));
+        assert_eq!(&*ancestors.next().unwrap(), path!("file.extension"));
+        assert!(ancestors.next().is_none());
     }
 }
