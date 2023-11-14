@@ -20,6 +20,9 @@ pub struct Path {
     inner: CStr,
 }
 
+/// Iterator over the ancestors of a Path
+///
+/// See documentation for [`Path::ancestors`][]
 pub struct Ancestors<'a> {
     path: &'a str,
 }
@@ -57,6 +60,9 @@ impl<'a> Iterator for Ancestors<'a> {
 
 impl<'a> FusedIterator for Ancestors<'a> {}
 
+/// Iterator over the components of a Path
+///
+/// See documentation for [`Path::iter`][]
 pub struct Iter<'a> {
     path: &'a str,
 }
@@ -84,6 +90,22 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 impl Path {
+    /// Get the name of the file this path points to if it points to one
+    ///
+    /// ```
+    ///# use littlefs2::path;
+    /// let path = path!("/some/path/file.extension");
+    /// assert_eq!(path.file_name(), Some(path!("file.extension")));
+    ///
+    /// let path = path!("/");
+    /// assert_eq!(path.file_name(), None);
+    ///
+    /// let path = path!("");
+    /// assert_eq!(path.file_name(), None);
+    ///
+    /// let path = path!("/some/path/file.extension/");
+    /// assert_eq!(path.file_name(), None);
+    /// ```
     pub fn file_name(&self) -> Option<&Path> {
         let this = self.as_str_ref_with_trailing_nul();
         match this.rsplit_once('/') {
@@ -97,12 +119,36 @@ impl Path {
         }
     }
 
+    /// Iterate over the ancestors of the path
+    ///
+    /// ```
+    ///# use littlefs2::path;
+    /// let path = path!("/some/path/file.extension");
+    /// let mut ancestors = path.ancestors();
+    /// assert_eq!(&*ancestors.next().unwrap(), path!("/some/path/file.extension"));
+    /// assert_eq!(&*ancestors.next().unwrap(), path!("/some/path"));
+    /// assert_eq!(&*ancestors.next().unwrap(), path!("/some"));
+    /// assert_eq!(&*ancestors.next().unwrap(), path!("/"));
+    /// assert!(ancestors.next().is_none());
+    /// ```
     pub fn ancestors(&self) -> Ancestors {
         Ancestors {
             path: self.as_str(),
         }
     }
 
+    /// Iterate over the components of the path
+    ///
+    /// ```
+    ///# use littlefs2::path;
+    /// let path = path!("/some/path/file.extension");
+    /// let mut iter = path.iter();
+    /// assert_eq!(&*iter.next().unwrap(), path!("/"));
+    /// assert_eq!(&*iter.next().unwrap(), path!("some"));
+    /// assert_eq!(&*iter.next().unwrap(), path!("path"));
+    /// assert_eq!(&*iter.next().unwrap(), path!("file.extension"));
+    /// assert!(iter.next().is_none());
+    /// ```
     pub fn iter(&self) -> Iter {
         Iter {
             path: self.as_str(),
@@ -185,12 +231,12 @@ impl Path {
 
     // helpful for debugging wither the trailing nul is indeed a trailing nul.
     pub fn as_str_ref_with_trailing_nul(&self) -> &str {
-        // SAFTEY: ASCII is valid UTF-8
+        // SAFETY: ASCII is valid UTF-8
         unsafe { str::from_utf8_unchecked(self.inner.to_bytes_with_nul()) }
     }
 
     pub fn as_str(&self) -> &str {
-        // SAFTEY: ASCII is valid UTF-8
+        // SAFETY: ASCII is valid UTF-8
         unsafe { str::from_utf8_unchecked(self.inner.to_bytes()) }
     }
 
