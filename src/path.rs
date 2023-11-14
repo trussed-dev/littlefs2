@@ -90,6 +90,18 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 impl Path {
+    /// Return true if the path is empty
+    ///
+    /// ```rust
+    ///# use littlefs2::path;
+    ///
+    /// assert!(path!("").is_empty());
+    /// assert!(!path!("something").is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.inner.to_bytes().is_empty()
+    }
+
     /// Get the name of the file this path points to if it points to one
     ///
     /// ```
@@ -107,11 +119,13 @@ impl Path {
     /// assert_eq!(path.file_name(), None);
     /// ```
     pub fn file_name(&self) -> Option<&Path> {
+        if self.is_empty() {
+            return None;
+        }
+
         let this = self.as_str_ref_with_trailing_nul();
         match this.rsplit_once('/') {
-            Some((_, path)) if path == "\x00" => None,
-            None if this != "\x00" => Some(self),
-            None => None,
+            None | Some((_, "\x00")) => None,
             Some((_, path)) => {
                 debug_assert!(path.ends_with('\x00'));
                 Some(unsafe { &Path::from_bytes_with_nul_unchecked(path.as_bytes()) })
