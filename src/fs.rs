@@ -241,7 +241,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     // TODO: check if this is equivalent to `is_formatted`.
     pub fn is_mountable(storage: &mut Storage) -> bool {
         let alloc = &mut Allocation::new();
-        matches!(Filesystem::mount(alloc, storage), Ok(_))
+        Filesystem::mount(alloc, storage).is_ok()
     }
 
     // Can BorrowMut be implemented "unsafely" instead?
