@@ -8,8 +8,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Unreleased
 
 ## Fixed
+
 - Fixed macro hygiene for `path!`.
 - Fixed build error that would occur on Windows systems.
+- Added path iteration utilities ([#47][])
+
+[#47]: https://github.com/trussed-dev/littlefs2/pull/47
 
 ## [v0.4.0] - 2023-02-07
 
