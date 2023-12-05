@@ -1,6 +1,9 @@
 //! Experimental Filesystem version using closures.
 
-use core::{cell::RefCell, cmp, mem, slice};
+use core::{
+    cell::{RefCell, UnsafeCell},
+    cmp, mem, slice,
+};
 
 use bitflags::bitflags;
 use generic_array::typenum::marker_traits::Unsigned;
@@ -18,10 +21,10 @@ use crate::{
 };
 
 struct Cache<Storage: driver::Storage> {
-    read: Bytes<Storage::CACHE_SIZE>,
-    write: Bytes<Storage::CACHE_SIZE>,
+    read: UnsafeCell<Bytes<Storage::CACHE_SIZE>>,
+    write: UnsafeCell<Bytes<Storage::CACHE_SIZE>>,
     // lookahead: aligned::Aligned<aligned::A4, Bytes<Storage::LOOKAHEAD_SIZE>>,
-    lookahead: generic_array::GenericArray<u64, Storage::LOOKAHEAD_SIZE>,
+    lookahead: UnsafeCell<generic_array::GenericArray<u64, Storage::LOOKAHEAD_SIZE>>,
 }
 
 impl<S: driver::Storage> Cache<S> {
@@ -1150,9 +1153,9 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     fn new(alloc: &'a mut Allocation<Storage>, storage: &'a mut Storage) -> Self {
         alloc.config.context = storage as *mut _ as *mut cty::c_void;
 
-        alloc.config.read_buffer = &mut alloc.cache.read as *mut _ as *mut cty::c_void;
-        alloc.config.prog_buffer = &mut alloc.cache.write as *mut _ as *mut cty::c_void;
-        alloc.config.lookahead_buffer = &mut alloc.cache.lookahead as *mut _ as *mut cty::c_void;
+        alloc.config.read_buffer = alloc.cache.read.get() as *mut cty::c_void;
+        alloc.config.prog_buffer = alloc.cache.write.get() as *mut cty::c_void;
+        alloc.config.lookahead_buffer = alloc.cache.lookahead.get() as *mut cty::c_void;
 
         Filesystem {
             alloc: RefCell::new(alloc),
