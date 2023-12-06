@@ -620,7 +620,7 @@ bitflags! {
 
 /// The state of a `File`. Pre-allocate with `File::allocate`.
 pub struct FileAllocation<S: driver::Storage> {
-    cache: Bytes<S::CACHE_SIZE>,
+    cache: UnsafeCell<Bytes<S::CACHE_SIZE>>,
     state: ll::lfs_file_t,
     config: ll::lfs_file_config,
 }
@@ -823,7 +823,7 @@ impl OpenOptions {
         alloc: &'b mut FileAllocation<S>,
         path: &Path,
     ) -> Result<File<'a, 'b, S>> {
-        alloc.config.buffer = &mut alloc.cache as *mut _ as *mut cty::c_void;
+        alloc.config.buffer = alloc.cache.get() as *mut _;
 
         let return_code = ll::lfs_file_opencfg(
             &mut fs.alloc.borrow_mut().state,
