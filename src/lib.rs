@@ -141,9 +141,9 @@ mod c_stubs;
 
 pub mod consts;
 pub mod driver;
-
 pub mod fs;
 pub mod io;
+pub mod object_safe;
 pub mod path;
 
 /// get information about the C backend

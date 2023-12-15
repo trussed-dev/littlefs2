@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+## Added
+- Added object-safe traits `DynFile`, `DynFilesystem` and `DynStorage` for
+  accessing `Storage`, `Filesystem` and `File` implementations for any storage.
+
 ## Fixed
 
 - Fixed macro hygiene for `path!`.
