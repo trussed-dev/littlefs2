@@ -1,6 +1,9 @@
 //! Paths
 
-use core::{convert::TryFrom, fmt, iter::FusedIterator, marker::PhantomData, ops, ptr, slice, str};
+use core::{
+    cmp::Ordering, convert::TryFrom, fmt, iter::FusedIterator, marker::PhantomData, ops, ptr,
+    slice, str,
+};
 
 use cstr_core::CStr;
 use cty::{c_char, size_t};
@@ -18,6 +21,62 @@ use crate::consts;
 #[repr(transparent)]
 pub struct Path {
     inner: CStr,
+}
+
+impl Path {
+    /// Compare the path using their string representation
+    /// This comarison function as would be expected for a `String` type.
+    ///
+    /// <div class="warning">
+    ///   This ordering does not match the ordering obsvered when iterating over a directory.
+    ///
+    ///   See <a href="#method.cmp_lfs">cmp_lfs</a> and <a href = "https://github.com/littlefs-project/littlefs/issues/923">littlefs#923</a>.
+    /// </div>
+    ///
+    /// ```
+    ///# use std::cmp::Ordering;
+    ///# use littlefs2::path;
+    /// assert_eq!(path!("some_path_a").cmp_str(path!("some_path_b")), Ordering::Less);
+    /// assert_eq!(path!("some_path_b").cmp_str(path!("some_path_a")), Ordering::Greater);
+    /// assert_eq!(path!("some_path").cmp_str(path!("some_path_a")), Ordering::Less);
+    /// assert_eq!(path!("some_path").cmp_str(path!("some_path_b")), Ordering::Less);
+    /// assert_eq!(path!("some_path").cmp_str(path!("some_path")), Ordering::Equal);
+    ///```
+    pub fn cmp_str(&self, other: &Path) -> Ordering {
+        self.inner.cmp(&other.inner)
+    }
+
+    /// Compare the path using their string representation
+    ///
+    /// This comparison function matches the iteration order of `littlefs` when iterating over directory.
+    /// For more information, see [littlefs#923](https://github.com/littlefs-project/littlefs/issues/923)
+    ///
+    /// ```
+    ///# use std::cmp::Ordering;
+    ///# use littlefs2::path;
+    /// assert_eq!(path!("some_path_a").cmp_lfs(path!("some_path_b")), Ordering::Less);
+    /// assert_eq!(path!("some_path_b").cmp_lfs(path!("some_path_a")), Ordering::Greater);
+    /// assert_eq!(path!("some_path").cmp_lfs(path!("some_path_a")), Ordering::Greater);
+    /// assert_eq!(path!("some_path").cmp_lfs(path!("some_path_b")), Ordering::Greater);
+    /// assert_eq!(path!("some_path_a").cmp_lfs(path!("some_path")), Ordering::Less);
+    /// assert_eq!(path!("some_path_b").cmp_lfs(path!("some_path")), Ordering::Less);
+    /// assert_eq!(path!("some_path").cmp_lfs(path!("some_path")), Ordering::Equal);
+    ///```
+    pub fn cmp_lfs(&self, other: &Path) -> Ordering {
+        let this = self.inner.to_bytes();
+        let other = other.inner.to_bytes();
+
+        let min_len = this.len().min(other.len());
+
+        match this[0..min_len].cmp(&other[0..min_len]) {
+            // if they have a clear ordering, return this ordering
+            Ordering::Less => Ordering::Less,
+            // if they have a clear ordering, return this ordering
+            Ordering::Greater => Ordering::Greater,
+            // If one is a prefix of the other, the longest on is the first
+            Ordering::Equal => other.len().cmp(&this.len()),
+        }
+    }
 }
 
 /// Iterator over the ancestors of a Path
