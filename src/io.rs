@@ -84,7 +84,7 @@ impl SeekFrom {
 
 /// Enumeration of possible methods to seek within an file that was just opened
 /// Used in the [`read_chunk`](crate::fs::Filesystem::read_chunk) and [`write_chunk`](crate::fs::Filesystem::write_chunk) methods,
-/// Where [`SeekFrom::Current`](SeekFrom::Current) would not make sense.
+/// Where [`SeekFrom::Current`] would not make sense.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OpenSeekFrom {
     Start(u32),

@@ -706,16 +706,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
     /// Sync the file and drop it from the internal linked list.
     /// Not doing this is UB, which is why we have all the closure-based APIs.
     ///
-    /// TODO: check if this can be closed >1 times, if so make it safe
-    ///
-    /// Update: It seems like there's an assertion on a flag called `LFS_F_OPENED`:
-    /// https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2549
-    /// https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2566
-    ///
-    /// - On second call, shouldn't find ourselves in the "mlist of mdirs"
-    /// - Since we don't have dynamically allocated buffers, at least we don't hit the double-free.
-    /// - Not sure what happens in `lfs_file_sync`, but it should be easy to just error on
-    ///   not LFS_F_OPENED...
+    /// This must not be called twice.
     pub unsafe fn close(self) -> Result<()> {
         let return_code = ll::lfs_file_close(
             &mut self.fs.alloc.borrow_mut().state,
