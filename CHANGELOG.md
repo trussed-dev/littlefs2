@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
--
+### Changed
+
+- Updated to [`littlefs2-sys` v0.3.1](https://github.com/trussed-dev/littlefs2-sys/releases/tag/0.3.1) and [`littlefs` v2.9.3](https://github.com/littlefs-project/littlefs/releases/tag/v2.9.3).
+  - `littlefs2` v2.6 introduced a new on-disk format (lfs2.1).
+    We use the multiversion feature to keep the old on-disk format (lfs2.0) to not break compatibility with older versions of this crate.
 
 ## [v0.5.0](https://github.com/trussed-dev/littlefs2/releases/tag/0.5.0) - 2024-10-25
 

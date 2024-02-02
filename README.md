@@ -37,14 +37,14 @@ The low-level bindings are provided by the [littlefs2-sys][littlefs2-sys] librar
 
 The core types that are independent of a specific implementation version are provided by the `littlefs2-core` crate, see the [`core`](./core) directory.  These types are re-exported from the `littlefs2` crate too.
 
-Upstream release: [v2.2.1][upstream-release]
+Upstream release: [v2.9.3][upstream-release]
 
 [geky]: https://github.com/geky
 [littlefs]: https://github.com/littlefs-project/littlefs
 [release-notes-2]: https://github.com/littlefs-project/littlefs/releases/tag/v2.0.0
 [std-fs]: https://doc.rust-lang.org/std/fs/index.html
 [littlefs2-sys]: https://lib.rs/littlefs2-sys
-[upstream-release]: https://github.com/littlefs-project/littlefs/releases/tag/v2.2.1
+[upstream-release]: https://github.com/littlefs-project/littlefs/releases/tag/v2.9.3
 
 ## `no_std`
 

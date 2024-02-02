@@ -158,6 +158,10 @@ impl<Storage: driver::Storage> Allocation<Storage> {
             name_max: filename_max_plus_one.wrapping_sub(1),
             file_max,
             attr_max,
+            compact_thresh: 0,
+            metadata_max: 0,
+            inline_max: 0,
+            disk_version: 0x0002_0000,
         };
 
         Self {
@@ -1223,6 +1227,28 @@ mod tests {
     use driver::Storage as LfsStorage;
     use io::Result as LfsResult;
     const_ram_storage!(TestStorage, 4096);
+
+    #[test]
+    fn disk_version() {
+        let mut test_storage = TestStorage::new();
+        Filesystem::format(&mut test_storage).unwrap();
+        Filesystem::mount_and_then(&mut test_storage, |fs| {
+            let mut fs_info = ll::lfs_fsinfo {
+                disk_version: 0,
+                block_size: 0,
+                block_count: 0,
+                name_max: 0,
+                file_max: 0,
+                attr_max: 0,
+            };
+            let return_code =
+                unsafe { ll::lfs_fs_stat(&mut fs.alloc.borrow_mut().state, &mut fs_info) };
+            result_from((), return_code).unwrap();
+            assert_eq!(fs_info.disk_version, 0x0002_0000);
+            Ok(())
+        })
+        .unwrap();
+    }
 
     #[test]
     fn todo() {
