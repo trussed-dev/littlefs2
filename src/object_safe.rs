@@ -68,7 +68,7 @@ impl dyn DynFile + '_ {
 /// Object-safe trait for [`Filesystem`][].
 ///
 /// It contains these additional methods from [`Path`][]:
-/// - [`DynStorage::exists`][]
+/// - [`DynFilesystem::exists`][]
 ///
 /// The following methods are implemented in [`DynStorage`][] instead:
 /// - [`DynStorage::format`][]

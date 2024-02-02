@@ -32,7 +32,7 @@ pub trait Storage {
 
     /// Size of an erasable block in bytes, as unsigned typenum.
     /// Must be a multiple of both `READ_SIZE` and `WRITE_SIZE`.
-    /// At least 128 (https://git.io/JeHp9). Stored in superblock.
+    /// [At least 128](https://github.com/littlefs-project/littlefs/issues/264#issuecomment-519963153). Stored in superblock.
     const BLOCK_SIZE: usize;
 
     /// Number of erasable blocks.
