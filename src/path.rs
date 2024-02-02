@@ -128,7 +128,7 @@ impl Path {
             None | Some((_, "\x00")) => None,
             Some((_, path)) => {
                 debug_assert!(path.ends_with('\x00'));
-                Some(unsafe { &Path::from_bytes_with_nul_unchecked(path.as_bytes()) })
+                Some(unsafe { Path::from_bytes_with_nul_unchecked(path.as_bytes()) })
             }
         }
     }
@@ -257,9 +257,7 @@ impl Path {
     pub fn parent(&self) -> Option<PathBuf> {
         let rk_path_bytes = self.as_ref()[..].as_bytes();
         match rk_path_bytes.iter().rposition(|x| *x == b'/') {
-            Some(0) if rk_path_bytes.len() != 1 => {
-                return Some(PathBuf::from("/"));
-            }
+            Some(0) if rk_path_bytes.len() != 1 => Some(PathBuf::from("/")),
             Some(slash_index) => {
                 // if we have a directory that ends with `/`,
                 // still need to "go up" one parent
