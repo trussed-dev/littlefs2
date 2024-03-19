@@ -642,7 +642,7 @@ impl<S: driver::Storage> FileAllocation<S> {
 
 pub struct File<'a, 'b, S: driver::Storage> {
     // We must store a raw pointer here since the FFI retains a copy of a pointer
-    // to the field alloc.state, so we cannot assert unique mutable access. 
+    // to the field alloc.state, so we cannot assert unique mutable access.
     alloc: RefCell<*mut FileAllocation<S>>,
     fs: &'b Filesystem<'a, S>,
 }
@@ -1054,7 +1054,7 @@ impl ReadDirAllocation {
 
 pub struct ReadDir<'a, 'b, S: driver::Storage> {
     // We must store a raw pointer here since the FFI retains a copy of a pointer
-    // to the field alloc.state, so we cannot assert unique mutable access. 
+    // to the field alloc.state, so we cannot assert unique mutable access.
     alloc: RefCell<*mut ReadDirAllocation>,
     fs: &'b Filesystem<'a, S>,
     #[cfg(feature = "dir-entry-path")]
