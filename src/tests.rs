@@ -41,8 +41,8 @@ ram_storage!(
 
 #[test]
 fn version() {
-    assert_eq!(crate::version().format, (2, 0));
-    assert_eq!(crate::version().backend, (2, 2));
+    assert_eq!(crate::version().format, (2, 1));
+    assert_eq!(crate::version().backend, (2, 6));
 }
 
 #[test]

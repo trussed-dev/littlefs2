@@ -44,6 +44,12 @@ pub trait Storage {
     /// Value zero is invalid, must be positive or -1.
     const BLOCK_CYCLES: isize = -1;
 
+    // Optional upper limit on total space given to metadata pairs in bytes. On
+    // devices with large blocks (e.g. 128kB) setting this to a low size (2-8kB)
+    // can help bound the metadata compaction time. Must be <= block_size.
+    // Defaults to block_size when zero.
+    const METADATA_MAX: u32 = 0;
+
     /// littlefs uses a read cache, a write cache, and one cache per per file.
     /// Must be a multiple of `READ_SIZE` and `WRITE_SIZE`.
     /// Must be a factor of `BLOCK_SIZE`.
