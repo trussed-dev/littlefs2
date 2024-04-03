@@ -22,7 +22,7 @@ default-features = false
 version = "0.2"
 
 [dependencies.littlefs2-sys]
-version = "0.1.6"
+version = "0.2.0"
 
 [dependencies.serde]
 version = "1"
@@ -57,3 +57,6 @@ log-error = []
 # member `char name[LFS_NAME_MAX+1]`.
 # This means that if we change `traits::Storage::FILENAME_MAX_PLUS_ONE`,
 # we need to pass this on!
+
+[patch.crates-io]
+littlefs2-sys = { git = "https://github.com/trussed-dev/littlefs2-sys", rev = "refs/pull/11/head" }

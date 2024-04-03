@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Added object-safe traits `DynFile`, `DynFilesystem` and `DynStorage` for
   accessing `Storage`, `Filesystem` and `File` implementations for any storage.
 
+## Changed
+- Update `littlefs2-sys` to v0.2.0.
+
 ## Fixed
 
 - Fixed macro hygiene for `path!`.
