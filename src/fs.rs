@@ -16,7 +16,7 @@ pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 
 use crate::{
     driver,
-    io::{self, OpenSeekFrom, Result},
+    io::{self, Error, OpenSeekFrom, Result},
     path,
     path::{Path, PathBuf},
 };
@@ -1179,10 +1179,32 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     pub fn mount(alloc: &'a mut Allocation<Storage>, storage: &'a mut Storage) -> Result<Self> {
         let fs = Self::new(alloc, storage);
-        let mut alloc = fs.alloc.borrow_mut();
+        fs.raw_mount()?;
+        Ok(fs)
+    }
+
+    /// Mount the filesystem or, if that fails, call `f` with the mount error and the storage and then try again.
+    pub fn mount_or_else<F>(
+        alloc: &'a mut Allocation<Storage>,
+        storage: &'a mut Storage,
+        f: F,
+    ) -> Result<Self>
+    where
+        F: FnOnce(Error, &mut Storage) -> Result<()>,
+    {
+        let fs = Self::new(alloc, storage);
+        if let Err(err) = fs.raw_mount() {
+            f(err, fs.storage)?;
+            fs.raw_mount()?;
+        }
+        Ok(fs)
+    }
+
+    fn raw_mount(&self) -> Result<()> {
+        let mut alloc = self.alloc.borrow_mut();
         let return_code = unsafe { ll::lfs_mount(&mut alloc.state, &alloc.config) };
         drop(alloc);
-        io::result_from(fs, return_code)
+        io::result_from((), return_code)
     }
 
     // Not public, user should use `mount`, possibly after `format`

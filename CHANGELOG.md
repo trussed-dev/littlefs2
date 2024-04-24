@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Added
 - Added object-safe traits `DynFile`, `DynFilesystem` and `DynStorage` for
   accessing `Storage`, `Filesystem` and `File` implementations for any storage.
+- Added `Filesystem::mount_or_else` function ([#57][])
 
 ## Fixed
 
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Added path iteration utilities ([#47][])
 
 [#47]: https://github.com/trussed-dev/littlefs2/pull/47
+[#57]: https://github.com/trussed-dev/littlefs2/pull/57
 
 ## [v0.4.0] - 2023-02-07
 
