@@ -15,7 +15,9 @@ bitflags = "1"
 cty = "0.2.1"
 delog = "0.1.0"
 generic-array = "0.14"
-heapless = "0.7"
+heapless = "0.8"
+embedded-io = { version = "0.6.1", optional = true }
+embedded-io-async = { version = "0.6.1", optional = true }
 
 [dependencies.cstr_core]
 default-features = false
@@ -44,6 +46,9 @@ ll-assertions = ["littlefs2-sys/assertions"]
 # enable trace in backend C code
 ll-trace = ["littlefs2-sys/trace"]
 c-stubs = []
+eio = ["dep:embedded-io"]
+eio-async = ["eio", "dep:embedded-io-async"]
+
 
 log-all = []
 log-none = []
