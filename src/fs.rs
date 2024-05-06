@@ -50,6 +50,8 @@ pub struct Allocation<Storage: driver::Storage> {
     state: ll::lfs_t,
 }
 
+unsafe impl<T: driver::Storage + Send> Send for Allocation<T> {}
+
 // pub fn check_storage_requirements(
 
 impl<Storage: driver::Storage> Default for Allocation<Storage> {
