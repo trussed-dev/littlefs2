@@ -141,6 +141,10 @@ mod c_stubs;
 
 pub mod consts;
 pub mod driver;
+#[cfg(feature = "eio")]
+pub mod eio;
+#[cfg(feature = "eio-async")]
+pub mod eio_async;
 pub mod fs;
 pub mod io;
 pub mod object_safe;
