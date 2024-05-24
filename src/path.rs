@@ -1,9 +1,6 @@
 //! Paths
 
-use core::{
-    cmp::Ordering, convert::TryFrom, fmt, iter::FusedIterator, marker::PhantomData, ops, ptr,
-    slice, str,
-};
+use core::{cmp::Ordering, convert::TryFrom, fmt, iter::FusedIterator, ops, ptr, slice, str};
 
 use cstr_core::CStr;
 use cty::{c_char, size_t};
@@ -551,6 +548,7 @@ impl ops::Deref for PathBuf {
     }
 }
 
+#[cfg(feature = "serde")]
 impl serde::Serialize for PathBuf {
     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
@@ -560,11 +558,14 @@ impl serde::Serialize for PathBuf {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for PathBuf {
     fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
+        use core::marker::PhantomData;
+
         struct ValueVisitor<'de>(PhantomData<&'de ()>);
 
         impl<'de> serde::de::Visitor<'de> for ValueVisitor<'de> {

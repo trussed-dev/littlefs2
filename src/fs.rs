@@ -9,7 +9,6 @@ use core::{
 };
 use generic_array::typenum::marker_traits::Unsigned;
 use littlefs2_sys as ll;
-use serde::{Deserialize, Serialize};
 
 // so far, don't need `heapless-bytes`.
 pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
@@ -17,7 +16,6 @@ pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 use crate::{
     driver,
     io::{self, Error, OpenSeekFrom, Result},
-    path,
     path::{Path, PathBuf},
 };
 
@@ -160,7 +158,8 @@ pub struct Filesystem<'a, Storage: driver::Storage> {
 }
 
 /// Regular file vs directory
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FileType {
     File,
     Dir,
@@ -179,7 +178,8 @@ impl FileType {
 }
 
 /// File type (regular vs directory) and size of a file.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Metadata {
     file_type: FileType,
     size: usize,
@@ -224,6 +224,7 @@ impl From<ll::lfs_info> for Metadata {
     }
 }
 
+#[cfg(feature = "dir-entry-path")]
 struct RemoveDirAllProgress {
     files_removed: usize,
     skipped_any: bool,
@@ -319,6 +320,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     }
 
     /// Returns number of deleted files + whether the directory was fully deleted or not
+    #[cfg(feature = "dir-entry-path")]
     fn remove_dir_all_where_inner<P>(
         &self,
         path: &Path,
@@ -327,6 +329,8 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     where
         P: Fn(&DirEntry) -> bool,
     {
+        use crate::path;
+
         if !path.exists(self) {
             debug_now!("no such directory {}, early return", path);
             return Ok(RemoveDirAllProgress {
@@ -992,7 +996,8 @@ impl<S: driver::Storage> io::Write for File<'_, '_, S> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DirEntry {
     file_name: PathBuf,
     metadata: Metadata,

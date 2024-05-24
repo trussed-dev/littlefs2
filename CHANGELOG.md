@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Fixed macro hygiene for `path!`.
 - Fixed build error that would occur on Windows systems.
+- Fixed compilation without default features.
 - Added path iteration utilities ([#47][])
 
 ## Changed
