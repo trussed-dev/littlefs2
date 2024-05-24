@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Fixed build error that would occur on Windows systems.
 - Added path iteration utilities ([#47][])
 
+## Changed
+
+- Enforced const evaluation for `path!`.
+
 [#47]: https://github.com/trussed-dev/littlefs2/pull/47
 [#57]: https://github.com/trussed-dev/littlefs2/pull/57
 
