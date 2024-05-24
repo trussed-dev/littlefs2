@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Changed
 
 - Enforced const evaluation for `path!`.
+- Removed `cstr_core` and `cty` dependencies.
+- Updated `littlefs2-sys` dependency to 0.2.0.
 
 [#47]: https://github.com/trussed-dev/littlefs2/pull/47
 [#57]: https://github.com/trussed-dev/littlefs2/pull/57

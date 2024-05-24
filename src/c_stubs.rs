@@ -2,11 +2,15 @@
 //!
 //! Use this instead of linking to libc if you only need a handful of free functions
 
-use cty::{c_char, c_void, size_t};
+use core::ffi::{c_char, c_void};
+
+// see core::ffi::c_size_t: currently, size_t is always usize
+#[allow(non_camel_case_types)]
+type c_size_t = usize;
 
 extern "C" {
     // provided by `compiler-builtins`
-    fn memcpy(dst: *mut c_void, src: *const c_void, n: size_t) -> *mut c_void;
+    fn memcpy(dst: *mut c_void, src: *const c_void, n: c_size_t) -> *mut c_void;
 }
 
 /// # Safety
@@ -19,7 +23,7 @@ unsafe fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_char {
 
 /// # Safety
 /// `s` must point to valid memory; `s` will be treated as a null terminated string
-pub unsafe fn strlen(mut s: *const c_char) -> size_t {
+pub unsafe fn strlen(mut s: *const c_char) -> c_size_t {
     let mut n = 0;
     while *s != 0 {
         s = s.add(1);

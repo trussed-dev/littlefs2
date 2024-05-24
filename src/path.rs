@@ -1,9 +1,13 @@
 //! Paths
 
-use core::{cmp::Ordering, convert::TryFrom, fmt, iter::FusedIterator, ops, ptr, slice, str};
-
-use cstr_core::CStr;
-use cty::{c_char, size_t};
+use core::{
+    cmp::Ordering,
+    convert::TryFrom,
+    ffi::{c_char, CStr},
+    fmt,
+    iter::FusedIterator,
+    ops, ptr, slice, str,
+};
 
 use crate::consts;
 
@@ -404,7 +408,7 @@ pub struct PathBuf {
 
 /// # Safety
 /// `s` must point to valid memory; `s` will be treated as a null terminated string
-unsafe fn strlen(mut s: *const c_char) -> size_t {
+unsafe fn strlen(mut s: *const c_char) -> usize {
     let mut n = 0;
     while *s != 0 {
         s = s.add(1);

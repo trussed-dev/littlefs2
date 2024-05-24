@@ -1,6 +1,7 @@
 //! Experimental Filesystem version using closures.
 
 use bitflags::bitflags;
+use core::ffi::{c_int, c_void};
 use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 use core::{
@@ -457,7 +458,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
                 &mut self.alloc.borrow_mut().state,
                 path.as_ptr(),
                 id,
-                &mut attribute.data as *mut _ as *mut cty::c_void,
+                &mut attribute.data as *mut _ as *mut c_void,
                 attr_max,
             )
         };
@@ -489,7 +490,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
                 &mut self.alloc.borrow_mut().state,
                 path.as_ptr(),
                 attribute.id,
-                &attribute.data as *const _ as *const cty::c_void,
+                &attribute.data as *const _ as *const c_void,
                 attribute.size as u32,
             )
         };
@@ -503,9 +504,9 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         c: *const ll::lfs_config,
         block: ll::lfs_block_t,
         off: ll::lfs_off_t,
-        buffer: *mut cty::c_void,
+        buffer: *mut c_void,
         size: ll::lfs_size_t,
-    ) -> cty::c_int {
+    ) -> c_int {
         // println!("in lfs_config_read for {} bytes", size);
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
@@ -522,9 +523,9 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         c: *const ll::lfs_config,
         block: ll::lfs_block_t,
         off: ll::lfs_off_t,
-        buffer: *const cty::c_void,
+        buffer: *const c_void,
         size: ll::lfs_size_t,
-    ) -> cty::c_int {
+    ) -> c_int {
         // println!("in lfs_config_prog");
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
@@ -538,7 +539,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     /// C callback interface used by LittleFS to erase data with the lower level system below the
     /// filesystem.
-    extern "C" fn lfs_config_erase(c: *const ll::lfs_config, block: ll::lfs_block_t) -> cty::c_int {
+    extern "C" fn lfs_config_erase(c: *const ll::lfs_config, block: ll::lfs_block_t) -> c_int {
         // println!("in lfs_config_erase");
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         let off = block as usize * Storage::BLOCK_SIZE;
@@ -950,7 +951,7 @@ impl<S: driver::Storage> io::Read for File<'_, '_, S> {
             ll::lfs_file_read(
                 &mut self.fs.alloc.borrow_mut().state,
                 addr_of_mut!((*(*self.alloc.borrow_mut())).state),
-                buf.as_mut_ptr() as *mut cty::c_void,
+                buf.as_mut_ptr() as *mut c_void,
                 buf.len() as u32,
             )
         };
@@ -984,7 +985,7 @@ impl<S: driver::Storage> io::Write for File<'_, '_, S> {
             ll::lfs_file_write(
                 &mut self.fs.alloc.borrow_mut().state,
                 addr_of_mut!((*(*self.alloc.borrow_mut())).state),
-                buf.as_ptr() as *const cty::c_void,
+                buf.as_ptr() as *const c_void,
                 buf.len() as u32,
             )
         };
@@ -1214,11 +1215,11 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 
     // Not public, user should use `mount`, possibly after `format`
     fn new(alloc: &'a mut Allocation<Storage>, storage: &'a mut Storage) -> Self {
-        alloc.config.context = storage as *mut _ as *mut cty::c_void;
+        alloc.config.context = storage as *mut _ as *mut c_void;
 
-        alloc.config.read_buffer = alloc.cache.read.get() as *mut cty::c_void;
-        alloc.config.prog_buffer = alloc.cache.write.get() as *mut cty::c_void;
-        alloc.config.lookahead_buffer = alloc.cache.lookahead.get() as *mut cty::c_void;
+        alloc.config.read_buffer = alloc.cache.read.get() as *mut c_void;
+        alloc.config.prog_buffer = alloc.cache.write.get() as *mut c_void;
+        alloc.config.lookahead_buffer = alloc.cache.lookahead.get() as *mut c_void;
 
         Filesystem {
             alloc: RefCell::new(alloc),
