@@ -158,7 +158,7 @@ impl Path {
     /// assert!(path!("").is_empty());
     /// assert!(!path!("something").is_empty());
     /// ```
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.inner.to_bytes().is_empty()
     }
 
@@ -250,9 +250,11 @@ impl Path {
     ///
     /// The buffer will be first interpreted as a `CStr` and then checked to be comprised only of
     /// ASCII characters.
-    pub fn from_bytes_with_nul(bytes: &[u8]) -> Result<&Self> {
-        let cstr = CStr::from_bytes_with_nul(bytes).map_err(|_| Error::NotCStr)?;
-        Self::from_cstr(cstr)
+    pub const fn from_bytes_with_nul(bytes: &[u8]) -> Result<&Self> {
+        match CStr::from_bytes_with_nul(bytes) {
+            Ok(cstr) => Self::from_cstr(cstr),
+            Err(_) => Err(Error::NotCStr),
+        }
     }
 
     /// Unchecked version of `from_bytes_with_nul`
@@ -267,7 +269,7 @@ impl Path {
     ///
     /// The string will be checked to be comprised only of ASCII characters
     // XXX should we reject empty paths (`""`) here?
-    pub fn from_cstr(cstr: &CStr) -> Result<&Self> {
+    pub const fn from_cstr(cstr: &CStr) -> Result<&Self> {
         let bytes = cstr.to_bytes();
         let n = cstr.to_bytes().len();
         if n > consts::PATH_MAX {
@@ -283,7 +285,7 @@ impl Path {
     ///
     /// # Safety
     /// `cstr` must be comprised only of ASCII characters
-    pub unsafe fn from_cstr_unchecked(cstr: &CStr) -> &Self {
+    pub const unsafe fn from_cstr_unchecked(cstr: &CStr) -> &Self {
         &*(cstr as *const CStr as *const Path)
     }
 
@@ -304,12 +306,12 @@ impl Path {
     }
 
     // helpful for debugging wither the trailing nul is indeed a trailing nul.
-    pub fn as_str_ref_with_trailing_nul(&self) -> &str {
+    pub const fn as_str_ref_with_trailing_nul(&self) -> &str {
         // SAFETY: ASCII is valid UTF-8
         unsafe { str::from_utf8_unchecked(self.inner.to_bytes_with_nul()) }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &str {
         // SAFETY: ASCII is valid UTF-8
         unsafe { str::from_utf8_unchecked(self.inner.to_bytes()) }
     }
@@ -424,7 +426,7 @@ impl Default for PathBuf {
 }
 
 impl PathBuf {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             buf: [0; consts::PATH_MAX_PLUS_ONE],
             len: 1,
