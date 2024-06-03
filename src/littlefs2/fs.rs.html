@@ -1619,9 +1619,11 @@
 <a href="#1617" id="1617">1617</a>
 <a href="#1618" id="1618">1618</a>
 <a href="#1619" id="1619">1619</a>
+<a href="#1620" id="1620">1620</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Experimental Filesystem version using closures.
 
 </span><span class="kw">use </span>bitflags::bitflags;
+<span class="kw">use </span>core::ffi::{c_int, c_void};
 <span class="kw">use </span>core::ptr::addr_of;
 <span class="kw">use </span>core::ptr::addr_of_mut;
 <span class="kw">use </span>core::{
@@ -2078,7 +2080,7 @@
                 <span class="kw-2">&amp;mut </span><span class="self">self</span>.alloc.borrow_mut().state,
                 path.as_ptr(),
                 id,
-                <span class="kw-2">&amp;mut </span>attribute.data <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_ as </span><span class="kw-2">*mut </span>cty::c_void,
+                <span class="kw-2">&amp;mut </span>attribute.data <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_ as </span><span class="kw-2">*mut </span>c_void,
                 attr_max,
             )
         };
@@ -2110,7 +2112,7 @@
                 <span class="kw-2">&amp;mut </span><span class="self">self</span>.alloc.borrow_mut().state,
                 path.as_ptr(),
                 attribute.id,
-                <span class="kw-2">&amp;</span>attribute.data <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*const </span>cty::c_void,
+                <span class="kw-2">&amp;</span>attribute.data <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*const </span>c_void,
                 attribute.size <span class="kw">as </span>u32,
             )
         };
@@ -2124,9 +2126,9 @@
         c: <span class="kw-2">*const </span>ll::lfs_config,
         block: ll::lfs_block_t,
         off: ll::lfs_off_t,
-        buffer: <span class="kw-2">*mut </span>cty::c_void,
+        buffer: <span class="kw-2">*mut </span>c_void,
         size: ll::lfs_size_t,
-    ) -&gt; cty::c_int {
+    ) -&gt; c_int {
         <span class="comment">// println!("in lfs_config_read for {} bytes", size);
         </span><span class="kw">let </span>storage = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>((<span class="kw-2">*</span>c).context <span class="kw">as </span><span class="kw-2">*mut </span>Storage) };
         <span class="macro">debug_assert!</span>(!c.is_null());
@@ -2143,9 +2145,9 @@
         c: <span class="kw-2">*const </span>ll::lfs_config,
         block: ll::lfs_block_t,
         off: ll::lfs_off_t,
-        buffer: <span class="kw-2">*const </span>cty::c_void,
+        buffer: <span class="kw-2">*const </span>c_void,
         size: ll::lfs_size_t,
-    ) -&gt; cty::c_int {
+    ) -&gt; c_int {
         <span class="comment">// println!("in lfs_config_prog");
         </span><span class="kw">let </span>storage = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>((<span class="kw-2">*</span>c).context <span class="kw">as </span><span class="kw-2">*mut </span>Storage) };
         <span class="macro">debug_assert!</span>(!c.is_null());
@@ -2159,7 +2161,7 @@
 
     <span class="doccomment">/// C callback interface used by LittleFS to erase data with the lower level system below the
     /// filesystem.
-    </span><span class="kw">extern </span><span class="string">"C" </span><span class="kw">fn </span>lfs_config_erase(c: <span class="kw-2">*const </span>ll::lfs_config, block: ll::lfs_block_t) -&gt; cty::c_int {
+    </span><span class="kw">extern </span><span class="string">"C" </span><span class="kw">fn </span>lfs_config_erase(c: <span class="kw-2">*const </span>ll::lfs_config, block: ll::lfs_block_t) -&gt; c_int {
         <span class="comment">// println!("in lfs_config_erase");
         </span><span class="kw">let </span>storage = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>((<span class="kw-2">*</span>c).context <span class="kw">as </span><span class="kw-2">*mut </span>Storage) };
         <span class="kw">let </span>off = block <span class="kw">as </span>usize * Storage::BLOCK_SIZE;
@@ -2571,7 +2573,7 @@
             </span>ll::lfs_file_read(
                 <span class="kw-2">&amp;mut </span><span class="self">self</span>.fs.alloc.borrow_mut().state,
                 <span class="macro">addr_of_mut!</span>((<span class="kw-2">*</span>(<span class="kw-2">*</span><span class="self">self</span>.alloc.borrow_mut())).state),
-                buf.as_mut_ptr() <span class="kw">as </span><span class="kw-2">*mut </span>cty::c_void,
+                buf.as_mut_ptr() <span class="kw">as </span><span class="kw-2">*mut </span>c_void,
                 buf.len() <span class="kw">as </span>u32,
             )
         };
@@ -2605,7 +2607,7 @@
             </span>ll::lfs_file_write(
                 <span class="kw-2">&amp;mut </span><span class="self">self</span>.fs.alloc.borrow_mut().state,
                 <span class="macro">addr_of_mut!</span>((<span class="kw-2">*</span>(<span class="kw-2">*</span><span class="self">self</span>.alloc.borrow_mut())).state),
-                buf.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span>cty::c_void,
+                buf.as_ptr() <span class="kw">as </span><span class="kw-2">*const </span>c_void,
                 buf.len() <span class="kw">as </span>u32,
             )
         };
@@ -2835,11 +2837,11 @@
 
     <span class="comment">// Not public, user should use `mount`, possibly after `format`
     </span><span class="kw">fn </span>new(alloc: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>Allocation&lt;Storage&gt;, storage: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>Storage) -&gt; <span class="self">Self </span>{
-        alloc.config.context = storage <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_ as </span><span class="kw-2">*mut </span>cty::c_void;
+        alloc.config.context = storage <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_ as </span><span class="kw-2">*mut </span>c_void;
 
-        alloc.config.read_buffer = alloc.cache.read.get() <span class="kw">as </span><span class="kw-2">*mut </span>cty::c_void;
-        alloc.config.prog_buffer = alloc.cache.write.get() <span class="kw">as </span><span class="kw-2">*mut </span>cty::c_void;
-        alloc.config.lookahead_buffer = alloc.cache.lookahead.get() <span class="kw">as </span><span class="kw-2">*mut </span>cty::c_void;
+        alloc.config.read_buffer = alloc.cache.read.get() <span class="kw">as </span><span class="kw-2">*mut </span>c_void;
+        alloc.config.prog_buffer = alloc.cache.write.get() <span class="kw">as </span><span class="kw-2">*mut </span>c_void;
+        alloc.config.lookahead_buffer = alloc.cache.lookahead.get() <span class="kw">as </span><span class="kw-2">*mut </span>c_void;
 
         Filesystem {
             alloc: RefCell::new(alloc),

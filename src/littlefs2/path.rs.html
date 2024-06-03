@@ -811,12 +811,20 @@
 <a href="#809" id="809">809</a>
 <a href="#810" id="810">810</a>
 <a href="#811" id="811">811</a>
+<a href="#812" id="812">812</a>
+<a href="#813" id="813">813</a>
+<a href="#814" id="814">814</a>
+<a href="#815" id="815">815</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Paths
 
-</span><span class="kw">use </span>core::{cmp::Ordering, convert::TryFrom, fmt, iter::FusedIterator, ops, ptr, slice, str};
-
-<span class="kw">use </span>cstr_core::CStr;
-<span class="kw">use </span>cty::{c_char, size_t};
+</span><span class="kw">use </span>core::{
+    cmp::Ordering,
+    convert::TryFrom,
+    ffi::{c_char, CStr},
+    fmt,
+    iter::FusedIterator,
+    ops, ptr, slice, str,
+};
 
 <span class="kw">use </span><span class="kw">crate</span>::consts;
 
@@ -1217,7 +1225,7 @@
 
 <span class="doccomment">/// # Safety
 /// `s` must point to valid memory; `s` will be treated as a null terminated string
-</span><span class="kw">unsafe fn </span>strlen(<span class="kw-2">mut </span>s: <span class="kw-2">*const </span>c_char) -&gt; size_t {
+</span><span class="kw">unsafe fn </span>strlen(<span class="kw-2">mut </span>s: <span class="kw-2">*const </span>c_char) -&gt; usize {
     <span class="kw">let </span><span class="kw-2">mut </span>n = <span class="number">0</span>;
     <span class="kw">while </span><span class="kw-2">*</span>s != <span class="number">0 </span>{
         s = s.add(<span class="number">1</span>);
