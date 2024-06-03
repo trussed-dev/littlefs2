@@ -195,20 +195,20 @@ fn test_create() {
         assert_eq!(fs.available_blocks().unwrap(), 512 - 2);
         assert_eq!(fs.available_space().unwrap(), 130_560);
 
-        assert!(!crate::path::PathBuf::from(b"/test_open.txt").exists(fs));
+        assert!(!path!("/test_open.txt").exists(fs));
         assert_eq!(
             File::open_and_then(fs, b"/test_open.txt\0".try_into().unwrap(), |_| { Ok(()) })
                 .map(drop)
                 .unwrap_err(), // "real" contains_err is experimental
             Error::NoSuchEntry
         );
-        assert!(!crate::path::PathBuf::from(b"/test_open.txt").exists(fs));
+        assert!(!path!("/test_open.txt").exists(fs));
 
         fs.create_dir(b"/tmp\0".try_into().unwrap()).unwrap();
         assert_eq!(fs.available_blocks().unwrap(), 512 - 2 - 2);
 
         // can create new files
-        assert!(!crate::path::PathBuf::from(b"/tmp/test_open.txt").exists(fs));
+        assert!(!path!("/tmp/test_open.txt").exists(fs));
         fs.create_file_and_then(b"/tmp/test_open.txt\0".try_into().unwrap(), |file| {
             // can write to files
             assert!(file.write(&[0u8, 1, 2]).unwrap() == 3);
@@ -219,7 +219,7 @@ fn test_create() {
             // file.close()?;
             Ok(())
         })?;
-        assert!(crate::path::PathBuf::from(b"/tmp/test_open.txt").exists(fs));
+        assert!(path!("/tmp/test_open.txt").exists(fs));
 
         // // cannot remove non-empty directories
         assert_eq!(

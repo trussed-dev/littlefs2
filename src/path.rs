@@ -9,7 +9,7 @@ use core::{
     ops, ptr, slice, str,
 };
 
-use crate::consts;
+use crate::{consts, path};
 
 /// A path
 ///
@@ -94,14 +94,14 @@ impl<'a> Iterator for Ancestors<'a> {
             return None;
         } else if self.path == "/" {
             self.path = "";
-            return Some("/".into());
+            return Some(path!("/").into());
         }
 
         let item = self.path;
 
         let Some((rem, item_name)) = self.path.rsplit_once('/') else {
             self.path = "";
-            return Some(item.into());
+            return item.try_into().ok();
         };
 
         if self.path.starts_with('/') && rem.is_empty() {
@@ -114,7 +114,7 @@ impl<'a> Iterator for Ancestors<'a> {
         if item_name.is_empty() {
             self.next();
         }
-        Some(item.into())
+        item.try_into().ok()
     }
 }
 
@@ -135,17 +135,17 @@ impl<'a> Iterator for Iter<'a> {
         }
         if self.path.starts_with('/') {
             self.path = &self.path[1..];
-            return Some("/".into());
+            return Some(path!("/").into());
         }
 
         let Some((path, rem)) = self.path.split_once('/') else {
-            let ret_val = Some(self.path.into());
+            let ret_val = self.path.try_into().ok();
             self.path = "";
             return ret_val;
         };
 
         self.path = rem;
-        Some(path.into())
+        path.try_into().ok()
     }
 }
 
@@ -236,21 +236,9 @@ impl Path {
     ///
     /// The string must only consist of ASCII characters.  The last character must be null.  It
     /// must contain at most [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing
-    /// null.  If these conditions are not met, this function panics.
-    pub const fn from_str_with_nul(s: &str) -> &Self {
-        let bytes = s.as_bytes();
-        let mut i = 0;
-        while i < bytes.len().saturating_sub(1) {
-            assert!(bytes[i] != 0, "must not contain null");
-            assert!(bytes[i].is_ascii(), "must be ASCII");
-            i += 1;
-        }
-        assert!(!bytes.is_empty(), "must not be empty");
-        assert!(bytes[i] == 0, "last byte must be null");
-        unsafe {
-            let cstr = CStr::from_bytes_with_nul_unchecked(bytes);
-            Self::from_cstr_unchecked(cstr)
-        }
+    /// null.  If these conditions are not met, this function returns an error.
+    pub const fn from_str_with_nul(s: &str) -> Result<&Self> {
+        Self::from_bytes_with_nul(s.as_bytes())
     }
 
     /// Creates a path from a byte buffer.
@@ -322,14 +310,16 @@ impl Path {
     pub fn parent(&self) -> Option<PathBuf> {
         let rk_path_bytes = self.as_ref()[..].as_bytes();
         match rk_path_bytes.iter().rposition(|x| *x == b'/') {
-            Some(0) if rk_path_bytes.len() != 1 => Some(PathBuf::from("/")),
+            Some(0) if rk_path_bytes.len() != 1 => Some(path!("/").into()),
             Some(slash_index) => {
                 // if we have a directory that ends with `/`,
                 // still need to "go up" one parent
                 if slash_index + 1 == rk_path_bytes.len() {
-                    PathBuf::from(&rk_path_bytes[..slash_index]).parent()
+                    PathBuf::try_from(&rk_path_bytes[..slash_index])
+                        .ok()?
+                        .parent()
                 } else {
-                    Some(PathBuf::from(&rk_path_bytes[..slash_index]))
+                    PathBuf::try_from(&rk_path_bytes[..slash_index]).ok()
                 }
             }
             None => None,
@@ -382,9 +372,11 @@ macro_rules! array_impls {
                 }
             }
 
-            impl From<&[u8; $N]> for PathBuf {
-                fn from(bytes: &[u8; $N]) -> Self {
-                    Self::from(&bytes[..])
+            impl TryFrom<&[u8; $N]> for PathBuf {
+                type Error = Error;
+
+                fn try_from(bytes: &[u8; $N]) -> Result<Self> {
+                    Self::try_from(&bytes[..])
                 }
             }
 
@@ -521,11 +513,11 @@ impl From<&Path> for PathBuf {
     }
 }
 
-impl From<&[u8]> for PathBuf {
-    /// Accepts byte string, with or without trailing nul.
-    ///
-    /// PANICS: when there are embedded nuls
-    fn from(bytes: &[u8]) -> Self {
+/// Accepts byte strings, with or without trailing nul.
+impl TryFrom<&[u8]> for PathBuf {
+    type Error = Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self> {
         // NB: This needs to set the final NUL byte, unless it already has one
         // It also checks that there are no inner NUL bytes
         let bytes = if !bytes.is_empty() && bytes[bytes.len() - 1] == b'\0' {
@@ -533,21 +525,31 @@ impl From<&[u8]> for PathBuf {
         } else {
             bytes
         };
-        let has_no_embedded_nul = !bytes.iter().any(|&byte| byte == b'\0');
-        assert!(has_no_embedded_nul);
+        if bytes.len() > consts::PATH_MAX {
+            return Err(Error::TooLarge);
+        }
+        for byte in bytes {
+            if *byte == 0 {
+                return Err(Error::NotCStr);
+            }
+            if !byte.is_ascii() {
+                return Err(Error::NotAscii);
+            }
+        }
 
         let mut buf = [0; consts::PATH_MAX_PLUS_ONE];
         let len = bytes.len();
-        assert!(len <= consts::PATH_MAX);
-        assert!(bytes.is_ascii());
         unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len) }
-        Self { buf, len: len + 1 }
+        Ok(Self { buf, len: len + 1 })
     }
 }
 
-impl From<&str> for PathBuf {
-    fn from(s: &str) -> Self {
-        PathBuf::from(s.as_bytes())
+/// Accepts strings, with or without trailing nul.
+impl TryFrom<&str> for PathBuf {
+    type Error = Error;
+
+    fn try_from(s: &str) -> Result<Self> {
+        PathBuf::try_from(s.as_bytes())
     }
 }
 
@@ -597,7 +599,7 @@ impl<'de> serde::Deserialize<'de> for PathBuf {
                 if v.len() > consts::PATH_MAX {
                     return Err(E::invalid_length(v.len(), &self));
                 }
-                Ok(PathBuf::from(v))
+                PathBuf::try_from(v).map_err(|_| E::custom("invalid path buffer"))
             }
         }
 
@@ -670,8 +672,8 @@ mod tests {
 
     #[test]
     fn path_macro() {
-        assert_eq!(EMPTY, &*PathBuf::from(""));
-        assert_eq!(SLASH, &*PathBuf::from("/"));
+        assert_eq!(EMPTY, &*PathBuf::try_from("").unwrap());
+        assert_eq!(SLASH, &*PathBuf::try_from("/").unwrap());
     }
 
     // does not compile:
@@ -679,15 +681,13 @@ mod tests {
     // const NULL: &Path = path!("ub\0er");
 
     #[test]
-    #[should_panic]
     fn nul_in_from_str_with_nul() {
-        Path::from_str_with_nul("ub\0er");
+        assert!(Path::from_str_with_nul("ub\0er").is_err());
     }
 
     #[test]
-    #[should_panic]
     fn non_ascii_in_from_str_with_nul() {
-        Path::from_str_with_nul("über");
+        assert!(Path::from_str_with_nul("über").is_err());
     }
 
     #[test]
@@ -725,7 +725,10 @@ mod tests {
 
     #[test]
     fn trailing_nuls() {
-        assert_eq!(PathBuf::from("abc"), PathBuf::from("abc\0"));
+        assert_eq!(
+            PathBuf::try_from("abc").unwrap(),
+            PathBuf::try_from("abc\0").unwrap()
+        );
     }
 
     #[test]

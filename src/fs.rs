@@ -1254,7 +1254,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let path_slice = path.as_ref().as_bytes();
         for i in 0..path_slice.len() {
             if path_slice[i] == b'/' {
-                let dir = PathBuf::from(&path_slice[..i]);
+                let dir = PathBuf::try_from(&path_slice[..i])?;
                 #[cfg(test)]
                 println!("generated PathBuf dir {:?} using i = {}", &dir, i);
                 match self.create_dir(&dir) {
@@ -1362,6 +1362,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::path;
     use core::convert::TryInto;
     use driver::Storage as LfsStorage;
     use io::Result as LfsResult;
@@ -1483,7 +1484,7 @@ mod tests {
                 // (...)
                 // fs.remove_dir_all(&PathBuf::from(b"/tmp\0"))?;
                 // fs.remove_dir_all(&PathBuf::from(b"/tmp"))?;
-                fs.remove_dir_all(&PathBuf::from("/tmp"))?;
+                fs.remove_dir_all(path!("/tmp"))?;
             }
 
             Ok(())
@@ -1493,7 +1494,7 @@ mod tests {
         let mut alloc = Allocation::new();
         let fs = Filesystem::mount(&mut alloc, &mut test_storage).unwrap();
         // fs.write(b"/z.txt\0".try_into().unwrap(), &jackson5).unwrap();
-        fs.write(&PathBuf::from("z.txt"), jackson5).unwrap();
+        fs.write(path!("z.txt"), jackson5).unwrap();
     }
 
     #[cfg(feature = "dir-entry-path")]

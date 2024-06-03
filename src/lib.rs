@@ -93,7 +93,7 @@ Separately, keeping track of the allocations is a chore, we hope that
 ```
 # use littlefs2::fs::{Filesystem, File, OpenOptions};
 # use littlefs2::io::prelude::*;
-# use littlefs2::path::PathBuf;
+# use littlefs2::path;
 #
 # use littlefs2::{consts, ram_storage, driver, io::Result};
 #
@@ -113,7 +113,7 @@ let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 let mut buf = [0u8; 11];
 fs.open_file_with_options_and_then(
     |options| options.read(true).write(true).create(true),
-    &PathBuf::from(b"example.txt"),
+    path!("example.txt"),
     |file| {
         file.write(b"Why is black smoke coming out?!")?;
         file.seek(SeekFrom::End(-24)).unwrap();
@@ -199,7 +199,10 @@ pub struct Version {
 macro_rules! path {
     ($path:literal) => {{
         const _PATH: &$crate::path::Path =
-            $crate::path::Path::from_str_with_nul(::core::concat!($path, "\0"));
+            match $crate::path::Path::from_str_with_nul(::core::concat!($path, "\0")) {
+                Ok(path) => path,
+                Err(_) => panic!("invalid littlefs2 path"),
+            };
         _PATH
     }};
 }

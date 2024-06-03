@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Enforced const evaluation for `path!`.
 - Removed `cstr_core` and `cty` dependencies.
 - Updated `littlefs2-sys` dependency to 0.2.0.
+- Replace all panicking `Path`/`PathBuf` conversions with fallible alternatives:
+  - Return a `Result` from `Path::from_str_with_nul`.
+  - Replace the `From<_>` implementations for `Path` and `PathBuf` with `TryFrom<_>`, except for `From<&Path> for PathBuf`.
 
 ### Removed
 
