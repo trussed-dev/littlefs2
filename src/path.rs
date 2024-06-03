@@ -188,7 +188,10 @@ impl Path {
             None | Some((_, "\x00")) => None,
             Some((_, path)) => {
                 debug_assert!(path.ends_with('\x00'));
-                Some(unsafe { Path::from_bytes_with_nul_unchecked(path.as_bytes()) })
+                unsafe {
+                    let cstr = CStr::from_bytes_with_nul_unchecked(path.as_bytes());
+                    Some(Path::from_cstr_unchecked(cstr))
+                }
             }
         }
     }
@@ -243,7 +246,10 @@ impl Path {
         }
         assert!(!bytes.is_empty(), "must not be empty");
         assert!(bytes[i] == 0, "last byte must be null");
-        unsafe { Self::from_bytes_with_nul_unchecked(bytes) }
+        unsafe {
+            let cstr = CStr::from_bytes_with_nul_unchecked(bytes);
+            Self::from_cstr_unchecked(cstr)
+        }
     }
 
     /// Creates a path from a byte buffer
@@ -255,14 +261,6 @@ impl Path {
             Ok(cstr) => Self::from_cstr(cstr),
             Err(_) => Err(Error::NotCStr),
         }
-    }
-
-    /// Unchecked version of `from_bytes_with_nul`
-    ///
-    /// # Safety
-    /// `bytes` must be null terminated string comprised of only ASCII characters
-    pub const unsafe fn from_bytes_with_nul_unchecked(bytes: &[u8]) -> &Self {
-        &*(bytes as *const [u8] as *const Path)
     }
 
     /// Creates a path from a C string
@@ -546,10 +544,9 @@ impl ops::Deref for PathBuf {
 
     fn deref(&self) -> &Path {
         unsafe {
-            Path::from_bytes_with_nul_unchecked(slice::from_raw_parts(
-                self.buf.as_ptr().cast(),
-                self.len,
-            ))
+            let bytes = slice::from_raw_parts(self.buf.as_ptr().cast(), self.len);
+            let cstr = CStr::from_bytes_with_nul_unchecked(bytes);
+            Path::from_cstr_unchecked(cstr)
         }
     }
 }

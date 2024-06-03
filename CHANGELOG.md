@@ -7,24 +7,28 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-## Added
+### Added
 - Added object-safe traits `DynFile`, `DynFilesystem` and `DynStorage` for
   accessing `Storage`, `Filesystem` and `File` implementations for any storage.
 - Added `Filesystem::mount_or_else` function ([#57][])
 - Marked `Path::is_empty`, `Path::from_bytes_with_nul`, `Path::from_cstr`, `Path::from_cstr_unchecked`, `Path::as_str_ref_with_trailing_nul`, `Path::as_str`, and `PathBuf::new` as `const`.
 
-## Fixed
+### Fixed
 
 - Fixed macro hygiene for `path!`.
 - Fixed build error that would occur on Windows systems.
 - Fixed compilation without default features.
 - Added path iteration utilities ([#47][])
 
-## Changed
+### Changed
 
 - Enforced const evaluation for `path!`.
 - Removed `cstr_core` and `cty` dependencies.
 - Updated `littlefs2-sys` dependency to 0.2.0.
+
+### Removed
+
+- Removed `Path::from_bytes_with_nul_unchecked`.  Use `CStr::from_bytes_with_nul_unchecked` and `Path::from_cstr_unchecked` instead.
 
 [#47]: https://github.com/trussed-dev/littlefs2/pull/47
 [#57]: https://github.com/trussed-dev/littlefs2/pull/57
