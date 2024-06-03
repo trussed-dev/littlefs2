@@ -810,12 +810,10 @@
 <a href="#808" id="808">808</a>
 <a href="#809" id="809">809</a>
 <a href="#810" id="810">810</a>
+<a href="#811" id="811">811</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Paths
 
-</span><span class="kw">use </span>core::{
-    cmp::Ordering, convert::TryFrom, fmt, iter::FusedIterator, marker::PhantomData, ops, ptr,
-    slice, str,
-};
+</span><span class="kw">use </span>core::{cmp::Ordering, convert::TryFrom, fmt, iter::FusedIterator, ops, ptr, slice, str};
 
 <span class="kw">use </span>cstr_core::CStr;
 <span class="kw">use </span>cty::{c_char, size_t};
@@ -1363,7 +1361,8 @@
     }
 }
 
-<span class="kw">impl </span>serde::Serialize <span class="kw">for </span>PathBuf {
+<span class="attr">#[cfg(feature = <span class="string">"serde"</span>)]
+</span><span class="kw">impl </span>serde::Serialize <span class="kw">for </span>PathBuf {
     <span class="kw">fn </span>serialize&lt;S&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, serializer: S) -&gt; core::result::Result&lt;S::Ok, S::Error&gt;
     <span class="kw">where
         </span>S: serde::Serializer,
@@ -1372,11 +1371,14 @@
     }
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">'de</span>&gt; serde::Deserialize&lt;<span class="lifetime">'de</span>&gt; <span class="kw">for </span>PathBuf {
+<span class="attr">#[cfg(feature = <span class="string">"serde"</span>)]
+</span><span class="kw">impl</span>&lt;<span class="lifetime">'de</span>&gt; serde::Deserialize&lt;<span class="lifetime">'de</span>&gt; <span class="kw">for </span>PathBuf {
     <span class="kw">fn </span>deserialize&lt;D&gt;(deserializer: D) -&gt; core::result::Result&lt;<span class="self">Self</span>, D::Error&gt;
     <span class="kw">where
         </span>D: serde::Deserializer&lt;<span class="lifetime">'de</span>&gt;,
     {
+        <span class="kw">use </span>core::marker::PhantomData;
+
         <span class="kw">struct </span>ValueVisitor&lt;<span class="lifetime">'de</span>&gt;(PhantomData&lt;<span class="kw-2">&amp;</span><span class="lifetime">'de </span>()&gt;);
 
         <span class="kw">impl</span>&lt;<span class="lifetime">'de</span>&gt; serde::de::Visitor&lt;<span class="lifetime">'de</span>&gt; <span class="kw">for </span>ValueVisitor&lt;<span class="lifetime">'de</span>&gt; {
