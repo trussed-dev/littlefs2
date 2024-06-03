@@ -13,11 +13,11 @@ use crate::consts;
 
 /// A path
 ///
-/// Paths must be null terminated ASCII strings
-///
-/// This assumption is not needed for littlefs itself (it works like Linux and
-/// accepts arbitrary C strings), but the assumption makes `AsRef<str>` trivial
-/// to implement.
+/// Paths must be null terminated ASCII strings with at most [`PATH_MAX`](`consts::PATH_MAX`) bytes
+/// (not including the trailing null).
+// Invariants:
+// 1. inner.to_bytes().is_ascii()
+// 2. inner.to_bytes().len() <= consts::PATH_MAX
 #[derive(PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Path {
@@ -234,8 +234,9 @@ impl Path {
 
     /// Creates a path from a string.
     ///
-    /// The string must only consist of ASCII characters, expect for the last character which must
-    /// be null.  If these conditions are not met, this function panics.
+    /// The string must only consist of ASCII characters.  The last character must be null.  It
+    /// must contain at most [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing
+    /// null.  If these conditions are not met, this function panics.
     pub const fn from_str_with_nul(s: &str) -> &Self {
         let bytes = s.as_bytes();
         let mut i = 0;
@@ -252,10 +253,11 @@ impl Path {
         }
     }
 
-    /// Creates a path from a byte buffer
+    /// Creates a path from a byte buffer.
     ///
-    /// The buffer will be first interpreted as a `CStr` and then checked to be comprised only of
-    /// ASCII characters.
+    /// The byte buffer must only consist of ASCII characters.  The last character must be null.
+    /// It must contain at most [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing
+    /// null.  If these conditions are not met, this function returns an error.
     pub const fn from_bytes_with_nul(bytes: &[u8]) -> Result<&Self> {
         match CStr::from_bytes_with_nul(bytes) {
             Ok(cstr) => Self::from_cstr(cstr),
@@ -263,9 +265,11 @@ impl Path {
         }
     }
 
-    /// Creates a path from a C string
+    /// Creates a path from a C string.
     ///
-    /// The string will be checked to be comprised only of ASCII characters
+    /// The string must only consist of ASCII characters.  It must contain at most
+    /// [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing null.  If these
+    /// conditions are not met, this function returns an error.
     // XXX should we reject empty paths (`""`) here?
     pub const fn from_cstr(cstr: &CStr) -> Result<&Self> {
         let bytes = cstr.to_bytes();
@@ -279,10 +283,11 @@ impl Path {
         }
     }
 
-    /// Unchecked version of `from_cstr`
+    /// Creates a path from a C string without checking the invariants.
     ///
     /// # Safety
-    /// `cstr` must be comprised only of ASCII characters
+    /// The string must only consist of ASCII characters.  It must contain at most
+    /// [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing null.
     pub const unsafe fn from_cstr_unchecked(cstr: &CStr) -> &Self {
         &*(cstr as *const CStr as *const Path)
     }
@@ -399,6 +404,13 @@ array_impls!(
 );
 
 /// An owned, mutable path
+///
+/// Paths must be null terminated ASCII strings with at most [`PATH_MAX`](`consts::PATH_MAX`) bytes
+/// (not including the trailing null).
+// Invariants:
+// 1. 0 < len <= consts::PATH_MAX_PLUS_ONE
+// 2. buf[len - 1] == 0
+// 3. buf[i].is_ascii() for 0 <= i < len - 1
 #[derive(Clone)]
 pub struct PathBuf {
     buf: [c_char; consts::PATH_MAX_PLUS_ONE],
