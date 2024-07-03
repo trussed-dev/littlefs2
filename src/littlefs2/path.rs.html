@@ -1,6 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/path.rs`."><title>path.rs - source</title><script> if (window.location.protocol !== "file:") document.write(`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2">`)</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-e935ef01ae1c1829.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="littlefs2" data-themes="" data-resource-suffix="" data-rustdoc-version="1.78.0 (9b00956e5 2024-04-29)" data-channel="1.78.0" data-search-js="search-42d8da7a6b9792c2.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-12cf3b4f4f9dc36d.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
-            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
-    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../littlefs2/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/path.rs`."><title>path.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-081576b923113409.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="littlefs2" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0 (129f3b996 2024-06-10)" data-channel="1.79.0" data-search-js="search-bf21c90c8c1d92b1.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-e32f0c247825364d.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-09095024cf37855e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../littlefs2/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Type ‘S’ or ‘/’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings">Settings</a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -815,6 +813,20 @@
 <a href="#813" id="813">813</a>
 <a href="#814" id="814">814</a>
 <a href="#815" id="815">815</a>
+<a href="#816" id="816">816</a>
+<a href="#817" id="817">817</a>
+<a href="#818" id="818">818</a>
+<a href="#819" id="819">819</a>
+<a href="#820" id="820">820</a>
+<a href="#821" id="821">821</a>
+<a href="#822" id="822">822</a>
+<a href="#823" id="823">823</a>
+<a href="#824" id="824">824</a>
+<a href="#825" id="825">825</a>
+<a href="#826" id="826">826</a>
+<a href="#827" id="827">827</a>
+<a href="#828" id="828">828</a>
+<a href="#829" id="829">829</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Paths
 
 </span><span class="kw">use </span>core::{
@@ -826,15 +838,15 @@
     ops, ptr, slice, str,
 };
 
-<span class="kw">use </span><span class="kw">crate</span>::consts;
+<span class="kw">use crate</span>::{consts, path};
 
 <span class="doccomment">/// A path
 ///
-/// Paths must be null terminated ASCII strings
-///
-/// This assumption is not needed for littlefs itself (it works like Linux and
-/// accepts arbitrary C strings), but the assumption makes `AsRef&lt;str&gt;` trivial
-/// to implement.
+/// Paths must be null terminated ASCII strings with at most [`PATH_MAX`](`consts::PATH_MAX`) bytes
+/// (not including the trailing null).
+</span><span class="comment">// Invariants:
+// 1. inner.to_bytes().is_ascii()
+// 2. inner.to_bytes().len() &lt;= consts::PATH_MAX
 </span><span class="attr">#[derive(PartialEq, Eq)]
 #[repr(transparent)]
 </span><span class="kw">pub struct </span>Path {
@@ -911,14 +923,14 @@
             <span class="kw">return </span><span class="prelude-val">None</span>;
         } <span class="kw">else if </span><span class="self">self</span>.path == <span class="string">"/" </span>{
             <span class="self">self</span>.path = <span class="string">""</span>;
-            <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="string">"/"</span>.into());
+            <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="macro">path!</span>(<span class="string">"/"</span>).into());
         }
 
         <span class="kw">let </span>item = <span class="self">self</span>.path;
 
         <span class="kw">let </span><span class="prelude-val">Some</span>((rem, item_name)) = <span class="self">self</span>.path.rsplit_once(<span class="string">'/'</span>) <span class="kw">else </span>{
             <span class="self">self</span>.path = <span class="string">""</span>;
-            <span class="kw">return </span><span class="prelude-val">Some</span>(item.into());
+            <span class="kw">return </span>item.try_into().ok();
         };
 
         <span class="kw">if </span><span class="self">self</span>.path.starts_with(<span class="string">'/'</span>) &amp;&amp; rem.is_empty() {
@@ -931,7 +943,7 @@
         </span><span class="kw">if </span>item_name.is_empty() {
             <span class="self">self</span>.next();
         }
-        <span class="prelude-val">Some</span>(item.into())
+        item.try_into().ok()
     }
 }
 
@@ -952,17 +964,17 @@
         }
         <span class="kw">if </span><span class="self">self</span>.path.starts_with(<span class="string">'/'</span>) {
             <span class="self">self</span>.path = <span class="kw-2">&amp;</span><span class="self">self</span>.path[<span class="number">1</span>..];
-            <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="string">"/"</span>.into());
+            <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="macro">path!</span>(<span class="string">"/"</span>).into());
         }
 
         <span class="kw">let </span><span class="prelude-val">Some</span>((path, rem)) = <span class="self">self</span>.path.split_once(<span class="string">'/'</span>) <span class="kw">else </span>{
-            <span class="kw">let </span>ret_val = <span class="prelude-val">Some</span>(<span class="self">self</span>.path.into());
+            <span class="kw">let </span>ret_val = <span class="self">self</span>.path.try_into().ok();
             <span class="self">self</span>.path = <span class="string">""</span>;
             <span class="kw">return </span>ret_val;
         };
 
         <span class="self">self</span>.path = rem;
-        <span class="prelude-val">Some</span>(path.into())
+        path.try_into().ok()
     }
 }
 
@@ -975,7 +987,7 @@
     /// assert!(path!("").is_empty());
     /// assert!(!path!("something").is_empty());
     /// ```
-    </span><span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub const fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.inner.to_bytes().is_empty()
     }
 
@@ -1005,7 +1017,10 @@
             <span class="prelude-val">None </span>| <span class="prelude-val">Some</span>((<span class="kw">_</span>, <span class="string">"\x00"</span>)) =&gt; <span class="prelude-val">None</span>,
             <span class="prelude-val">Some</span>((<span class="kw">_</span>, path)) =&gt; {
                 <span class="macro">debug_assert!</span>(path.ends_with(<span class="string">'\x00'</span>));
-                <span class="prelude-val">Some</span>(<span class="kw">unsafe </span>{ Path::from_bytes_with_nul_unchecked(path.as_bytes()) })
+                <span class="kw">unsafe </span>{
+                    <span class="kw">let </span>cstr = CStr::from_bytes_with_nul_unchecked(path.as_bytes());
+                    <span class="prelude-val">Some</span>(Path::from_cstr_unchecked(cstr))
+                }
             }
         }
     }
@@ -1048,43 +1063,32 @@
 
     <span class="doccomment">/// Creates a path from a string.
     ///
-    /// The string must only consist of ASCII characters, expect for the last character which must
-    /// be null.  If these conditions are not met, this function panics.
-    </span><span class="kw">pub const fn </span>from_str_with_nul(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="kw-2">&amp;</span><span class="self">Self </span>{
-        <span class="kw">let </span>bytes = s.as_bytes();
-        <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
-        <span class="kw">while </span>i &lt; bytes.len().saturating_sub(<span class="number">1</span>) {
-            <span class="macro">assert!</span>(bytes[i] != <span class="number">0</span>, <span class="string">"must not contain null"</span>);
-            <span class="macro">assert!</span>(bytes[i].is_ascii(), <span class="string">"must be ASCII"</span>);
-            i += <span class="number">1</span>;
+    /// The string must only consist of ASCII characters.  The last character must be null.  It
+    /// must contain at most [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing
+    /// null.  If these conditions are not met, this function returns an error.
+    </span><span class="kw">pub const fn </span>from_str_with_nul(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="self">Self</span>&gt; {
+        <span class="self">Self</span>::from_bytes_with_nul(s.as_bytes())
+    }
+
+    <span class="doccomment">/// Creates a path from a byte buffer.
+    ///
+    /// The byte buffer must only consist of ASCII characters.  The last character must be null.
+    /// It must contain at most [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing
+    /// null.  If these conditions are not met, this function returns an error.
+    </span><span class="kw">pub const fn </span>from_bytes_with_nul(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="self">Self</span>&gt; {
+        <span class="kw">match </span>CStr::from_bytes_with_nul(bytes) {
+            <span class="prelude-val">Ok</span>(cstr) =&gt; <span class="self">Self</span>::from_cstr(cstr),
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(Error::NotCStr),
         }
-        <span class="macro">assert!</span>(!bytes.is_empty(), <span class="string">"must not be empty"</span>);
-        <span class="macro">assert!</span>(bytes[i] == <span class="number">0</span>, <span class="string">"last byte must be null"</span>);
-        <span class="kw">unsafe </span>{ <span class="self">Self</span>::from_bytes_with_nul_unchecked(bytes) }
     }
 
-    <span class="doccomment">/// Creates a path from a byte buffer
+    <span class="doccomment">/// Creates a path from a C string.
     ///
-    /// The buffer will be first interpreted as a `CStr` and then checked to be comprised only of
-    /// ASCII characters.
-    </span><span class="kw">pub fn </span>from_bytes_with_nul(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="self">Self</span>&gt; {
-        <span class="kw">let </span>cstr = CStr::from_bytes_with_nul(bytes).map_err(|<span class="kw">_</span>| Error::NotCStr)<span class="question-mark">?</span>;
-        <span class="self">Self</span>::from_cstr(cstr)
-    }
-
-    <span class="doccomment">/// Unchecked version of `from_bytes_with_nul`
-    ///
-    /// # Safety
-    /// `bytes` must be null terminated string comprised of only ASCII characters
-    </span><span class="kw">pub const unsafe fn </span>from_bytes_with_nul_unchecked(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="kw-2">&amp;</span><span class="self">Self </span>{
-        <span class="kw-2">&amp;*</span>(bytes <span class="kw">as </span><span class="kw-2">*const </span>[u8] <span class="kw">as </span><span class="kw-2">*const </span>Path)
-    }
-
-    <span class="doccomment">/// Creates a path from a C string
-    ///
-    /// The string will be checked to be comprised only of ASCII characters
+    /// The string must only consist of ASCII characters.  It must contain at most
+    /// [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing null.  If these
+    /// conditions are not met, this function returns an error.
     </span><span class="comment">// XXX should we reject empty paths (`""`) here?
-    </span><span class="kw">pub fn </span>from_cstr(cstr: <span class="kw-2">&amp;</span>CStr) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="self">Self</span>&gt; {
+    </span><span class="kw">pub const fn </span>from_cstr(cstr: <span class="kw-2">&amp;</span>CStr) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="self">Self</span>&gt; {
         <span class="kw">let </span>bytes = cstr.to_bytes();
         <span class="kw">let </span>n = cstr.to_bytes().len();
         <span class="kw">if </span>n &gt; consts::PATH_MAX {
@@ -1096,11 +1100,12 @@
         }
     }
 
-    <span class="doccomment">/// Unchecked version of `from_cstr`
+    <span class="doccomment">/// Creates a path from a C string without checking the invariants.
     ///
     /// # Safety
-    /// `cstr` must be comprised only of ASCII characters
-    </span><span class="kw">pub unsafe fn </span>from_cstr_unchecked(cstr: <span class="kw-2">&amp;</span>CStr) -&gt; <span class="kw-2">&amp;</span><span class="self">Self </span>{
+    /// The string must only consist of ASCII characters.  It must contain at most
+    /// [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing null.
+    </span><span class="kw">pub const unsafe fn </span>from_cstr_unchecked(cstr: <span class="kw-2">&amp;</span>CStr) -&gt; <span class="kw-2">&amp;</span><span class="self">Self </span>{
         <span class="kw-2">&amp;*</span>(cstr <span class="kw">as </span><span class="kw-2">*const </span>CStr <span class="kw">as </span><span class="kw-2">*const </span>Path)
     }
 
@@ -1121,12 +1126,12 @@
     }
 
     <span class="comment">// helpful for debugging wither the trailing nul is indeed a trailing nul.
-    </span><span class="kw">pub fn </span>as_str_ref_with_trailing_nul(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
+    </span><span class="kw">pub const fn </span>as_str_ref_with_trailing_nul(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
         <span class="comment">// SAFETY: ASCII is valid UTF-8
         </span><span class="kw">unsafe </span>{ str::from_utf8_unchecked(<span class="self">self</span>.inner.to_bytes_with_nul()) }
     }
 
-    <span class="kw">pub fn </span>as_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
+    <span class="kw">pub const fn </span>as_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
         <span class="comment">// SAFETY: ASCII is valid UTF-8
         </span><span class="kw">unsafe </span>{ str::from_utf8_unchecked(<span class="self">self</span>.inner.to_bytes()) }
     }
@@ -1134,14 +1139,16 @@
     <span class="kw">pub fn </span>parent(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;PathBuf&gt; {
         <span class="kw">let </span>rk_path_bytes = <span class="self">self</span>.as_ref()[..].as_bytes();
         <span class="kw">match </span>rk_path_bytes.iter().rposition(|x| <span class="kw-2">*</span>x == <span class="string">b'/'</span>) {
-            <span class="prelude-val">Some</span>(<span class="number">0</span>) <span class="kw">if </span>rk_path_bytes.len() != <span class="number">1 </span>=&gt; <span class="prelude-val">Some</span>(PathBuf::from(<span class="string">"/"</span>)),
+            <span class="prelude-val">Some</span>(<span class="number">0</span>) <span class="kw">if </span>rk_path_bytes.len() != <span class="number">1 </span>=&gt; <span class="prelude-val">Some</span>(<span class="macro">path!</span>(<span class="string">"/"</span>).into()),
             <span class="prelude-val">Some</span>(slash_index) =&gt; {
                 <span class="comment">// if we have a directory that ends with `/`,
                 // still need to "go up" one parent
                 </span><span class="kw">if </span>slash_index + <span class="number">1 </span>== rk_path_bytes.len() {
-                    PathBuf::from(<span class="kw-2">&amp;</span>rk_path_bytes[..slash_index]).parent()
+                    PathBuf::try_from(<span class="kw-2">&amp;</span>rk_path_bytes[..slash_index])
+                        .ok()<span class="question-mark">?
+                        </span>.parent()
                 } <span class="kw">else </span>{
-                    <span class="prelude-val">Some</span>(PathBuf::from(<span class="kw-2">&amp;</span>rk_path_bytes[..slash_index]))
+                    PathBuf::try_from(<span class="kw-2">&amp;</span>rk_path_bytes[..slash_index]).ok()
                 }
             }
             <span class="prelude-val">None </span>=&gt; <span class="prelude-val">None</span>,
@@ -1194,9 +1201,11 @@
                 }
             }
 
-            <span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>[u8; <span class="macro-nonterminal">$N</span>]&gt; <span class="kw">for </span>PathBuf {
-                <span class="kw">fn </span>from(bytes: <span class="kw-2">&amp;</span>[u8; <span class="macro-nonterminal">$N</span>]) -&gt; <span class="self">Self </span>{
-                    <span class="self">Self</span>::from(<span class="kw-2">&amp;</span>bytes[..])
+            <span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>[u8; <span class="macro-nonterminal">$N</span>]&gt; <span class="kw">for </span>PathBuf {
+                <span class="kw">type </span>Error = Error;
+
+                <span class="kw">fn </span>try_from(bytes: <span class="kw-2">&amp;</span>[u8; <span class="macro-nonterminal">$N</span>]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+                    <span class="self">Self</span>::try_from(<span class="kw-2">&amp;</span>bytes[..])
                 }
             }
 
@@ -1216,6 +1225,13 @@
 </span>);
 
 <span class="doccomment">/// An owned, mutable path
+///
+/// Paths must be null terminated ASCII strings with at most [`PATH_MAX`](`consts::PATH_MAX`) bytes
+/// (not including the trailing null).
+</span><span class="comment">// Invariants:
+// 1. 0 &lt; len &lt;= consts::PATH_MAX_PLUS_ONE
+// 2. buf[len - 1] == 0
+// 3. buf[i].is_ascii() for 0 &lt;= i &lt; len - 1
 </span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>PathBuf {
     buf: [c_char; consts::PATH_MAX_PLUS_ONE],
@@ -1241,7 +1257,7 @@
 }
 
 <span class="kw">impl </span>PathBuf {
-    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+    <span class="kw">pub const fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             buf: [<span class="number">0</span>; consts::PATH_MAX_PLUS_ONE],
             len: <span class="number">1</span>,
@@ -1326,11 +1342,11 @@
     }
 }
 
-<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>[u8]&gt; <span class="kw">for </span>PathBuf {
-    <span class="doccomment">/// Accepts byte string, with or without trailing nul.
-    ///
-    /// PANICS: when there are embedded nuls
-    </span><span class="kw">fn </span>from(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="self">Self </span>{
+<span class="doccomment">/// Accepts byte strings, with or without trailing nul.
+</span><span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>[u8]&gt; <span class="kw">for </span>PathBuf {
+    <span class="kw">type </span>Error = Error;
+
+    <span class="kw">fn </span>try_from(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
         <span class="comment">// NB: This needs to set the final NUL byte, unless it already has one
         // It also checks that there are no inner NUL bytes
         </span><span class="kw">let </span>bytes = <span class="kw">if </span>!bytes.is_empty() &amp;&amp; bytes[bytes.len() - <span class="number">1</span>] == <span class="string">b'\0' </span>{
@@ -1338,21 +1354,31 @@
         } <span class="kw">else </span>{
             bytes
         };
-        <span class="kw">let </span>has_no_embedded_nul = !bytes.iter().any(|<span class="kw-2">&amp;</span>byte| byte == <span class="string">b'\0'</span>);
-        <span class="macro">assert!</span>(has_no_embedded_nul);
+        <span class="kw">if </span>bytes.len() &gt; consts::PATH_MAX {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::TooLarge);
+        }
+        <span class="kw">for </span>byte <span class="kw">in </span>bytes {
+            <span class="kw">if </span><span class="kw-2">*</span>byte == <span class="number">0 </span>{
+                <span class="kw">return </span><span class="prelude-val">Err</span>(Error::NotCStr);
+            }
+            <span class="kw">if </span>!byte.is_ascii() {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(Error::NotAscii);
+            }
+        }
 
         <span class="kw">let </span><span class="kw-2">mut </span>buf = [<span class="number">0</span>; consts::PATH_MAX_PLUS_ONE];
         <span class="kw">let </span>len = bytes.len();
-        <span class="macro">assert!</span>(len &lt;= consts::PATH_MAX);
-        <span class="macro">assert!</span>(bytes.is_ascii());
         <span class="kw">unsafe </span>{ ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len) }
-        <span class="self">Self </span>{ buf, len: len + <span class="number">1 </span>}
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{ buf, len: len + <span class="number">1 </span>})
     }
 }
 
-<span class="kw">impl </span>From&lt;<span class="kw-2">&amp;</span>str&gt; <span class="kw">for </span>PathBuf {
-    <span class="kw">fn </span>from(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="self">Self </span>{
-        PathBuf::from(s.as_bytes())
+<span class="doccomment">/// Accepts strings, with or without trailing nul.
+</span><span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>str&gt; <span class="kw">for </span>PathBuf {
+    <span class="kw">type </span>Error = Error;
+
+    <span class="kw">fn </span>try_from(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+        PathBuf::try_from(s.as_bytes())
     }
 }
 
@@ -1361,10 +1387,9 @@
 
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Path {
         <span class="kw">unsafe </span>{
-            Path::from_bytes_with_nul_unchecked(slice::from_raw_parts(
-                <span class="self">self</span>.buf.as_ptr().cast(),
-                <span class="self">self</span>.len,
-            ))
+            <span class="kw">let </span>bytes = slice::from_raw_parts(<span class="self">self</span>.buf.as_ptr().cast(), <span class="self">self</span>.len);
+            <span class="kw">let </span>cstr = CStr::from_bytes_with_nul_unchecked(bytes);
+            Path::from_cstr_unchecked(cstr)
         }
     }
 }
@@ -1403,7 +1428,7 @@
                 <span class="kw">if </span>v.len() &gt; consts::PATH_MAX {
                     <span class="kw">return </span><span class="prelude-val">Err</span>(E::invalid_length(v.len(), <span class="kw-2">&amp;</span><span class="self">self</span>));
                 }
-                <span class="prelude-val">Ok</span>(PathBuf::from(v))
+                PathBuf::try_from(v).map_err(|<span class="kw">_</span>| E::custom(<span class="string">"invalid path buffer"</span>))
             }
         }
 
@@ -1476,8 +1501,8 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>path_macro() {
-        <span class="macro">assert_eq!</span>(EMPTY, <span class="kw-2">&amp;*</span>PathBuf::from(<span class="string">""</span>));
-        <span class="macro">assert_eq!</span>(SLASH, <span class="kw-2">&amp;*</span>PathBuf::from(<span class="string">"/"</span>));
+        <span class="macro">assert_eq!</span>(EMPTY, <span class="kw-2">&amp;*</span>PathBuf::try_from(<span class="string">""</span>).unwrap());
+        <span class="macro">assert_eq!</span>(SLASH, <span class="kw-2">&amp;*</span>PathBuf::try_from(<span class="string">"/"</span>).unwrap());
     }
 
     <span class="comment">// does not compile:
@@ -1485,15 +1510,13 @@
     // const NULL: &amp;Path = path!("ub\0er");
 
     </span><span class="attr">#[test]
-    #[should_panic]
     </span><span class="kw">fn </span>nul_in_from_str_with_nul() {
-        Path::from_str_with_nul(<span class="string">"ub\0er"</span>);
+        <span class="macro">assert!</span>(Path::from_str_with_nul(<span class="string">"ub\0er"</span>).is_err());
     }
 
     <span class="attr">#[test]
-    #[should_panic]
     </span><span class="kw">fn </span>non_ascii_in_from_str_with_nul() {
-        Path::from_str_with_nul(<span class="string">"über"</span>);
+        <span class="macro">assert!</span>(Path::from_str_with_nul(<span class="string">"über"</span>).is_err());
     }
 
     <span class="attr">#[test]
@@ -1531,7 +1554,10 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>trailing_nuls() {
-        <span class="macro">assert_eq!</span>(PathBuf::from(<span class="string">"abc"</span>), PathBuf::from(<span class="string">"abc\0"</span>));
+        <span class="macro">assert_eq!</span>(
+            PathBuf::try_from(<span class="string">"abc"</span>).unwrap(),
+            PathBuf::try_from(<span class="string">"abc\0"</span>).unwrap()
+        );
     }
 
     <span class="attr">#[test]
