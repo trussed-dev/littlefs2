@@ -243,7 +243,7 @@ impl dyn DynFilesystem + '_ {
     }
 
     pub fn create_file_and_then<R>(&self, path: &Path, f: FileCallback<'_, R>) -> Result<R> {
-        let mut result = Err(Error::Io);
+        let mut result = Err(Error::IO);
         self.create_file_and_then_unit(path, &mut |file| {
             result = Ok(f(file)?);
             Ok(())
@@ -252,7 +252,7 @@ impl dyn DynFilesystem + '_ {
     }
 
     pub fn open_file_and_then<R>(&self, path: &Path, f: FileCallback<'_, R>) -> Result<R> {
-        let mut result = Err(Error::Io);
+        let mut result = Err(Error::IO);
         self.open_file_and_then_unit(path, &mut |file| {
             result = Ok(f(file)?);
             Ok(())
@@ -266,7 +266,7 @@ impl dyn DynFilesystem + '_ {
         path: &Path,
         f: FileCallback<'_, R>,
     ) -> Result<R> {
-        let mut result = Err(Error::Io);
+        let mut result = Err(Error::IO);
         self.open_file_with_options_and_then_unit(o, path, &mut |file| {
             result = Ok(f(file)?);
             Ok(())
@@ -275,7 +275,7 @@ impl dyn DynFilesystem + '_ {
     }
 
     pub fn read_dir_and_then<R>(&self, path: &Path, f: DirEntriesCallback<'_, R>) -> Result<R> {
-        let mut result = Err(Error::Io);
+        let mut result = Err(Error::IO);
         self.read_dir_and_then_unit(path, &mut |entries| {
             result = Ok(f(entries)?);
             Ok(())
@@ -372,7 +372,7 @@ impl<S: Storage> DynStorage for S {
 
 impl dyn DynStorage + '_ {
     pub fn mount_and_then<R>(&mut self, f: FilesystemCallback<'_, R>) -> Result<R> {
-        let mut result = Err(Error::Io);
+        let mut result = Err(Error::IO);
         self.mount_and_then_unit(&mut |fs| {
             result = Ok(f(fs)?);
             Ok(())

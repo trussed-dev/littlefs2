@@ -28,10 +28,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Replace all panicking `Path`/`PathBuf` conversions with fallible alternatives:
   - Return a `Result` from `Path::from_str_with_nul`.
   - Replace the `From<_>` implementations for `Path` and `PathBuf` with `TryFrom<_>`, except for `From<&Path> for PathBuf`.
+- Refactor error types:
+  - Change `Error` enum to a struct with associated constants.
+  - Remove `Error::Success` and enforce negative values for `Error`.
 
 ### Removed
 
 - Removed `Path::from_bytes_with_nul_unchecked`.  Use `CStr::from_bytes_with_nul_unchecked` and `Path::from_cstr_unchecked` instead.
+- Removed `From<littlefs2::path::Error> for littlefs2::io::Error`.
 
 [#47]: https://github.com/trussed-dev/littlefs2/pull/47
 [#57]: https://github.com/trussed-dev/littlefs2/pull/57

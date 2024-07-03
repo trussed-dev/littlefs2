@@ -56,7 +56,7 @@ fn format() {
         Filesystem::mount(&mut alloc, &mut storage)
             .map(drop)
             .unwrap_err(),
-        Error::Corruption
+        Error::CORRUPTION
     );
     // should succeed
     assert!(Filesystem::format(&mut storage).is_ok());
@@ -200,7 +200,7 @@ fn test_create() {
             File::open_and_then(fs, b"/test_open.txt\0".try_into().unwrap(), |_| { Ok(()) })
                 .map(drop)
                 .unwrap_err(), // "real" contains_err is experimental
-            Error::NoSuchEntry
+            Error::NO_SUCH_ENTRY
         );
         assert!(!path!("/test_open.txt").exists(fs));
 
@@ -224,7 +224,7 @@ fn test_create() {
         // // cannot remove non-empty directories
         assert_eq!(
             fs.remove(b"/tmp\0".try_into().unwrap()).unwrap_err(),
-            Error::DirNotEmpty
+            Error::DIR_NOT_EMPTY
         );
 
         let metadata = fs.metadata(b"/tmp\0".try_into().unwrap())?;
@@ -414,10 +414,10 @@ fn remove_dir_all_where() {
         })
         .unwrap();
         assert!(fs.metadata(path!("test_dir/test_file")).unwrap().is_file());
-        assert_eq!(fs.metadata(path!("test_file")), Err(Error::NoSuchEntry));
+        assert_eq!(fs.metadata(path!("test_file")), Err(Error::NO_SUCH_ENTRY));
         assert_eq!(
             fs.metadata(path!("test_dir/test_file2")),
-            Err(Error::NoSuchEntry)
+            Err(Error::NO_SUCH_ENTRY)
         );
         Ok(())
     })
@@ -474,15 +474,15 @@ fn test_iter_dirs() {
     let mut storage = RamStorage::new(&mut backend);
     Filesystem::format(&mut storage).unwrap();
     Filesystem::mount_and_then(&mut storage, |fs| {
-        fs.create_dir(b"/tmp\0".try_into()?)?;
+        fs.create_dir(path!("/tmp").into())?;
 
         // TODO: we might want "multi-open"
-        fs.create_file_and_then(b"/tmp/file.a\0".try_into()?, |file| {
+        fs.create_file_and_then(path!("/tmp/file.a"), |file| {
             file.set_len(37)?;
-            fs.create_file_and_then(b"/tmp/file.b\0".try_into()?, |file| file.set_len(42))
+            fs.create_file_and_then(path!("/tmp/file.b"), |file| file.set_len(42))
         })?;
 
-        fs.read_dir_and_then(b"/tmp\0".try_into()?, |dir| {
+        fs.read_dir_and_then(path!("/tmp"), |dir| {
             let mut found_files: usize = 0;
             let mut sizes = [0usize; 4];
 

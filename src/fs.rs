@@ -1254,23 +1254,19 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let path_slice = path.as_ref().as_bytes();
         for i in 0..path_slice.len() {
             if path_slice[i] == b'/' {
-                let dir = PathBuf::try_from(&path_slice[..i])?;
+                let dir = PathBuf::try_from(&path_slice[..i]).map_err(|_| Error::IO)?;
                 #[cfg(test)]
                 println!("generated PathBuf dir {:?} using i = {}", &dir, i);
-                match self.create_dir(&dir) {
-                    Ok(_) => {}
-                    Err(io::Error::EntryAlreadyExisted) => {}
-                    error => {
-                        panic!("{:?}", &error);
+                if let Err(error) = self.create_dir(&dir) {
+                    if error != Error::ENTRY_ALREADY_EXISTED {
+                        return Err(error);
                     }
                 }
             }
         }
-        match self.create_dir(path) {
-            Ok(_) => {}
-            Err(io::Error::EntryAlreadyExisted) => {}
-            error => {
-                panic!("{:?}", &error);
+        if let Err(error) = self.create_dir(path) {
+            if error != Error::ENTRY_ALREADY_EXISTED {
+                return Err(error);
             }
         }
         Ok(())

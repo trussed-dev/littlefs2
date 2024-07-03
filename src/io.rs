@@ -2,6 +2,11 @@
 
 pub mod prelude;
 
+use core::{
+    ffi::c_int,
+    fmt::{self, Debug, Formatter},
+};
+
 use littlefs2_sys as ll;
 
 /// The `Read` trait allows for reading bytes from a file.
@@ -17,7 +22,7 @@ pub trait Read {
             Ok(())
         } else {
             // TODO: Decide whether to add an equivalent of `ErrorKind::UnexpectedEof`
-            Err(Error::Io)
+            Err(Error::IO)
         }
     }
 }
@@ -43,7 +48,7 @@ pub trait Write {
             match self.write(buf) {
                 Ok(0) => {
                     // failed to write whole buffer
-                    return Err(Error::Io);
+                    return Err(Error::IO);
                 }
                 Ok(n) => buf = &buf[n..],
                 Err(e) => return Err(e),
@@ -112,105 +117,151 @@ pub trait Seek {
 
 pub type Result<T> = core::result::Result<T, Error>;
 
-/// Definition of errors that might be returned by filesystem functionality.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Error {
-    /// Error code was >=0, operation was successful.
-    Success,
+/// The error type for filesystem operations.
+///
+/// Specific error codes are available as associated constants of this type.
+///
+/// ```
+/// # use littlefs2::io::Error;
+///
+/// assert_eq!(Error::IO.code(), -5);
+/// assert_eq!(Error::new(-5), Some(Error::IO));
+/// ```
+#[derive(Clone, Copy, PartialEq)]
+pub struct Error {
+    code: c_int,
+}
+
+impl Error {
     /// Input / output error occurred.
-    Io,
+    pub const IO: Self = Self::new_const(ll::lfs_error_LFS_ERR_IO);
+
     /// File or filesystem was corrupt.
-    Corruption,
+    pub const CORRUPTION: Self = Self::new_const(ll::lfs_error_LFS_ERR_CORRUPT);
+
     /// No entry found with that name.
-    NoSuchEntry,
+    pub const NO_SUCH_ENTRY: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOENT);
+
     /// File or directory already exists.
-    EntryAlreadyExisted,
+    pub const ENTRY_ALREADY_EXISTED: Self = Self::new_const(ll::lfs_error_LFS_ERR_EXIST);
+
     /// Path name is not a directory.
-    PathNotDir,
+    pub const PATH_NOT_DIR: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOTDIR);
+
     /// Path specification is to a directory.
-    PathIsDir,
+    pub const PATH_IS_DIR: Self = Self::new_const(ll::lfs_error_LFS_ERR_ISDIR);
+
     /// Directory was not empty.
-    DirNotEmpty,
+    pub const DIR_NOT_EMPTY: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOTEMPTY);
+
     /// Bad file descriptor.
-    BadFileDescriptor,
+    pub const BAD_FILE_DESCRIPTOR: Self = Self::new_const(ll::lfs_error_LFS_ERR_BADF);
+
     /// File is too big.
-    FileTooBig,
+    pub const FILE_TOO_BIG: Self = Self::new_const(ll::lfs_error_LFS_ERR_FBIG);
+
     /// Incorrect value specified to function.
-    Invalid,
+    pub const INVALID: Self = Self::new_const(ll::lfs_error_LFS_ERR_INVAL);
+
     /// No space left available for operation.
-    NoSpace,
+    pub const NO_SPACE: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOSPC);
+
     /// No memory available for completing request.
-    NoMemory,
+    pub const NO_MEMORY: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOMEM);
+
     /// No attribute or data available
-    NoAttribute,
+    pub const NO_ATTRIBUTE: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOATTR);
+
     /// Filename too long
-    FilenameTooLong,
-    /// Unknown error occurred, integer code specified.
-    Unknown(i32),
-}
+    pub const FILENAME_TOO_LONG: Self = Self::new_const(ll::lfs_error_LFS_ERR_NAMETOOLONG);
 
-impl From<crate::path::Error> for Error {
-    fn from(_error: crate::path::Error) -> Self {
-        Error::Io
+    /// Construct an `Error` from an error code.
+    ///
+    /// Return values that are greater or equals to zero represent success.  In this case, `None`
+    /// is returned.
+    pub const fn new(code: c_int) -> Option<Self> {
+        if code >= 0 {
+            None
+        } else {
+            Some(Self { code })
+        }
+    }
+
+    const fn new_const(code: c_int) -> Self {
+        if code >= 0 {
+            panic!("error code must be negative");
+        }
+        Self { code }
+    }
+
+    /// Return the error code of this error.
+    pub const fn code(&self) -> c_int {
+        self.code
+    }
+
+    const fn kind(&self) -> Option<&'static str> {
+        Some(match *self {
+            Self::IO => "Io",
+            Self::CORRUPTION => "Corruption",
+            Self::NO_SUCH_ENTRY => "NoSuchEntry",
+            Self::ENTRY_ALREADY_EXISTED => "EntryAlreadyExisted",
+            Self::PATH_NOT_DIR => "PathNotDir",
+            Self::PATH_IS_DIR => "PathIsDir",
+            Self::DIR_NOT_EMPTY => "DirNotEmpty",
+            Self::BAD_FILE_DESCRIPTOR => "BadFileDescriptor",
+            Self::FILE_TOO_BIG => "FileTooBig",
+            Self::INVALID => "Invalid",
+            Self::NO_SPACE => "NoSpace",
+            Self::NO_MEMORY => "NoMemory",
+            Self::NO_ATTRIBUTE => "NoAttribute",
+            Self::FILENAME_TOO_LONG => "FilenameTooLong",
+            _ => {
+                return None;
+            }
+        })
     }
 }
 
-impl From<Error> for ll::lfs_error {
+/// Prints the numeric error code and the name of the error (if known).
+///
+/// ```
+/// # use littlefs2::io::Error;
+///
+/// assert_eq!(
+///     &format!("{:?}", Error::IO),
+///     "Error { code: -5, kind: Some(\"Io\") }",
+/// );
+/// assert_eq!(
+///     &format!("{:?}", Error::new(-128).unwrap()),
+///     "Error { code: -128, kind: None }",
+/// );
+/// ```
+impl Debug for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // add pseudo-field kind to debug output to make errors easier to read
+        f.debug_struct("Error")
+            .field("code", &self.code)
+            .field("kind", &self.kind())
+            .finish()
+    }
+}
+
+impl From<Error> for c_int {
     fn from(error: Error) -> Self {
-        match error {
-            Error::Success => ll::lfs_error_LFS_ERR_OK,
-            Error::Io => ll::lfs_error_LFS_ERR_IO,
-            Error::Corruption => ll::lfs_error_LFS_ERR_CORRUPT,
-            Error::NoSuchEntry => ll::lfs_error_LFS_ERR_NOENT,
-            Error::EntryAlreadyExisted => ll::lfs_error_LFS_ERR_EXIST,
-            Error::PathNotDir => ll::lfs_error_LFS_ERR_NOTDIR,
-            Error::PathIsDir => ll::lfs_error_LFS_ERR_ISDIR,
-            Error::DirNotEmpty => ll::lfs_error_LFS_ERR_NOTEMPTY,
-            Error::BadFileDescriptor => ll::lfs_error_LFS_ERR_BADF,
-            Error::FileTooBig => ll::lfs_error_LFS_ERR_FBIG,
-            Error::Invalid => ll::lfs_error_LFS_ERR_INVAL,
-            Error::NoSpace => ll::lfs_error_LFS_ERR_NOSPC,
-            Error::NoMemory => ll::lfs_error_LFS_ERR_NOMEM,
-            Error::NoAttribute => ll::lfs_error_LFS_ERR_NOATTR,
-            Error::FilenameTooLong => ll::lfs_error_LFS_ERR_NAMETOOLONG,
-            Error::Unknown(error_code) => error_code,
-        }
-    }
-}
-
-impl From<i32> for Error {
-    fn from(error_code: i32) -> Error {
-        match error_code {
-            n if n >= 0 => Error::Success,
-            // negative codes
-            ll::lfs_error_LFS_ERR_IO => Error::Io,
-            ll::lfs_error_LFS_ERR_CORRUPT => Error::Corruption,
-            ll::lfs_error_LFS_ERR_NOENT => Error::NoSuchEntry,
-            ll::lfs_error_LFS_ERR_EXIST => Error::EntryAlreadyExisted,
-            ll::lfs_error_LFS_ERR_NOTDIR => Error::PathNotDir,
-            ll::lfs_error_LFS_ERR_ISDIR => Error::PathIsDir,
-            ll::lfs_error_LFS_ERR_NOTEMPTY => Error::DirNotEmpty,
-            ll::lfs_error_LFS_ERR_BADF => Error::BadFileDescriptor,
-            ll::lfs_error_LFS_ERR_FBIG => Error::FileTooBig,
-            ll::lfs_error_LFS_ERR_INVAL => Error::Invalid,
-            ll::lfs_error_LFS_ERR_NOSPC => Error::NoSpace,
-            ll::lfs_error_LFS_ERR_NOMEM => Error::NoMemory,
-            ll::lfs_error_LFS_ERR_NOATTR => Error::NoAttribute,
-            ll::lfs_error_LFS_ERR_NAMETOOLONG => Error::FilenameTooLong,
-            // positive codes should always indicate success
-            _ => Error::Unknown(error_code),
-        }
+        error.code
     }
 }
 
 pub fn error_code_from<T>(result: Result<T>) -> ll::lfs_error {
-    result.err().unwrap_or(Error::Success).into()
+    result
+        .map(|_| ll::lfs_error_LFS_ERR_OK)
+        .unwrap_or_else(From::from)
 }
 
 pub fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {
-    let error: Error = error_code.into();
-    match error {
-        Error::Success => Ok(return_value),
-        _ => Err(error),
+    if let Some(error) = Error::new(error_code) {
+        Err(error)
+    } else {
+        Ok(return_value)
     }
 }
