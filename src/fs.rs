@@ -467,7 +467,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             attribute.size = cmp::min(attr_max, return_code as u32) as usize;
             return Ok(Some(attribute));
         }
-        if return_code == ll::lfs_error_LFS_ERR_NOATTR {
+        if matches!(return_code.into(), Error::NoAttribute) {
             return Ok(None);
         }
 
@@ -549,7 +549,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     /// C callback interface used by LittleFS to sync data with the lower level interface below the
     /// filesystem. Note that this function currently does nothing.
-    extern "C" fn lfs_config_sync(_c: *const ll::lfs_config) -> i32 {
+    extern "C" fn lfs_config_sync(_c: *const ll::lfs_config) -> c_int {
         // println!("in lfs_config_sync");
         // Do nothing; we presume that data is synchronized.
         0
@@ -851,7 +851,7 @@ impl OpenOptions {
             &mut fs.alloc.borrow_mut().state,
             addr_of_mut!(alloc.state),
             path.as_ptr(),
-            self.0.bits() as i32,
+            self.0.bits() as c_int,
             addr_of!(alloc.config),
         );
 
@@ -969,7 +969,7 @@ impl<S: driver::Storage> io::Seek for File<'_, '_, S> {
                 &mut self.fs.alloc.borrow_mut().state,
                 addr_of_mut!((*(*self.alloc.borrow_mut())).state),
                 pos.off(),
-                pos.whence(),
+                pos.whence() as c_int,
             )
         };
         io::result_from(return_code as usize, return_code)

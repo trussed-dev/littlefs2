@@ -173,15 +173,18 @@ impl From<Error> for ll::lfs_error {
             Error::NoMemory => ll::lfs_error_LFS_ERR_NOMEM,
             Error::NoAttribute => ll::lfs_error_LFS_ERR_NOATTR,
             Error::FilenameTooLong => ll::lfs_error_LFS_ERR_NAMETOOLONG,
-            Error::Unknown(error_code) => error_code,
+            Error::Unknown(error_code) => error_code as ll::lfs_error,
         }
     }
 }
 
 impl From<i32> for Error {
     fn from(error_code: i32) -> Error {
-        match error_code {
-            n if n >= 0 => Error::Success,
+        if error_code >= 0 {
+            return Error::Success;
+        };
+
+        match error_code as ll::lfs_error {
             // negative codes
             ll::lfs_error_LFS_ERR_IO => Error::Io,
             ll::lfs_error_LFS_ERR_CORRUPT => Error::Corruption,
@@ -203,11 +206,17 @@ impl From<i32> for Error {
     }
 }
 
+impl From<i16> for Error {
+    fn from(value: i16) -> Self {
+        Self::from(value as i32)
+    }
+}
+
 pub fn error_code_from<T>(result: Result<T>) -> ll::lfs_error {
     result.err().unwrap_or(Error::Success).into()
 }
 
-pub fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {
+pub fn result_from<T, E: Into<Error>>(return_value: T, error_code: E) -> Result<T> {
     let error: Error = error_code.into();
     match error {
         Error::Success => Ok(return_value),
