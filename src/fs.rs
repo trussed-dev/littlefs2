@@ -35,6 +35,13 @@ fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {
     }
 }
 
+pub fn u32_result(return_value: i32) -> Result<u32> {
+    u32::try_from(return_value).map_err(|_| {
+        let error_code = c_int::try_from(return_value).unwrap_or(c_int::MIN);
+        Error::new(error_code).unwrap()
+    })
+}
+
 struct Cache<Storage: driver::Storage> {
     read: UnsafeCell<Bytes<Storage::CACHE_SIZE>>,
     write: UnsafeCell<Bytes<Storage::CACHE_SIZE>>,
@@ -246,7 +253,9 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// by this method available, at any given time.
     pub fn available_blocks(&self) -> Result<usize> {
         let return_code = unsafe { ll::lfs_fs_size(&mut self.alloc.borrow_mut().state) };
-        result_from(return_code, return_code).map(|blocks| self.total_blocks() - blocks as usize)
+        u32_result(return_code)
+            .map(|blocks| usize::try_from(blocks).unwrap_or(usize::MAX))
+            .map(|blocks| self.total_blocks().saturating_sub(blocks))
     }
 
     /// Available number of unused bytes in the filesystem
@@ -430,17 +439,18 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             )
         };
 
-        if return_code >= 0 {
-            let total_size = usize::try_from(return_code).unwrap_or(usize::MAX);
-            return Ok(Some(Attribute::new(buffer, total_size)));
-        }
-        if return_code == ll::lfs_error_LFS_ERR_NOATTR {
-            return Ok(None);
-        }
-
-        result_from((), return_code)?;
-        // TODO: get rid of this
-        unreachable!();
+        u32_result(return_code)
+            .map(|n| {
+                let total_size = usize::try_from(n).unwrap_or(usize::MAX);
+                Some(Attribute::new(buffer, total_size))
+            })
+            .or_else(|err| {
+                if err == Error::NO_ATTRIBUTE {
+                    Ok(None)
+                } else {
+                    Err(err)
+                }
+            })
     }
 
     /// Remove attribute.
@@ -516,7 +526,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     /// C callback interface used by LittleFS to sync data with the lower level interface below the
     /// filesystem. Note that this function currently does nothing.
-    extern "C" fn lfs_config_sync(_c: *const ll::lfs_config) -> i32 {
+    extern "C" fn lfs_config_sync(_c: *const ll::lfs_config) -> c_int {
         // println!("in lfs_config_sync");
         // Do nothing; we presume that data is synchronized.
         0
@@ -653,7 +663,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
                 addr_of_mut!((*(*self.alloc.borrow_mut())).state),
             )
         };
-        result_from(return_code as usize, return_code)
+        u32_result(return_code).map(|n| n as usize)
     }
 
     pub fn is_empty(&self) -> Result<bool> {
@@ -860,7 +870,7 @@ impl<S: driver::Storage> io::Read for File<'_, '_, S> {
                 buf.len() as u32,
             )
         };
-        result_from(return_code as usize, return_code)
+        u32_result(return_code).map(|n| n as usize)
     }
 }
 
@@ -877,7 +887,7 @@ impl<S: driver::Storage> io::Seek for File<'_, '_, S> {
                 pos.whence(),
             )
         };
-        result_from(return_code as usize, return_code)
+        u32_result(return_code).map(|n| n as usize)
     }
 }
 
@@ -894,7 +904,7 @@ impl<S: driver::Storage> io::Write for File<'_, '_, S> {
                 buf.len() as u32,
             )
         };
-        result_from(return_code as usize, return_code)
+        u32_result(return_code).map(|n| n as usize)
     }
 
     fn flush(&self) -> Result<()> {
