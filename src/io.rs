@@ -78,7 +78,7 @@ impl SeekFrom {
         }
     }
 
-    pub(crate) fn whence(self) -> i32 {
+    pub(crate) fn whence(self) -> c_int {
         match self {
             SeekFrom::Start(_) => 0,
             SeekFrom::End(_) => 2,
@@ -264,4 +264,11 @@ pub fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {
     } else {
         Ok(return_value)
     }
+}
+
+pub fn u32_result(return_value: i32) -> Result<u32> {
+    u32::try_from(return_value).map_err(|_| {
+        let error_code = c_int::try_from(return_value).unwrap_or(c_int::MIN);
+        Error::new(error_code).unwrap()
+    })
 }

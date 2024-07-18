@@ -287,8 +287,9 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// by this method available, at any given time.
     pub fn available_blocks(&self) -> Result<usize> {
         let return_code = unsafe { ll::lfs_fs_size(&mut self.alloc.borrow_mut().state) };
-        io::result_from(return_code, return_code)
-            .map(|blocks| self.total_blocks() - blocks as usize)
+        io::u32_result(return_code)
+            .map(|blocks| usize::try_from(blocks).unwrap_or(usize::MAX))
+            .map(|blocks| self.total_blocks().saturating_sub(blocks))
     }
 
     /// Available number of unused bytes in the filesystem
@@ -471,17 +472,18 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             )
         };
 
-        if return_code >= 0 {
-            attribute.size = cmp::min(attr_max, return_code as u32) as usize;
-            return Ok(Some(attribute));
-        }
-        if return_code == ll::lfs_error_LFS_ERR_NOATTR {
-            return Ok(None);
-        }
-
-        io::result_from((), return_code)?;
-        // TODO: get rid of this
-        unreachable!();
+        io::u32_result(return_code)
+            .map(|n| {
+                attribute.size = cmp::min(attr_max, n) as usize;
+                Some(attribute)
+            })
+            .or_else(|err| {
+                if err == Error::NO_ATTRIBUTE {
+                    Ok(None)
+                } else {
+                    Err(err)
+                }
+            })
     }
 
     /// Remove attribute.
@@ -557,7 +559,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     /// C callback interface used by LittleFS to sync data with the lower level interface below the
     /// filesystem. Note that this function currently does nothing.
-    extern "C" fn lfs_config_sync(_c: *const ll::lfs_config) -> i32 {
+    extern "C" fn lfs_config_sync(_c: *const ll::lfs_config) -> c_int {
         // println!("in lfs_config_sync");
         // Do nothing; we presume that data is synchronized.
         0
@@ -613,7 +615,7 @@ impl Attribute {
 bitflags! {
     /// Definition of file open flags which can be mixed and matched as appropriate. These definitions
     /// are reminiscent of the ones defined by POSIX.
-    struct FileOpenFlags: u32 {
+    struct FileOpenFlags: c_int {
         /// Open file in read only mode.
         const READ = 0x1;
         /// Open file in write only mode.
@@ -762,7 +764,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
                 addr_of_mut!((*(*self.alloc.borrow_mut())).state),
             )
         };
-        io::result_from(return_code as usize, return_code)
+        io::u32_result(return_code).map(|n| n as usize)
     }
 
     pub fn is_empty(&self) -> Result<bool> {
@@ -859,7 +861,7 @@ impl OpenOptions {
             &mut fs.alloc.borrow_mut().state,
             addr_of_mut!(alloc.state),
             path.as_ptr(),
-            self.0.bits() as i32,
+            self.0.bits(),
             addr_of!(alloc.config),
         );
 
@@ -963,7 +965,7 @@ impl<S: driver::Storage> io::Read for File<'_, '_, S> {
                 buf.len() as u32,
             )
         };
-        io::result_from(return_code as usize, return_code)
+        io::u32_result(return_code).map(|n| n as usize)
     }
 }
 
@@ -980,7 +982,7 @@ impl<S: driver::Storage> io::Seek for File<'_, '_, S> {
                 pos.whence(),
             )
         };
-        io::result_from(return_code as usize, return_code)
+        io::u32_result(return_code).map(|n| n as usize)
     }
 }
 
@@ -997,7 +999,7 @@ impl<S: driver::Storage> io::Write for File<'_, '_, S> {
                 buf.len() as u32,
             )
         };
-        io::result_from(return_code as usize, return_code)
+        io::u32_result(return_code).map(|n| n as usize)
     }
 
     fn flush(&self) -> Result<()> {
