@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   accessing `Storage`, `Filesystem` and `File` implementations for any storage.
 - Added `Filesystem::mount_or_else` function ([#57][])
 - Marked `Path::is_empty`, `Path::from_bytes_with_nul`, `Path::from_cstr`, `Path::from_cstr_unchecked`, `Path::as_str_ref_with_trailing_nul`, `Path::as_str`, and `PathBuf::new` as `const`.
+- Made `fs::FileOpenFlags` public and added `From<fs::FileOpenFlags>` for `fs::OpenOptions`.
 
 ### Fixed
 
@@ -32,11 +33,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   - Change `Error` enum to a struct with associated constants.
   - Remove `Error::Success` and enforce negative values for `Error`.
 - Replace `Path::exists` with `Filesystem::exists`
+- Replace `DynFilesystem::open_file_with_options_and_then{,unit}` with `DynFilesystem::open_file_with_flags_and_then{,unit}` using `FileOpenFlags` instead of `OpenOptionsCallback`
 
 ### Removed
 
 - Removed `Path::from_bytes_with_nul_unchecked`.  Use `CStr::from_bytes_with_nul_unchecked` and `Path::from_cstr_unchecked` instead.
 - Removed `From<littlefs2::path::Error> for littlefs2::io::Error`.
+- Removed `object_safe::OpenOptionsCallback`.
 
 [#47]: https://github.com/trussed-dev/littlefs2/pull/47
 [#57]: https://github.com/trussed-dev/littlefs2/pull/57

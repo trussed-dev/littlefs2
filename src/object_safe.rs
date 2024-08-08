@@ -5,7 +5,7 @@ use heapless::Vec;
 
 use crate::{
     driver::Storage,
-    fs::{Attribute, DirEntry, File, Filesystem, Metadata, OpenOptions},
+    fs::{Attribute, DirEntry, File, FileOpenFlags, Filesystem, Metadata},
     io::{Error, OpenSeekFrom, Read, Result, Seek, Write},
     path::Path,
 };
@@ -19,7 +19,6 @@ pub type DirEntriesCallback<'a, R = ()> =
     &'a mut dyn FnMut(&mut dyn Iterator<Item = Result<DirEntry>>) -> Result<R>;
 pub type FileCallback<'a, R = ()> = &'a mut dyn FnMut(&dyn DynFile) -> Result<R>;
 pub type FilesystemCallback<'a, R = ()> = &'a mut dyn FnMut(&dyn DynFilesystem) -> Result<R>;
-pub type OpenOptionsCallback<'a> = &'a dyn Fn(&mut OpenOptions) -> &OpenOptions;
 pub type Predicate<'a> = &'a dyn Fn(&DirEntry) -> bool;
 
 /// Object-safe trait for [`File`][].
@@ -75,7 +74,7 @@ impl dyn DynFile + '_ {
 /// The following methods cannot support generic return types in the callbacks:
 /// - [`DynFilesystem::create_file_and_then_unit`][]
 /// - [`DynFilesystem::open_file_and_then_unit`][]
-/// - [`DynFilesystem::open_file_with_options_and_then_unit`][]
+/// - [`DynFilesystem::open_file_with_flags_and_then_unit`][]
 /// - [`DynFilesystem::read_dir_and_then_unit`][]
 ///
 /// Use these helper functions instead:
@@ -101,9 +100,9 @@ pub trait DynFilesystem {
     fn metadata(&self, path: &Path) -> Result<Metadata>;
     fn create_file_and_then_unit(&self, path: &Path, f: FileCallback<'_>) -> Result<()>;
     fn open_file_and_then_unit(&self, path: &Path, f: FileCallback<'_>) -> Result<()>;
-    fn open_file_with_options_and_then_unit(
+    fn open_file_with_flags_and_then_unit(
         &self,
-        o: OpenOptionsCallback<'_>,
+        flags: FileOpenFlags,
         path: &Path,
         f: FileCallback<'_>,
     ) -> Result<()>;
@@ -172,13 +171,21 @@ impl<S: Storage> DynFilesystem for Filesystem<'_, S> {
         Filesystem::open_file_and_then(self, path, |file| f(file))
     }
 
-    fn open_file_with_options_and_then_unit(
+    fn open_file_with_flags_and_then_unit(
         &self,
-        o: OpenOptionsCallback<'_>,
+        flags: FileOpenFlags,
         path: &Path,
         f: FileCallback<'_>,
     ) -> Result<()> {
-        Filesystem::open_file_with_options_and_then(self, o, path, |file| f(file))
+        Filesystem::open_file_with_options_and_then(
+            self,
+            |o| {
+                *o = flags.into();
+                o
+            },
+            path,
+            |file| f(file),
+        )
     }
 
     fn attribute(&self, path: &Path, id: u8) -> Result<Option<Attribute>> {
@@ -257,14 +264,14 @@ impl dyn DynFilesystem + '_ {
         result
     }
 
-    pub fn open_file_with_options_and_then<R>(
+    pub fn open_file_with_flags_and_then<R>(
         &self,
-        o: OpenOptionsCallback<'_>,
+        flags: FileOpenFlags,
         path: &Path,
         f: FileCallback<'_, R>,
     ) -> Result<R> {
         let mut result = Err(Error::IO);
-        self.open_file_with_options_and_then_unit(o, path, &mut |file| {
+        self.open_file_with_flags_and_then_unit(flags, path, &mut |file| {
             result = Ok(f(file)?);
             Ok(())
         })?;
