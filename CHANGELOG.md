@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Refactor error types:
   - Change `Error` enum to a struct with associated constants.
   - Remove `Error::Success` and enforce negative values for `Error`.
+- Replace `Path::exists` with `Filesystem::exists`
 
 ### Removed
 

@@ -332,7 +332,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     {
         use crate::path;
 
-        if !path.exists(self) {
+        if !self.exists(path) {
             debug_now!("no such directory {}, early return", path);
             return Ok(RemoveDirAllProgress {
                 files_removed: 0,
@@ -398,6 +398,14 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             )
         };
         io::result_from((), return_code)
+    }
+
+    /// Check whether a file or directory exists at a path.
+    ///
+    /// This is equivalent to calling [`Filesystem::metadata`][] and checking for an `Ok` return
+    /// value.
+    pub fn exists(&self, path: &Path) -> bool {
+        self.metadata(path).is_ok()
     }
 
     /// Given a path, query the filesystem to get information about a file or directory.

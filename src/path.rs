@@ -292,10 +292,6 @@ impl Path {
         p
     }
 
-    pub fn exists<S: crate::driver::Storage>(&self, fs: &crate::fs::Filesystem<S>) -> bool {
-        fs.metadata(self).is_ok()
-    }
-
     // helpful for debugging wither the trailing nul is indeed a trailing nul.
     pub const fn as_str_ref_with_trailing_nul(&self) -> &str {
         // SAFETY: ASCII is valid UTF-8

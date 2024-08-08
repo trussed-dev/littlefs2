@@ -67,9 +67,6 @@ impl dyn DynFile + '_ {
 
 /// Object-safe trait for [`Filesystem`][].
 ///
-/// It contains these additional methods from [`Path`][]:
-/// - [`DynFilesystem::exists`][]
-///
 /// The following methods are implemented in [`DynStorage`][] instead:
 /// - [`DynStorage::format`][]
 /// - [`DynStorage::is_mountable`][]
@@ -100,6 +97,7 @@ pub trait DynFilesystem {
     #[cfg(feature = "dir-entry-path")]
     fn remove_dir_all_where(&self, path: &Path, predicate: Predicate<'_>) -> Result<usize>;
     fn rename(&self, from: &Path, to: &Path) -> Result<()>;
+    fn exists(&self, path: &Path) -> bool;
     fn metadata(&self, path: &Path) -> Result<Metadata>;
     fn create_file_and_then_unit(&self, path: &Path, f: FileCallback<'_>) -> Result<()>;
     fn open_file_and_then_unit(&self, path: &Path, f: FileCallback<'_>) -> Result<()>;
@@ -117,7 +115,6 @@ pub trait DynFilesystem {
     fn create_dir_all(&self, path: &Path) -> Result<()>;
     fn write(&self, path: &Path, contents: &[u8]) -> Result<()>;
     fn write_chunk(&self, path: &Path, contents: &[u8], pos: OpenSeekFrom) -> Result<()>;
-    fn exists(&self, path: &Path) -> bool;
 }
 
 impl<S: Storage> DynFilesystem for Filesystem<'_, S> {
@@ -157,6 +154,10 @@ impl<S: Storage> DynFilesystem for Filesystem<'_, S> {
 
     fn rename(&self, from: &Path, to: &Path) -> Result<()> {
         Filesystem::rename(self, from, to)
+    }
+
+    fn exists(&self, path: &Path) -> bool {
+        Filesystem::exists(self, path)
     }
 
     fn metadata(&self, path: &Path) -> Result<Metadata> {
@@ -210,10 +211,6 @@ impl<S: Storage> DynFilesystem for Filesystem<'_, S> {
 
     fn write_chunk(&self, path: &Path, contents: &[u8], pos: OpenSeekFrom) -> Result<()> {
         Filesystem::write_chunk(self, path, contents, pos)
-    }
-
-    fn exists(&self, path: &Path) -> bool {
-        path.exists(self)
     }
 }
 

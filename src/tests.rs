@@ -195,20 +195,20 @@ fn test_create() {
         assert_eq!(fs.available_blocks().unwrap(), 512 - 2);
         assert_eq!(fs.available_space().unwrap(), 130_560);
 
-        assert!(!path!("/test_open.txt").exists(fs));
+        assert!(!fs.exists(path!("/test_open.txt")));
         assert_eq!(
             File::open_and_then(fs, b"/test_open.txt\0".try_into().unwrap(), |_| { Ok(()) })
                 .map(drop)
                 .unwrap_err(), // "real" contains_err is experimental
             Error::NO_SUCH_ENTRY
         );
-        assert!(!path!("/test_open.txt").exists(fs));
+        assert!(!fs.exists(path!("/test_open.txt")));
 
         fs.create_dir(b"/tmp\0".try_into().unwrap()).unwrap();
         assert_eq!(fs.available_blocks().unwrap(), 512 - 2 - 2);
 
         // can create new files
-        assert!(!path!("/tmp/test_open.txt").exists(fs));
+        assert!(!fs.exists(path!("/tmp/test_open.txt")));
         fs.create_file_and_then(b"/tmp/test_open.txt\0".try_into().unwrap(), |file| {
             // can write to files
             assert!(file.write(&[0u8, 1, 2]).unwrap() == 3);
@@ -219,7 +219,7 @@ fn test_create() {
             // file.close()?;
             Ok(())
         })?;
-        assert!(path!("/tmp/test_open.txt").exists(fs));
+        assert!(fs.exists(path!("/tmp/test_open.txt")));
 
         // // cannot remove non-empty directories
         assert_eq!(
