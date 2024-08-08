@@ -9,15 +9,15 @@ use core::{
     ops, ptr, slice, str,
 };
 
-use crate::{consts, path};
+use crate::path;
 
 /// A path
 ///
-/// Paths must be null terminated ASCII strings with at most [`PATH_MAX`](`consts::PATH_MAX`) bytes
-/// (not including the trailing null).
+/// Paths must be null terminated ASCII strings with at most [`PathBuf::MAX_SIZE`][] bytes (not
+/// including the trailing null).
 // Invariants:
 // 1. inner.to_bytes().is_ascii()
-// 2. inner.to_bytes().len() <= consts::PATH_MAX
+// 2. inner.to_bytes().len() <= PathBuf::MAX_SIZE
 #[derive(PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Path {
@@ -235,8 +235,8 @@ impl Path {
     /// Creates a path from a string.
     ///
     /// The string must only consist of ASCII characters.  The last character must be null.  It
-    /// must contain at most [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing
-    /// null.  If these conditions are not met, this function returns an error.
+    /// must contain at most [`PathBuf::MAX_SIZE`][] bytes, not including the trailing null.  If
+    /// these conditions are not met, this function returns an error.
     pub const fn from_str_with_nul(s: &str) -> Result<&Self> {
         Self::from_bytes_with_nul(s.as_bytes())
     }
@@ -244,8 +244,8 @@ impl Path {
     /// Creates a path from a byte buffer.
     ///
     /// The byte buffer must only consist of ASCII characters.  The last character must be null.
-    /// It must contain at most [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing
-    /// null.  If these conditions are not met, this function returns an error.
+    /// It must contain at most [`PathBuf::MAX_SIZE`][] bytes, not including the trailing null.  If
+    /// these conditions are not met, this function returns an error.
     pub const fn from_bytes_with_nul(bytes: &[u8]) -> Result<&Self> {
         match CStr::from_bytes_with_nul(bytes) {
             Ok(cstr) => Self::from_cstr(cstr),
@@ -256,13 +256,13 @@ impl Path {
     /// Creates a path from a C string.
     ///
     /// The string must only consist of ASCII characters.  It must contain at most
-    /// [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing null.  If these
-    /// conditions are not met, this function returns an error.
+    /// [`PathBuf::MAX_SIZE`][] bytes, not including the trailing null.  If these conditions are
+    /// not met, this function returns an error.
     // XXX should we reject empty paths (`""`) here?
     pub const fn from_cstr(cstr: &CStr) -> Result<&Self> {
         let bytes = cstr.to_bytes();
         let n = cstr.to_bytes().len();
-        if n > consts::PATH_MAX {
+        if n > PathBuf::MAX_SIZE {
             Err(PathError::TooLarge)
         } else if bytes.is_ascii() {
             Ok(unsafe { Self::from_cstr_unchecked(cstr) })
@@ -275,7 +275,7 @@ impl Path {
     ///
     /// # Safety
     /// The string must only consist of ASCII characters.  It must contain at most
-    /// [`PATH_MAX`](`consts::PATH_MAX`) bytes, not including the trailing null.
+    /// [`PathBuf::MAX_SIZE`][] bytes, not including the trailing null.
     pub const unsafe fn from_cstr_unchecked(cstr: &CStr) -> &Self {
         &*(cstr as *const CStr as *const Path)
     }
@@ -393,15 +393,15 @@ array_impls!(
 
 /// An owned, mutable path
 ///
-/// Paths must be null terminated ASCII strings with at most [`PATH_MAX`](`consts::PATH_MAX`) bytes
-/// (not including the trailing null).
+/// Paths must be null terminated ASCII strings with at most [`PathBuf::MAX_SIZE`][] bytes (not
+/// including the trailing null).
 // Invariants:
-// 1. 0 < len <= consts::PATH_MAX_PLUS_ONE
+// 1. 0 < len <= PathBuf::MAX_SIZE_PLUS_ONE
 // 2. buf[len - 1] == 0
 // 3. buf[i].is_ascii() for 0 <= i < len - 1
 #[derive(Clone)]
 pub struct PathBuf {
-    buf: [c_char; consts::PATH_MAX_PLUS_ONE],
+    buf: [c_char; PathBuf::MAX_SIZE_PLUS_ONE],
     // NOTE `len` DOES include the final null byte
     len: usize,
 }
@@ -424,15 +424,18 @@ impl Default for PathBuf {
 }
 
 impl PathBuf {
+    pub const MAX_SIZE: usize = 255;
+    pub const MAX_SIZE_PLUS_ONE: usize = Self::MAX_SIZE + 1;
+
     pub const fn new() -> Self {
         Self {
-            buf: [0; consts::PATH_MAX_PLUS_ONE],
+            buf: [0; Self::MAX_SIZE_PLUS_ONE],
             len: 1,
         }
     }
 
     pub fn clear(&mut self) {
-        self.buf = [0; consts::PATH_MAX_PLUS_ONE];
+        self.buf = [0; Self::MAX_SIZE_PLUS_ONE];
         self.len = 1;
     }
 
@@ -441,7 +444,7 @@ impl PathBuf {
     /// # Safety
     ///
     /// The buffer must contain only ASCII characters and at least one null byte.
-    pub unsafe fn from_buffer_unchecked(buf: [c_char; consts::PATH_MAX_PLUS_ONE]) -> Self {
+    pub unsafe fn from_buffer_unchecked(buf: [c_char; Self::MAX_SIZE_PLUS_ONE]) -> Self {
         let len = strlen(buf.as_ptr()) + 1 /* null byte */;
         PathBuf { buf, len }
     }
@@ -481,7 +484,7 @@ impl PathBuf {
                 } else {
                     0
                 }
-                <= consts::PATH_MAX_PLUS_ONE
+                <= Self::MAX_SIZE_PLUS_ONE
         );
 
         let len = self.len;
@@ -503,9 +506,9 @@ impl From<&Path> for PathBuf {
     fn from(path: &Path) -> Self {
         let bytes = path.as_ref().as_bytes();
 
-        let mut buf = [0; consts::PATH_MAX_PLUS_ONE];
+        let mut buf = [0; Self::MAX_SIZE_PLUS_ONE];
         let len = bytes.len();
-        assert!(len <= consts::PATH_MAX);
+        assert!(len <= Self::MAX_SIZE_PLUS_ONE);
         unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len + 1) }
         Self { buf, len: len + 1 }
     }
@@ -523,7 +526,7 @@ impl TryFrom<&[u8]> for PathBuf {
         } else {
             bytes
         };
-        if bytes.len() > consts::PATH_MAX {
+        if bytes.len() > Self::MAX_SIZE {
             return Err(PathError::TooLarge);
         }
         for byte in bytes {
@@ -535,7 +538,7 @@ impl TryFrom<&[u8]> for PathBuf {
             }
         }
 
-        let mut buf = [0; consts::PATH_MAX_PLUS_ONE];
+        let mut buf = [0; Self::MAX_SIZE_PLUS_ONE];
         let len = bytes.len();
         unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buf.as_mut_ptr().cast(), len) }
         Ok(Self { buf, len: len + 1 })
@@ -594,7 +597,7 @@ impl<'de> serde::Deserialize<'de> for PathBuf {
             where
                 E: serde::de::Error,
             {
-                if v.len() > consts::PATH_MAX {
+                if v.len() > PathBuf::MAX_SIZE {
                     return Err(E::invalid_length(v.len(), &self));
                 }
                 PathBuf::try_from(v).map_err(|_| E::custom("invalid path buffer"))
@@ -653,7 +656,7 @@ pub enum PathError {
     NotAscii,
     /// Byte buffer is not a C string
     NotCStr,
-    /// Byte buffer is too long (longer than `consts::PATH_MAX_PLUS_ONE`)
+    /// Byte buffer is too long (longer than [`PathBuf::MAX_SIZE_PLUS_ONE`][])
     TooLarge,
 }
 

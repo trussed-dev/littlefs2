@@ -90,16 +90,18 @@ impl Metadata {
 /// [`Filesystem::clear_attribute`](struct.Filesystem.html#method.clear_attribute).
 pub struct Attribute {
     id: u8,
-    data: [u8; crate::consts::ATTRBYTES_MAX as _],
+    data: [u8; Attribute::MAX_SIZE as _],
     // invariant: size <= data.len()
     size: usize,
 }
 
 impl Attribute {
+    pub const MAX_SIZE: u32 = 1_022;
+
     pub fn new(id: u8) -> Self {
         Attribute {
             id,
-            data: [0; crate::consts::ATTRBYTES_MAX as _],
+            data: [0; Self::MAX_SIZE as _],
             size: 0,
         }
     }
@@ -109,7 +111,7 @@ impl Attribute {
     }
 
     pub fn data(&self) -> &[u8] {
-        let attr_max = crate::consts::ATTRBYTES_MAX as _;
+        let attr_max = Self::MAX_SIZE as _;
         let len = cmp::min(attr_max, self.size);
         &self.data[..len]
     }
@@ -119,7 +121,7 @@ impl Attribute {
     }
 
     pub fn set_data(&mut self, data: &[u8]) -> &mut Self {
-        let attr_max = crate::consts::ATTRBYTES_MAX as _;
+        let attr_max = Self::MAX_SIZE as _;
         let len = cmp::min(attr_max, data.len());
         self.data[..len].copy_from_slice(&data[..len]);
         self.size = len;
