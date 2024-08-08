@@ -1,6 +1,5 @@
 //! Experimental Filesystem version using closures.
 
-use bitflags::bitflags;
 use core::ffi::{c_int, c_void};
 use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
@@ -14,11 +13,27 @@ use littlefs2_sys as ll;
 // so far, don't need `heapless-bytes`.
 pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 
+pub use littlefs2_core::{Attribute, DirEntry, FileOpenFlags, FileType, Metadata};
+
 use crate::{
     driver,
     io::{self, Error, OpenSeekFrom, Result},
     path::{Path, PathBuf},
 };
+
+fn error_code_from<T>(result: Result<T>) -> ll::lfs_error {
+    result
+        .map(|_| ll::lfs_error_LFS_ERR_OK)
+        .unwrap_or_else(From::from)
+}
+
+fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {
+    if let Some(error) = Error::new(error_code) {
+        Err(error)
+    } else {
+        Ok(return_value)
+    }
+}
 
 struct Cache<Storage: driver::Storage> {
     read: UnsafeCell<Bytes<Storage::CACHE_SIZE>>,
@@ -158,71 +173,16 @@ pub struct Filesystem<'a, Storage: driver::Storage> {
     storage: &'a mut Storage,
 }
 
-/// Regular file vs directory
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum FileType {
-    File,
-    Dir,
-}
-
-impl FileType {
-    #[allow(clippy::all)] // following `std::fs`
-    pub fn is_dir(&self) -> bool {
-        *self == FileType::Dir
-    }
-
-    #[allow(clippy::all)] // following `std::fs`
-    pub fn is_file(&self) -> bool {
-        *self == FileType::File
-    }
-}
-
-/// File type (regular vs directory) and size of a file.
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Metadata {
-    file_type: FileType,
-    size: usize,
-}
-
-impl Metadata {
-    pub fn file_type(&self) -> FileType {
-        self.file_type
-    }
-
-    pub fn is_dir(&self) -> bool {
-        self.file_type().is_dir()
-    }
-
-    pub fn is_file(&self) -> bool {
-        self.file_type().is_file()
-    }
-
-    pub fn len(&self) -> usize {
-        self.size
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.size == 0
-    }
-}
-
-impl From<ll::lfs_info> for Metadata {
-    fn from(info: ll::lfs_info) -> Self {
-        let file_type = match info.type_ as ll::lfs_type {
-            ll::lfs_type_LFS_TYPE_DIR => FileType::Dir,
-            ll::lfs_type_LFS_TYPE_REG => FileType::File,
-            _ => {
-                unreachable!();
-            }
-        };
-
-        Metadata {
-            file_type,
-            size: info.size as usize,
+fn metadata(info: ll::lfs_info) -> Metadata {
+    let file_type = match info.type_ as ll::lfs_type {
+        ll::lfs_type_LFS_TYPE_DIR => FileType::Dir,
+        ll::lfs_type_LFS_TYPE_REG => FileType::File,
+        _ => {
+            unreachable!();
         }
-    }
+    };
+
+    Metadata::new(file_type, info.size as usize)
 }
 
 #[cfg(feature = "dir-entry-path")]
@@ -241,7 +201,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let fs = Filesystem::new(alloc, storage);
         let mut alloc = fs.alloc.borrow_mut();
         let return_code = unsafe { ll::lfs_format(&mut alloc.state, &alloc.config) };
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     // TODO: check if this is equivalent to `is_formatted`.
@@ -287,8 +247,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// by this method available, at any given time.
     pub fn available_blocks(&self) -> Result<usize> {
         let return_code = unsafe { ll::lfs_fs_size(&mut self.alloc.borrow_mut().state) };
-        io::result_from(return_code, return_code)
-            .map(|blocks| self.total_blocks() - blocks as usize)
+        result_from(return_code, return_code).map(|blocks| self.total_blocks() - blocks as usize)
     }
 
     /// Available number of unused bytes in the filesystem
@@ -305,7 +264,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     pub fn remove(&self, path: &Path) -> Result<()> {
         let return_code =
             unsafe { ll::lfs_remove(&mut self.alloc.borrow_mut().state, path.as_ptr()) };
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     /// Remove a file or directory.
@@ -397,7 +356,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
                 to.as_ptr(),
             )
         };
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     /// Check whether a file or directory exists at a path.
@@ -423,7 +382,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let return_code =
             unsafe { ll::lfs_stat(&mut self.alloc.borrow_mut().state, path.as_ptr(), &mut info) };
 
-        io::result_from((), return_code).map(|_| info.into())
+        result_from((), return_code).map(|_| metadata(info))
     }
 
     pub fn create_file_and_then<R>(
@@ -479,7 +438,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             return Ok(None);
         }
 
-        io::result_from((), return_code)?;
+        result_from((), return_code)?;
         // TODO: get rid of this
         unreachable!();
     }
@@ -488,7 +447,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     pub fn remove_attribute(&self, path: &Path, id: u8) -> Result<()> {
         let return_code =
             unsafe { ll::lfs_removeattr(&mut self.alloc.borrow_mut().state, path.as_ptr(), id) };
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     /// Set attribute.
@@ -497,13 +456,13 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
             ll::lfs_setattr(
                 &mut self.alloc.borrow_mut().state,
                 path.as_ptr(),
-                attribute.id,
+                attribute.id(),
                 &attribute.data as *const _ as *const c_void,
                 attribute.size as u32,
             )
         };
 
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     /// C callback interface used by LittleFS to read data with the lower level system below the
@@ -522,7 +481,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let off = (block * block_size + off) as usize;
         let buf: &mut [u8] = unsafe { slice::from_raw_parts_mut(buffer as *mut u8, size as usize) };
 
-        io::error_code_from(storage.read(off, buf))
+        error_code_from(storage.read(off, buf))
     }
 
     /// C callback interface used by LittleFS to program data with the lower level system below the
@@ -542,7 +501,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let off = (block * block_size + off) as usize;
         let buf: &[u8] = unsafe { slice::from_raw_parts(buffer as *const u8, size as usize) };
 
-        io::error_code_from(storage.write(off, buf))
+        error_code_from(storage.write(off, buf))
     }
 
     /// C callback interface used by LittleFS to erase data with the lower level system below the
@@ -552,7 +511,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         let off = block as usize * Storage::BLOCK_SIZE;
 
-        io::error_code_from(storage.erase(off, Storage::BLOCK_SIZE))
+        error_code_from(storage.erase(off, Storage::BLOCK_SIZE))
     }
 
     /// C callback interface used by LittleFS to sync data with the lower level interface below the
@@ -561,74 +520,6 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         // println!("in lfs_config_sync");
         // Do nothing; we presume that data is synchronized.
         0
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-/// Custom user attribute that can be set on files and directories.
-///
-/// Consists of an numerical identifier between 0 and 255, and arbitrary
-/// binary data up to size `ATTRBYTES_MAX`.
-///
-/// Use [`Filesystem::attribute`](struct.Filesystem.html#method.attribute),
-/// [`Filesystem::set_attribute`](struct.Filesystem.html#method.set_attribute), and
-/// [`Filesystem::clear_attribute`](struct.Filesystem.html#method.clear_attribute).
-pub struct Attribute {
-    id: u8,
-    data: Bytes<crate::consts::ATTRBYTES_MAX_TYPE>,
-    size: usize,
-}
-
-impl Attribute {
-    pub fn new(id: u8) -> Self {
-        Attribute {
-            id,
-            data: Default::default(),
-            size: 0,
-        }
-    }
-
-    pub fn id(&self) -> u8 {
-        self.id
-    }
-
-    pub fn data(&self) -> &[u8] {
-        let attr_max = crate::consts::ATTRBYTES_MAX as _;
-        let len = cmp::min(attr_max, self.size);
-        &self.data[..len]
-    }
-
-    pub fn set_data(&mut self, data: &[u8]) -> &mut Self {
-        let attr_max = crate::consts::ATTRBYTES_MAX as _;
-        let len = cmp::min(attr_max, data.len());
-        self.data[..len].copy_from_slice(&data[..len]);
-        self.size = len;
-        for entry in self.data[len..].iter_mut() {
-            *entry = 0;
-        }
-        self
-    }
-}
-
-bitflags! {
-    /// Definition of file open flags which can be mixed and matched as appropriate. These definitions
-    /// are reminiscent of the ones defined by POSIX.
-    pub struct FileOpenFlags: i32 {
-        /// Open file in read only mode.
-        const READ = 0x1;
-        /// Open file in write only mode.
-        const WRITE = 0x2;
-        /// Open file for reading and writing.
-        const READWRITE = Self::READ.bits | Self::WRITE.bits;
-        /// Create the file if it does not exist.
-        const CREATE = 0x0100;
-        /// Fail if creating a file that already exists.
-        /// TODO: Good name for this
-        const EXCL = 0x0200;
-        /// Truncate the file if it already exists.
-        const TRUNCATE = 0x0400;
-        /// Open the file in append only mode.
-        const APPEND = 0x0800;
     }
 }
 
@@ -734,7 +625,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
             // so we cannot assert unique mutable access.
             addr_of_mut!((*(*self.alloc.borrow_mut())).state),
         );
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     /// Synchronize file contents to storage.
@@ -748,7 +639,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
                 addr_of_mut!((*(*self.alloc.borrow_mut())).state),
             )
         };
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     /// Size of the file in bytes.
@@ -762,7 +653,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
                 addr_of_mut!((*(*self.alloc.borrow_mut())).state),
             )
         };
-        io::result_from(return_code as usize, return_code)
+        result_from(return_code as usize, return_code)
     }
 
     pub fn is_empty(&self) -> Result<bool> {
@@ -785,7 +676,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
                 size as u32,
             )
         };
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     // This belongs in `io::Read` but really don't want that to have a generic parameter
@@ -868,7 +759,7 @@ impl OpenOptions {
             fs,
         };
 
-        io::result_from(file, return_code)
+        result_from(file, return_code)
     }
 
     /// (Hopefully) safe abstraction around `open`.
@@ -969,7 +860,7 @@ impl<S: driver::Storage> io::Read for File<'_, '_, S> {
                 buf.len() as u32,
             )
         };
-        io::result_from(return_code as usize, return_code)
+        result_from(return_code as usize, return_code)
     }
 }
 
@@ -986,7 +877,7 @@ impl<S: driver::Storage> io::Seek for File<'_, '_, S> {
                 pos.whence(),
             )
         };
-        io::result_from(return_code as usize, return_code)
+        result_from(return_code as usize, return_code)
     }
 }
 
@@ -1003,56 +894,11 @@ impl<S: driver::Storage> io::Write for File<'_, '_, S> {
                 buf.len() as u32,
             )
         };
-        io::result_from(return_code as usize, return_code)
+        result_from(return_code as usize, return_code)
     }
 
     fn flush(&self) -> Result<()> {
         Ok(())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DirEntry {
-    file_name: PathBuf,
-    metadata: Metadata,
-    #[cfg(feature = "dir-entry-path")]
-    path: PathBuf,
-}
-
-impl DirEntry {
-    // // Returns the full path to the file that this entry represents.
-    // pub fn path(&self) -> Path {}
-
-    // Returns the metadata for the file that this entry points at.
-    pub fn metadata(&self) -> Metadata {
-        self.metadata.clone()
-    }
-
-    // Returns the file type for the file that this entry points at.
-    pub fn file_type(&self) -> FileType {
-        self.metadata.file_type
-    }
-
-    // Returns the bare file name of this directory entry without any other leading path component.
-    pub fn file_name(&self) -> &Path {
-        &self.file_name
-    }
-
-    /// Returns the full path to the file that this entry represents.
-    ///
-    /// The full path is created by joining the original path to read_dir with the filename of this entry.
-    #[cfg(feature = "dir-entry-path")]
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    #[cfg(feature = "dir-entry-path")]
-    #[doc(hidden)]
-    // This is used in `crypto-service` to "namespace" paths
-    // by mutating a DirEntry in-place.
-    pub unsafe fn path_buf_mut(&mut self) -> &mut PathBuf {
-        &mut self.path
     }
 }
 
@@ -1100,19 +946,18 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S> {
         };
 
         if return_code > 0 {
-            let file_name = unsafe { PathBuf::from_buffer(info.name) };
-            let metadata = info.into();
+            let file_name = unsafe { PathBuf::from_buffer_unchecked(info.name) };
+            let metadata = metadata(info);
 
             #[cfg(feature = "dir-entry-path")]
-            // TODO: error handling...
             let path = self.path.join(&file_name);
 
-            let dir_entry = DirEntry {
+            let dir_entry = DirEntry::new(
                 file_name,
                 metadata,
                 #[cfg(feature = "dir-entry-path")]
                 path,
-            };
+            );
             return Some(Ok(dir_entry));
         }
 
@@ -1120,7 +965,7 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S> {
             return None;
         }
 
-        Some(Err(io::result_from((), return_code).unwrap_err()))
+        Some(Err(result_from((), return_code).unwrap_err()))
     }
 }
 
@@ -1149,7 +994,7 @@ impl<S: driver::Storage> ReadDir<'_, '_, S> {
                 addr_of_mut!((*(*self.alloc.borrow_mut())).state),
             )
         };
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 }
 
@@ -1192,7 +1037,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
             path: PathBuf::from(path),
         };
 
-        io::result_from(read_dir, return_code)
+        result_from(read_dir, return_code)
     }
 }
 
@@ -1224,7 +1069,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let mut alloc = self.alloc.borrow_mut();
         let return_code = unsafe { ll::lfs_mount(&mut alloc.state, &alloc.config) };
         drop(alloc);
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     // Not public, user should use `mount`, possibly after `format`
@@ -1255,7 +1100,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         println!("creating {:?}", path);
         let return_code =
             unsafe { ll::lfs_mkdir(&mut self.alloc.borrow_mut().state, path.as_ptr()) };
-        io::result_from((), return_code)
+        result_from((), return_code)
     }
 
     /// Recursively create a directory and all of its parent components if they are missing.
@@ -1582,7 +1427,7 @@ mod tests {
                     // Do we want a way to borrow_filesystem for DirEntry?
                     // One usecase is to read data from the files iterated over.
                     //
-                    if entry.metadata.is_file() {
+                    if entry.metadata().is_file() {
                         fs.write(entry.file_name(), b"wowee zowie")?;
                     }
                 }

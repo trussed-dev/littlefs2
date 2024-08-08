@@ -36,7 +36,7 @@ impl Path {
     ///
     /// ```
     ///# use std::cmp::Ordering;
-    ///# use littlefs2::path;
+    ///# use littlefs2_core::path;
     /// assert_eq!(path!("some_path_a").cmp_str(path!("some_path_b")), Ordering::Less);
     /// assert_eq!(path!("some_path_b").cmp_str(path!("some_path_a")), Ordering::Greater);
     /// assert_eq!(path!("some_path").cmp_str(path!("some_path_a")), Ordering::Less);
@@ -54,7 +54,7 @@ impl Path {
     ///
     /// ```
     ///# use std::cmp::Ordering;
-    ///# use littlefs2::path;
+    ///# use littlefs2_core::path;
     /// assert_eq!(path!("some_path_a").cmp_lfs(path!("some_path_b")), Ordering::Less);
     /// assert_eq!(path!("some_path_b").cmp_lfs(path!("some_path_a")), Ordering::Greater);
     /// assert_eq!(path!("some_path").cmp_lfs(path!("some_path_a")), Ordering::Greater);
@@ -153,7 +153,7 @@ impl Path {
     /// Return true if the path is empty
     ///
     /// ```rust
-    ///# use littlefs2::path;
+    ///# use littlefs2_core::path;
     ///
     /// assert!(path!("").is_empty());
     /// assert!(!path!("something").is_empty());
@@ -165,7 +165,7 @@ impl Path {
     /// Get the name of the file this path points to if it points to one
     ///
     /// ```
-    ///# use littlefs2::path;
+    ///# use littlefs2_core::path;
     /// let path = path!("/some/path/file.extension");
     /// assert_eq!(path.file_name(), Some(path!("file.extension")));
     ///
@@ -199,7 +199,7 @@ impl Path {
     /// Iterate over the ancestors of the path
     ///
     /// ```
-    ///# use littlefs2::path;
+    ///# use littlefs2_core::path;
     /// let path = path!("/some/path/file.extension");
     /// let mut ancestors = path.ancestors();
     /// assert_eq!(&*ancestors.next().unwrap(), path!("/some/path/file.extension"));
@@ -217,7 +217,7 @@ impl Path {
     /// Iterate over the components of the path
     ///
     /// ```
-    ///# use littlefs2::path;
+    ///# use littlefs2_core::path;
     /// let path = path!("/some/path/file.extension");
     /// let mut iter = path.iter();
     /// assert_eq!(&*iter.next().unwrap(), path!("/"));
@@ -249,7 +249,7 @@ impl Path {
     pub const fn from_bytes_with_nul(bytes: &[u8]) -> Result<&Self> {
         match CStr::from_bytes_with_nul(bytes) {
             Ok(cstr) => Self::from_cstr(cstr),
-            Err(_) => Err(Error::NotCStr),
+            Err(_) => Err(PathError::NotCStr),
         }
     }
 
@@ -263,11 +263,11 @@ impl Path {
         let bytes = cstr.to_bytes();
         let n = cstr.to_bytes().len();
         if n > consts::PATH_MAX {
-            Err(Error::TooLarge)
+            Err(PathError::TooLarge)
         } else if bytes.is_ascii() {
             Ok(unsafe { Self::from_cstr_unchecked(cstr) })
         } else {
-            Err(Error::NotAscii)
+            Err(PathError::NotAscii)
         }
     }
 
@@ -281,7 +281,7 @@ impl Path {
     }
 
     /// Returns the inner pointer to this C string.
-    pub(crate) fn as_ptr(&self) -> *const c_char {
+    pub fn as_ptr(&self) -> *const c_char {
         self.inner.as_ptr()
     }
 
@@ -343,7 +343,7 @@ impl fmt::Display for Path {
 }
 
 impl<'b> TryFrom<&'b [u8]> for &'b Path {
-    type Error = Error;
+    type Error = PathError;
 
     fn try_from(bytes: &[u8]) -> Result<&Path> {
         Path::from_bytes_with_nul(bytes)
@@ -361,7 +361,7 @@ macro_rules! array_impls {
     ($($N:expr),+) => {
         $(
             impl<'b> TryFrom<&'b [u8; $N]> for &'b Path {
-                type Error = Error;
+                type Error = PathError;
 
                 fn try_from(bytes: &[u8; $N]) -> Result<&Path> {
                     Path::from_bytes_with_nul(&bytes[..])
@@ -369,7 +369,7 @@ macro_rules! array_impls {
             }
 
             impl TryFrom<&[u8; $N]> for PathBuf {
-                type Error = Error;
+                type Error = PathError;
 
                 fn try_from(bytes: &[u8; $N]) -> Result<Self> {
                     Self::try_from(&bytes[..])
@@ -436,7 +436,12 @@ impl PathBuf {
         self.len = 1;
     }
 
-    pub(crate) unsafe fn from_buffer(buf: [c_char; consts::PATH_MAX_PLUS_ONE]) -> Self {
+    /// Creates a from a raw buffer containing a null-terminated ASCII string.
+    ///
+    /// # Safety
+    ///
+    /// The buffer must contain only ASCII characters and at least one null byte.
+    pub unsafe fn from_buffer_unchecked(buf: [c_char; consts::PATH_MAX_PLUS_ONE]) -> Self {
         let len = strlen(buf.as_ptr()) + 1 /* null byte */;
         PathBuf { buf, len }
     }
@@ -467,9 +472,6 @@ impl PathBuf {
             .map(|byte| *byte != b'/')
             .unwrap_or(false);
         let slen = src.len();
-        #[cfg(test)]
-        println!("{}, {}, {}", self.len, slen, consts::PATH_MAX_PLUS_ONE);
-        // hprintln!("{}, {}, {}", self.len, slen, consts::PATH_MAX_PLUS_ONE);
         assert!(
             self.len
                 + slen
@@ -511,7 +513,7 @@ impl From<&Path> for PathBuf {
 
 /// Accepts byte strings, with or without trailing nul.
 impl TryFrom<&[u8]> for PathBuf {
-    type Error = Error;
+    type Error = PathError;
 
     fn try_from(bytes: &[u8]) -> Result<Self> {
         // NB: This needs to set the final NUL byte, unless it already has one
@@ -522,14 +524,14 @@ impl TryFrom<&[u8]> for PathBuf {
             bytes
         };
         if bytes.len() > consts::PATH_MAX {
-            return Err(Error::TooLarge);
+            return Err(PathError::TooLarge);
         }
         for byte in bytes {
             if *byte == 0 {
-                return Err(Error::NotCStr);
+                return Err(PathError::NotCStr);
             }
             if !byte.is_ascii() {
-                return Err(Error::NotAscii);
+                return Err(PathError::NotAscii);
             }
         }
 
@@ -542,7 +544,7 @@ impl TryFrom<&[u8]> for PathBuf {
 
 /// Accepts strings, with or without trailing nul.
 impl TryFrom<&str> for PathBuf {
-    type Error = Error;
+    type Error = PathError;
 
     fn try_from(s: &str) -> Result<Self> {
         PathBuf::try_from(s.as_bytes())
@@ -646,7 +648,7 @@ impl core::cmp::Eq for PathBuf {}
 
 /// Errors that arise from converting byte buffers into paths
 #[derive(Clone, Copy, Debug)]
-pub enum Error {
+pub enum PathError {
     /// Byte buffer contains non-ASCII characters
     NotAscii,
     /// Byte buffer is not a C string
@@ -655,8 +657,7 @@ pub enum Error {
     TooLarge,
 }
 
-/// Result type that has its Error variant set to `path::Error`
-pub type Result<T> = core::result::Result<T, Error>;
+type Result<T> = core::result::Result<T, PathError>;
 
 #[cfg(test)]
 mod tests {

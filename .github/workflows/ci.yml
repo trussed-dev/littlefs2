@@ -30,29 +30,29 @@ jobs:
 
       - name: Check
         run: |
-          cargo check --all-targets
-          cargo check --all-targets --all-features
-          cargo check --all-targets --no-default-features
-          cargo check --all-targets --no-default-features --features serde
-          cargo check --all-targets --no-default-features --features dir-entry-path
+          cargo check --workspace --all-targets
+          cargo check --workspace --all-targets --all-features
+          cargo check --workspace --all-targets --no-default-features
+          cargo check --workspace --all-targets --no-default-features --features serde
+          cargo check --workspace --all-targets --no-default-features --features dir-entry-path
 
       - name: Build
-        run: cargo build --release --verbose
+        run: cargo build --workspace --release --verbose
 
       - name: Run clippy
         if: matrix.target == 'x86_64-unknown-linux-gnu'
-        run: cargo clippy --all-features --all-targets -- --deny warnings
+        run: cargo clippy --workspace --all-features --all-targets -- --deny warnings
 
       - name: Check code format
         if: matrix.target == 'x86_64-unknown-linux-gnu'
-        run: cargo fmt -- --check
+        run: cargo fmt --all -- --check
 
       - name: Run tests
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: >
-          cargo test &&
-          cargo test --release
+          cargo test --workspace &&
+          cargo test --workspace --release
 
       - name: Check documentation
         if: matrix.target == 'x86_64-unknown-linux-gnu'
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps 
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
