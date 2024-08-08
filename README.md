@@ -35,6 +35,8 @@ We follow [`std::fs`][std-fs] as much as reasonable.
 
 The low-level bindings are provided by the [littlefs2-sys][littlefs2-sys] library.
 
+The core types that are independent of a specific implementation version are provided by the `littlefs2-core` crate, see the [`core`](./core) directory.  These types are re-exported from the `littlefs2` crate too.
+
 Upstream release: [v2.2.1][upstream-release]
 
 [geky]: https://github.com/geky

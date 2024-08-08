@@ -128,6 +128,26 @@ assert_eq!(&buf, b"black smoke");
 /// Low-level bindings
 pub use littlefs2_sys as ll;
 
+// Re-exports for compatibility with older versions
+pub use littlefs2_core::path;
+
+/// Traits and types for core I/O functionality.
+pub mod io {
+    pub use littlefs2_core::{Error, OpenSeekFrom, Read, Result, Seek, SeekFrom, Write};
+
+    pub mod prelude {
+        //! Export of the Read, Write and Seek traits for ease of use.
+
+        pub use super::{Read, Seek, SeekFrom, Write};
+    }
+}
+
+/// Paths
+pub mod path {
+    pub use littlefs2_core::{Ancestors, Iter, Path, PathBuf, PathError as Error};
+    pub type Result<T> = core::result::Result<T, Error>;
+}
+
 #[macro_use]
 extern crate delog;
 generate_macros!();
@@ -142,9 +162,7 @@ mod c_stubs;
 pub mod consts;
 pub mod driver;
 pub mod fs;
-pub mod io;
 pub mod object_safe;
-pub mod path;
 
 /// get information about the C backend
 pub fn version() -> Version {
@@ -161,50 +179,6 @@ pub struct Version {
     pub format: (u32, u32),
     /// Backend release (currently: 2.1)
     pub backend: (u32, u32),
-}
-
-/// Creates a path from a string without a trailing null.
-///
-/// Panics and causes a compiler error if the string contains null bytes or non-ascii characters.
-///
-/// # Examples
-///
-/// ```
-/// use littlefs2::{path, path::Path};
-///
-/// const HOME: &Path = path!("/home");
-/// let root = path!("/");
-/// ```
-///
-/// Illegal values:
-///
-/// ```compile_fail
-/// # use littlefs2::{path, path::Path};
-/// const WITH_NULL: &Path = path!("/h\0me");  // does not compile
-/// ```
-///
-/// ```compile_fail
-/// # use littlefs2::{path, path::Path};
-/// const WITH_UTF8: &Path = path!("/höme");  // does not compile
-/// ```
-///
-/// The macro enforces const evaluation so that compilation fails for illegal values even if the
-/// macro is not used in a const context:
-///
-/// ```compile_fail
-/// # use littlefs2::path;
-/// let path = path!("te\0st");  // does not compile
-/// ```
-#[macro_export]
-macro_rules! path {
-    ($path:literal) => {{
-        const _PATH: &$crate::path::Path =
-            match $crate::path::Path::from_str_with_nul(::core::concat!($path, "\0")) {
-                Ok(path) => path,
-                Err(_) => panic!("invalid littlefs2 path"),
-            };
-        _PATH
-    }};
 }
 
 #[cfg(test)]
