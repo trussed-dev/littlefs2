@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   accessing `Storage`, `Filesystem` and `File` implementations for any storage.
 - Added `Filesystem::mount_or_else` function ([#57][])
 - Marked `Path::is_empty`, `Path::from_bytes_with_nul`, `Path::from_cstr`, `Path::from_cstr_unchecked`, `Path::as_str_ref_with_trailing_nul`, `Path::as_str`, and `PathBuf::new` as `const`.
+- Support platforms where `c_int` is not `i32`.
 
 ### Fixed
 
