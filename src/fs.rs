@@ -613,7 +613,7 @@ impl Attribute {
 bitflags! {
     /// Definition of file open flags which can be mixed and matched as appropriate. These definitions
     /// are reminiscent of the ones defined by POSIX.
-    struct FileOpenFlags: u32 {
+    pub struct FileOpenFlags: i32 {
         /// Open file in read only mode.
         const READ = 0x1;
         /// Open file in write only mode.
@@ -859,7 +859,7 @@ impl OpenOptions {
             &mut fs.alloc.borrow_mut().state,
             addr_of_mut!(alloc.state),
             path.as_ptr(),
-            self.0.bits() as i32,
+            self.0.bits(),
             addr_of!(alloc.config),
         );
 
@@ -947,6 +947,12 @@ impl OpenOptions {
             self.0.remove(FileOpenFlags::TRUNCATE)
         };
         self
+    }
+}
+
+impl From<FileOpenFlags> for OpenOptions {
+    fn from(flags: FileOpenFlags) -> Self {
+        Self(flags)
     }
 }
 
