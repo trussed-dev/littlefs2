@@ -5,6 +5,7 @@ use crate::{
     driver,
     fs::{Attribute, File, Filesystem},
     io::{Error, OpenSeekFrom, Read, Result, SeekFrom},
+    path,
 };
 
 ram_storage!(

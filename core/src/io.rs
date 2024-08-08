@@ -1,13 +1,9 @@
 //! Traits and types for core I/O functionality.
 
-pub mod prelude;
-
 use core::{
     ffi::c_int,
     fmt::{self, Debug, Formatter},
 };
-
-use littlefs2_sys as ll;
 
 /// The `Read` trait allows for reading bytes from a file.
 pub trait Read {
@@ -70,7 +66,7 @@ pub enum SeekFrom {
 }
 
 impl SeekFrom {
-    pub(crate) fn off(self) -> i32 {
+    pub fn off(self) -> i32 {
         match self {
             SeekFrom::Start(u) => u as i32,
             SeekFrom::End(i) => i,
@@ -78,7 +74,7 @@ impl SeekFrom {
         }
     }
 
-    pub(crate) fn whence(self) -> i32 {
+    pub fn whence(self) -> i32 {
         match self {
             SeekFrom::Start(_) => 0,
             SeekFrom::End(_) => 2,
@@ -88,7 +84,7 @@ impl SeekFrom {
 }
 
 /// Enumeration of possible methods to seek within an file that was just opened
-/// Used in the [`read_chunk`](crate::fs::Filesystem::read_chunk) and [`write_chunk`](crate::fs::Filesystem::write_chunk) methods,
+/// Used in the `read_chunk` and `write_chunk` methods,
 /// Where [`SeekFrom::Current`] would not make sense.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OpenSeekFrom {
@@ -122,8 +118,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// Specific error codes are available as associated constants of this type.
 ///
 /// ```
-/// # use littlefs2::io::Error;
-///
+/// # use littlefs2_core::Error;
 /// assert_eq!(Error::IO.code(), -5);
 /// assert_eq!(Error::new(-5), Some(Error::IO));
 /// ```
@@ -134,46 +129,46 @@ pub struct Error {
 
 impl Error {
     /// Input / output error occurred.
-    pub const IO: Self = Self::new_const(ll::lfs_error_LFS_ERR_IO);
+    pub const IO: Self = Self::new_const(-5);
 
     /// File or filesystem was corrupt.
-    pub const CORRUPTION: Self = Self::new_const(ll::lfs_error_LFS_ERR_CORRUPT);
+    pub const CORRUPTION: Self = Self::new_const(-84);
 
     /// No entry found with that name.
-    pub const NO_SUCH_ENTRY: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOENT);
+    pub const NO_SUCH_ENTRY: Self = Self::new_const(-2);
 
     /// File or directory already exists.
-    pub const ENTRY_ALREADY_EXISTED: Self = Self::new_const(ll::lfs_error_LFS_ERR_EXIST);
+    pub const ENTRY_ALREADY_EXISTED: Self = Self::new_const(-17);
 
     /// Path name is not a directory.
-    pub const PATH_NOT_DIR: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOTDIR);
+    pub const PATH_NOT_DIR: Self = Self::new_const(-20);
 
     /// Path specification is to a directory.
-    pub const PATH_IS_DIR: Self = Self::new_const(ll::lfs_error_LFS_ERR_ISDIR);
+    pub const PATH_IS_DIR: Self = Self::new_const(-21);
 
     /// Directory was not empty.
-    pub const DIR_NOT_EMPTY: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOTEMPTY);
+    pub const DIR_NOT_EMPTY: Self = Self::new_const(-39);
 
     /// Bad file descriptor.
-    pub const BAD_FILE_DESCRIPTOR: Self = Self::new_const(ll::lfs_error_LFS_ERR_BADF);
+    pub const BAD_FILE_DESCRIPTOR: Self = Self::new_const(-9);
 
     /// File is too big.
-    pub const FILE_TOO_BIG: Self = Self::new_const(ll::lfs_error_LFS_ERR_FBIG);
+    pub const FILE_TOO_BIG: Self = Self::new_const(-27);
 
     /// Incorrect value specified to function.
-    pub const INVALID: Self = Self::new_const(ll::lfs_error_LFS_ERR_INVAL);
+    pub const INVALID: Self = Self::new_const(-22);
 
     /// No space left available for operation.
-    pub const NO_SPACE: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOSPC);
+    pub const NO_SPACE: Self = Self::new_const(-28);
 
     /// No memory available for completing request.
-    pub const NO_MEMORY: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOMEM);
+    pub const NO_MEMORY: Self = Self::new_const(-12);
 
     /// No attribute or data available
-    pub const NO_ATTRIBUTE: Self = Self::new_const(ll::lfs_error_LFS_ERR_NOATTR);
+    pub const NO_ATTRIBUTE: Self = Self::new_const(-61);
 
     /// Filename too long
-    pub const FILENAME_TOO_LONG: Self = Self::new_const(ll::lfs_error_LFS_ERR_NAMETOOLONG);
+    pub const FILENAME_TOO_LONG: Self = Self::new_const(-36);
 
     /// Construct an `Error` from an error code.
     ///
@@ -225,8 +220,7 @@ impl Error {
 /// Prints the numeric error code and the name of the error (if known).
 ///
 /// ```
-/// # use littlefs2::io::Error;
-///
+/// # use littlefs2_core::Error;
 /// assert_eq!(
 ///     &format!("{:?}", Error::IO),
 ///     "Error { code: -5, kind: Some(\"Io\") }",
@@ -249,19 +243,5 @@ impl Debug for Error {
 impl From<Error> for c_int {
     fn from(error: Error) -> Self {
         error.code
-    }
-}
-
-pub fn error_code_from<T>(result: Result<T>) -> ll::lfs_error {
-    result
-        .map(|_| ll::lfs_error_LFS_ERR_OK)
-        .unwrap_or_else(From::from)
-}
-
-pub fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {
-    if let Some(error) = Error::new(error_code) {
-        Err(error)
-    } else {
-        Ok(return_value)
     }
 }
