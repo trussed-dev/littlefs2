@@ -4,8 +4,6 @@ use bitflags::bitflags;
 
 use crate::path::{Path, PathBuf};
 
-pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
-
 bitflags! {
     /// Definition of file open flags which can be mixed and matched as appropriate. These definitions
     /// are reminiscent of the ones defined by POSIX.
@@ -92,15 +90,16 @@ impl Metadata {
 /// [`Filesystem::clear_attribute`](struct.Filesystem.html#method.clear_attribute).
 pub struct Attribute {
     id: u8,
-    pub data: Bytes<crate::consts::ATTRBYTES_MAX_TYPE>,
-    pub size: usize,
+    data: [u8; crate::consts::ATTRBYTES_MAX as _],
+    // invariant: size <= data.len()
+    size: usize,
 }
 
 impl Attribute {
     pub fn new(id: u8) -> Self {
         Attribute {
             id,
-            data: Default::default(),
+            data: [0; crate::consts::ATTRBYTES_MAX as _],
             size: 0,
         }
     }
@@ -115,6 +114,10 @@ impl Attribute {
         &self.data[..len]
     }
 
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
     pub fn set_data(&mut self, data: &[u8]) -> &mut Self {
         let attr_max = crate::consts::ATTRBYTES_MAX as _;
         let len = cmp::min(attr_max, data.len());
@@ -124,6 +127,14 @@ impl Attribute {
             *entry = 0;
         }
         self
+    }
+
+    pub fn buffer_mut(&mut self) -> &mut [u8] {
+        &mut self.data
+    }
+
+    pub fn set_size(&mut self, size: usize) {
+        self.size = cmp::min(size, self.data.len());
     }
 }
 

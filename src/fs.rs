@@ -5,7 +5,7 @@ use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 use core::{
     cell::{RefCell, UnsafeCell},
-    cmp, mem, slice,
+    mem, slice,
 };
 use generic_array::typenum::marker_traits::Unsigned;
 use littlefs2_sys as ll;
@@ -425,13 +425,13 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
                 &mut self.alloc.borrow_mut().state,
                 path.as_ptr(),
                 id,
-                &mut attribute.data as *mut _ as *mut c_void,
+                attribute.buffer_mut() as *mut _ as *mut c_void,
                 attr_max,
             )
         };
 
         if return_code >= 0 {
-            attribute.size = cmp::min(attr_max, return_code as u32) as usize;
+            attribute.set_size(return_code as usize);
             return Ok(Some(attribute));
         }
         if return_code == ll::lfs_error_LFS_ERR_NOATTR {
@@ -457,8 +457,8 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
                 &mut self.alloc.borrow_mut().state,
                 path.as_ptr(),
                 attribute.id(),
-                &attribute.data as *const _ as *const c_void,
-                attribute.size as u32,
+                attribute.data() as *const _ as *const c_void,
+                attribute.size() as u32,
             )
         };
 
