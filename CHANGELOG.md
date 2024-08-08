@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Removed `Path::from_bytes_with_nul_unchecked`.  Use `CStr::from_bytes_with_nul_unchecked` and `Path::from_cstr_unchecked` instead.
 - Removed `From<littlefs2::path::Error> for littlefs2::io::Error`.
 - Removed `object_safe::OpenOptionsCallback`.
+- Removed `consts::ATTRBYTES_MAX_TYPE`.
 
 [#47]: https://github.com/trussed-dev/littlefs2/pull/47
 [#57]: https://github.com/trussed-dev/littlefs2/pull/57

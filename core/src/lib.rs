@@ -12,7 +12,7 @@ mod io;
 mod object_safe;
 mod path;
 
-pub use consts::{ATTRBYTES_MAX, ATTRBYTES_MAX_TYPE, PATH_MAX, PATH_MAX_PLUS_ONE};
+pub use consts::{ATTRBYTES_MAX, PATH_MAX, PATH_MAX_PLUS_ONE};
 pub use fs::{Attribute, DirEntry, FileOpenFlags, FileType, Metadata};
 pub use io::{Error, OpenSeekFrom, Read, Result, Seek, SeekFrom, Write};
 pub use object_safe::{DirEntriesCallback, DynFile, DynFilesystem, FileCallback, Predicate};
