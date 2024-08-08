@@ -2,7 +2,6 @@
 #![allow(non_camel_case_types)]
 
 use generic_array::ArrayLength;
-use littlefs2_sys as ll;
 
 use crate::io::Result;
 
@@ -93,45 +92,4 @@ pub trait Storage {
     fn erase(&mut self, off: usize, len: usize) -> Result<usize>;
     // /// Synchronize writes to the storage device.
     // fn sync(&mut self) -> Result<usize>;
-}
-
-// in the future, try to split the megatrait `Storage` into pieces
-// like this?
-mod future {
-    // content of "superblock"
-    pub trait DiskFormat {
-        // version, upper/lower half-word contain major/minor
-        // const DISK_FORMAT_VERSION: u32,
-
-        // block_size, block_count
-        const BLOCK_SIZE: usize;
-        const BLOCK_COUNT: usize;
-
-        // name_max, file_max, attr_max
-        type FILENAME_MAX_PLUS_ONE;
-        const FILEBYTES_MAX: usize = super::ll::LFS_FILE_MAX as _;
-        type ATTRBYTES_MAX;
-    }
-
-    pub trait Driver {
-        const READ_SIZE: usize;
-        const WRITE_SIZE: usize;
-
-        const BLOCK_SIZE: usize;
-        const BLOCK_COUNT: usize;
-
-        // fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize>;
-        // fn write(&mut self, offset: usize, data: &[u8]) -> Result<usize>;
-        // fn erase(&mut self, offset: usize, len: usize) -> Result<usize>;
-    }
-
-    pub trait MemoryUsage {
-        // TODO: this supposedly influences whether files are inlined or not. Clarify
-        type CACHE_SIZE;
-        type LOOKAHEADWORDS_SIZE;
-    }
-
-    pub trait RuntimeParameters {
-        const BLOCK_CYCLES: isize = -1;
-    }
 }

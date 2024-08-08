@@ -474,7 +474,7 @@ fn test_iter_dirs() {
     let mut storage = RamStorage::new(&mut backend);
     Filesystem::format(&mut storage).unwrap();
     Filesystem::mount_and_then(&mut storage, |fs| {
-        fs.create_dir(path!("/tmp").into())?;
+        fs.create_dir(path!("/tmp"))?;
 
         // TODO: we might want "multi-open"
         fs.create_file_and_then(path!("/tmp/file.a"), |file| {
