@@ -1,4 +1,4 @@
-use core::cmp;
+use core::{cmp, ffi::c_int};
 
 use bitflags::bitflags;
 
@@ -8,7 +8,7 @@ bitflags! {
     /// Definition of file open flags which can be mixed and matched as appropriate. These definitions
     /// are reminiscent of the ones defined by POSIX.
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub struct FileOpenFlags: i32 {
+    pub struct FileOpenFlags: c_int {
         /// Open file in read only mode.
         const READ = 0x1;
         /// Open file in write only mode.

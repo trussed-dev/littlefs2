@@ -74,7 +74,7 @@ impl SeekFrom {
         }
     }
 
-    pub fn whence(self) -> i32 {
+    pub fn whence(self) -> c_int {
         match self {
             SeekFrom::Start(_) => 0,
             SeekFrom::End(_) => 2,
