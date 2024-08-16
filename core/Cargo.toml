@@ -14,5 +14,4 @@ heapless = "0.7"
 serde = { version = "1", default-features = false, features = ["derive"], optional = true }
 
 [features]
-dir-entry-path = []
 serde = ["dep:serde"]

@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Removed `From<littlefs2::path::Error> for littlefs2::io::Error`.
 - Removed `object_safe::OpenOptionsCallback`.
 - Removed `consts::ATTRBYTES_MAX_TYPE`.
+- Removed `dir-entry-path` feature (now always enabled).
 
 [#47]: https://github.com/trussed-dev/littlefs2/pull/47
 [#57]: https://github.com/trussed-dev/littlefs2/pull/57

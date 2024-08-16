@@ -396,7 +396,6 @@ fn test_fancy_open() {
 }
 
 #[test]
-#[cfg(feature = "dir-entry-path")]
 fn remove_dir_all_where() {
     let mut backend = Ram::default();
     let mut storage = RamStorage::new(&mut backend);

@@ -58,9 +58,7 @@ pub trait DynFilesystem {
     fn available_space(&self) -> Result<usize>;
     fn remove(&self, path: &Path) -> Result<()>;
     fn remove_dir(&self, path: &Path) -> Result<()>;
-    #[cfg(feature = "dir-entry-path")]
     fn remove_dir_all(&self, path: &Path) -> Result<()>;
-    #[cfg(feature = "dir-entry-path")]
     fn remove_dir_all_where(&self, path: &Path, predicate: Predicate<'_>) -> Result<usize>;
     fn rename(&self, from: &Path, to: &Path) -> Result<()>;
     fn exists(&self, path: &Path) -> bool;

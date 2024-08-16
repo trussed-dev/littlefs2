@@ -32,9 +32,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 # trybuild = "1"
 
 [features]
-default = ["dir-entry-path", "serde"]
-# use experimental closure-based API
-dir-entry-path = ["littlefs2-core/dir-entry-path"]
+default = ["serde"]
 serde = ["littlefs2-core/serde"]
 # enable assertions in backend C code
 ll-assertions = ["littlefs2-sys/assertions"]

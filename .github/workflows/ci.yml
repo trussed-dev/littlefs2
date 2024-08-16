@@ -34,7 +34,6 @@ jobs:
           cargo check --workspace --all-targets --all-features
           cargo check --workspace --all-targets --no-default-features
           cargo check --workspace --all-targets --no-default-features --features serde
-          cargo check --workspace --all-targets --no-default-features --features dir-entry-path
 
       - name: Build
         run: cargo build --workspace --release --verbose

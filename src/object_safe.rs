@@ -59,12 +59,10 @@ impl<S: Storage> DynFilesystem for Filesystem<'_, S> {
         Filesystem::remove_dir(self, path)
     }
 
-    #[cfg(feature = "dir-entry-path")]
     fn remove_dir_all(&self, path: &Path) -> Result<()> {
         Filesystem::remove_dir_all(self, path)
     }
 
-    #[cfg(feature = "dir-entry-path")]
     fn remove_dir_all_where(&self, path: &Path, predicate: Predicate<'_>) -> Result<usize> {
         Filesystem::remove_dir_all_where(self, path, &|entry| predicate(entry))
     }

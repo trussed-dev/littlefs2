@@ -115,20 +115,14 @@ impl<'a> Attribute<'a> {
 pub struct DirEntry {
     file_name: PathBuf,
     metadata: Metadata,
-    #[cfg(feature = "dir-entry-path")]
     path: PathBuf,
 }
 
 impl DirEntry {
-    pub fn new(
-        file_name: PathBuf,
-        metadata: Metadata,
-        #[cfg(feature = "dir-entry-path")] path: PathBuf,
-    ) -> Self {
+    pub fn new(file_name: PathBuf, metadata: Metadata, path: PathBuf) -> Self {
         Self {
             file_name,
             metadata,
-            #[cfg(feature = "dir-entry-path")]
             path,
         }
     }
@@ -151,12 +145,10 @@ impl DirEntry {
     /// Returns the full path to the file that this entry represents.
     ///
     /// The full path is created by joining the original path to read_dir with the filename of this entry.
-    #[cfg(feature = "dir-entry-path")]
     pub fn path(&self) -> &Path {
         &self.path
     }
 
-    #[cfg(feature = "dir-entry-path")]
     #[doc(hidden)]
     // This is used in `crypto-service` to "namespace" paths
     // by mutating a DirEntry in-place.

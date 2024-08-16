@@ -185,7 +185,6 @@ fn metadata(info: ll::lfs_info) -> Metadata {
     Metadata::new(file_type, info.size as usize)
 }
 
-#[cfg(feature = "dir-entry-path")]
 struct RemoveDirAllProgress {
     files_removed: usize,
     skipped_any: bool,
@@ -274,13 +273,11 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     /// TODO: This method fails if some `println!` calls are removed.
     /// Whyy?
-    #[cfg(feature = "dir-entry-path")]
     pub fn remove_dir_all(&self, path: &Path) -> Result<()> {
         self.remove_dir_all_where(path, &|_| true).map(|_| ())
     }
 
     /// Returns number of deleted files + whether the directory was fully deleted or not
-    #[cfg(feature = "dir-entry-path")]
     fn remove_dir_all_where_inner<P>(
         &self,
         path: &Path,
@@ -338,7 +335,6 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         })
     }
 
-    #[cfg(feature = "dir-entry-path")]
     pub fn remove_dir_all_where<P>(&self, path: &Path, predicate: &P) -> Result<usize>
     where
         P: Fn(&DirEntry) -> bool,
@@ -927,7 +923,6 @@ pub struct ReadDir<'a, 'b, S: driver::Storage> {
     // to the field alloc.state, so we cannot assert unique mutable access.
     alloc: RefCell<*mut ReadDirAllocation>,
     fs: &'b Filesystem<'a, S>,
-    #[cfg(feature = "dir-entry-path")]
     path: PathBuf,
 }
 
@@ -953,15 +948,9 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S> {
             let file_name = unsafe { PathBuf::from_buffer_unchecked(info.name) };
             let metadata = metadata(info);
 
-            #[cfg(feature = "dir-entry-path")]
             let path = self.path.join(&file_name);
 
-            let dir_entry = DirEntry::new(
-                file_name,
-                metadata,
-                #[cfg(feature = "dir-entry-path")]
-                path,
-            );
+            let dir_entry = DirEntry::new(file_name, metadata, path);
             return Some(Ok(dir_entry));
         }
 
@@ -1037,7 +1026,6 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let read_dir = ReadDir {
             alloc: RefCell::new(alloc),
             fs: self,
-            #[cfg(feature = "dir-entry-path")]
             path: PathBuf::from(path),
         };
 
@@ -1254,7 +1242,6 @@ mod tests {
             //     unsafe { file.close() }
             // }).unwrap();
 
-            #[cfg(feature = "dir-entry-path")]
             fs.read_dir_and_then(b"/\0".try_into().unwrap(), |read_dir| {
                 for entry in read_dir {
                     let entry = entry?;
@@ -1274,24 +1261,20 @@ mod tests {
                 for entry in read_dir {
                     let entry = entry?;
                     println!("entry: {:?}", entry.file_name());
-                    #[cfg(feature = "dir-entry-path")]
-                    {
-                        println!("path: {:?}", entry.path());
+                    println!("path: {:?}", entry.path());
 
-                        let attribute: &[u8] = if entry.file_type().is_dir() {
-                            b"directory alarm"
-                        } else {
-                            // not 100% sure this is allowed, but if seems to work :)
-                            fs.write(entry.path(), b"Alles neu macht n\xc3\xa4chstens der Mai")?;
-                            b"ceci n'est pas une pipe"
-                        };
-                        fs.set_attribute(entry.path(), 37, attribute)?;
-                    }
+                    let attribute: &[u8] = if entry.file_type().is_dir() {
+                        b"directory alarm"
+                    } else {
+                        // not 100% sure this is allowed, but if seems to work :)
+                        fs.write(entry.path(), b"Alles neu macht n\xc3\xa4chstens der Mai")?;
+                        b"ceci n'est pas une pipe"
+                    };
+                    fs.set_attribute(entry.path(), 37, attribute)?;
                 }
                 Ok(())
             })?;
 
-            #[cfg(feature = "dir-entry-path")]
             fs.read_dir_and_then(b"/tmp/test\0".try_into().unwrap(), |read_dir| {
                 for (i, entry) in read_dir.enumerate() {
                     let entry = entry?;
@@ -1334,17 +1317,14 @@ mod tests {
                 Ok(())
             })?;
 
-            #[cfg(feature = "dir-entry-path")]
-            {
-                println!("\nDELETION SPREE\n");
-                // behaves veeryweirldy
-                // (...)
-                // entry = DirEntry { file_name: "test", metadata: Metadata { file_type: Dir, size: 0 }, path: "/tmp\u{0}/test" }
-                // (...)
-                // fs.remove_dir_all(&PathBuf::from(b"/tmp\0"))?;
-                // fs.remove_dir_all(&PathBuf::from(b"/tmp"))?;
-                fs.remove_dir_all(path!("/tmp"))?;
-            }
+            println!("\nDELETION SPREE\n");
+            // behaves veeryweirldy
+            // (...)
+            // entry = DirEntry { file_name: "test", metadata: Metadata { file_type: Dir, size: 0 }, path: "/tmp\u{0}/test" }
+            // (...)
+            // fs.remove_dir_all(&PathBuf::from(b"/tmp\0"))?;
+            // fs.remove_dir_all(&PathBuf::from(b"/tmp"))?;
+            fs.remove_dir_all(path!("/tmp"))?;
 
             Ok(())
         })
@@ -1356,7 +1336,6 @@ mod tests {
         fs.write(path!("z.txt"), jackson5).unwrap();
     }
 
-    #[cfg(feature = "dir-entry-path")]
     #[test]
     fn remove_dir_all() {
         let mut test_storage = TestStorage::new();
