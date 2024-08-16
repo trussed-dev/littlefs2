@@ -923,7 +923,7 @@ pub struct ReadDir<'a, 'b, S: driver::Storage> {
     // to the field alloc.state, so we cannot assert unique mutable access.
     alloc: RefCell<*mut ReadDirAllocation>,
     fs: &'b Filesystem<'a, S>,
-    path: PathBuf,
+    path: &'b Path,
 }
 
 impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S> {
@@ -1012,7 +1012,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     pub unsafe fn read_dir<'b>(
         &'b self,
         alloc: &'b mut ReadDirAllocation,
-        path: &Path,
+        path: &'b Path,
     ) -> Result<ReadDir<'a, 'b, Storage>> {
         // ll::lfs_dir_open stores a copy of the pointer to alloc.state, so
         // we must use addr_of_mut! here, since &mut alloc.state asserts unique
@@ -1026,7 +1026,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let read_dir = ReadDir {
             alloc: RefCell::new(alloc),
             fs: self,
-            path: PathBuf::from(path),
+            path,
         };
 
         result_from(read_dir, return_code)
