@@ -106,16 +106,21 @@ impl<S: Storage> DynFilesystem for Filesystem<'_, S> {
         )
     }
 
-    fn attribute(&self, path: &Path, id: u8) -> Result<Option<Attribute>> {
-        Filesystem::attribute(self, path, id)
+    fn attribute<'a>(
+        &self,
+        path: &Path,
+        id: u8,
+        buffer: &'a mut [u8],
+    ) -> Result<Option<Attribute<'a>>> {
+        Filesystem::attribute(self, path, id, buffer)
     }
 
     fn remove_attribute(&self, path: &Path, id: u8) -> Result<()> {
         Filesystem::remove_attribute(self, path, id)
     }
 
-    fn set_attribute(&self, path: &Path, attribute: &Attribute) -> Result<()> {
-        Filesystem::set_attribute(self, path, attribute)
+    fn set_attribute(&self, path: &Path, id: u8, data: &[u8]) -> Result<()> {
+        Filesystem::set_attribute(self, path, id, data)
     }
 
     fn read_dir_and_then_unit(&self, path: &Path, f: DirEntriesCallback<'_>) -> Result<()> {

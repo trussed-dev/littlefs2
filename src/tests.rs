@@ -431,15 +431,32 @@ fn attributes() {
     let mut storage = RamStorage::new(&mut backend);
     Filesystem::format(&mut storage).unwrap();
     Filesystem::mount_and_then(&mut storage, |fs| {
+        let mut buffer = [0; Attribute::MAX_SIZE as _];
+
         let filename = b"some.file\0".try_into().unwrap();
         fs.write(filename, &[])?;
-        assert!(fs.attribute(filename, 37)?.is_none());
+        assert!(fs.attribute(filename, 37, &mut buffer)?.is_none());
 
-        let mut attribute = Attribute::new(37);
-        attribute.set_data(b"top secret");
+        let data = b"top secret";
+        fs.set_attribute(filename, 37, data).unwrap();
+        let attribute = fs.attribute(filename, 37, &mut buffer)?.unwrap();
+        assert_eq!(data, attribute.data());
+        assert_eq!(data.len(), attribute.total_size());
 
-        fs.set_attribute(filename, &attribute).unwrap();
-        assert_eq!(b"top secret", fs.attribute(filename, 37)?.unwrap().data());
+        // if the buffer is smaller than the attribute, it is truncated and the
+        // full size is returned
+        let mut small_buffer = [0; 5];
+        let attribute = fs.attribute(filename, 37, &mut small_buffer)?.unwrap();
+        assert_eq!(&data[..5], attribute.data());
+        assert_eq!(data.len(), attribute.total_size());
+
+        // if the input data is too long, an error is returned
+        let long_data = &[0xff; 1024];
+        assert!(long_data.len() > Attribute::MAX_SIZE as _);
+        assert_eq!(
+            Err(Error::NO_SPACE),
+            fs.set_attribute(filename, 37, long_data)
+        );
 
         // // not sure if we should have this method (may be quite expensive)
         // let attributes = unsafe { fs.attributes("some.file", &mut storage).unwrap() };
@@ -447,22 +464,21 @@ fn attributes() {
         // assert_eq!(attributes.iter().fold(0, |sum, i| sum + (*i as u8)), 1);
 
         fs.remove_attribute(filename, 37)?;
-        assert!(fs.attribute(filename, 37)?.is_none());
+        assert!(fs.attribute(filename, 37, &mut buffer)?.is_none());
 
         // // Directories can have attributes too
         let tmp_dir = b"/tmp\0".try_into().unwrap();
         fs.create_dir(tmp_dir)?;
 
-        attribute.set_data(b"temporary directory");
-        fs.set_attribute(tmp_dir, &attribute)?;
+        let data = b"temporary directory";
+        fs.set_attribute(tmp_dir, 37, data)?;
 
-        assert_eq!(
-            b"temporary directory",
-            fs.attribute(tmp_dir, 37)?.unwrap().data()
-        );
+        let attribute = fs.attribute(tmp_dir, 37, &mut buffer)?.unwrap();
+        assert_eq!(data, attribute.data());
+        assert_eq!(data.len(), attribute.total_size());
 
         fs.remove_attribute(tmp_dir, 37)?;
-        assert!(fs.attribute(tmp_dir, 37)?.is_none());
+        assert!(fs.attribute(tmp_dir, 37, &mut buffer)?.is_none());
 
         Ok(())
     })

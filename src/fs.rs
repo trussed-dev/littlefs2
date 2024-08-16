@@ -416,23 +416,27 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     }
 
     /// Read attribute.
-    pub fn attribute(&self, path: &Path, id: u8) -> Result<Option<Attribute>> {
-        let mut attribute = Attribute::new(id);
-        let attr_max = crate::consts::ATTRBYTES_MAX;
+    pub fn attribute<'a>(
+        &self,
+        path: &Path,
+        id: u8,
+        buffer: &'a mut [u8],
+    ) -> Result<Option<Attribute<'a>>> {
+        let n = u32::try_from(buffer.len()).unwrap_or(u32::MAX);
 
         let return_code = unsafe {
             ll::lfs_getattr(
                 &mut self.alloc.borrow_mut().state,
                 path.as_ptr(),
                 id,
-                attribute.buffer_mut() as *mut _ as *mut c_void,
-                attr_max,
+                buffer as *mut _ as *mut c_void,
+                n,
             )
         };
 
         if return_code >= 0 {
-            attribute.set_size(return_code as usize);
-            return Ok(Some(attribute));
+            let total_size = usize::try_from(return_code).unwrap_or(usize::MAX);
+            return Ok(Some(Attribute::new(buffer, total_size)));
         }
         if return_code == ll::lfs_error_LFS_ERR_NOATTR {
             return Ok(None);
@@ -451,14 +455,14 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     }
 
     /// Set attribute.
-    pub fn set_attribute(&self, path: &Path, attribute: &Attribute) -> Result<()> {
+    pub fn set_attribute(&self, path: &Path, id: u8, data: &[u8]) -> Result<()> {
         let return_code = unsafe {
             ll::lfs_setattr(
                 &mut self.alloc.borrow_mut().state,
                 path.as_ptr(),
-                attribute.id(),
-                attribute.data() as *const _ as *const c_void,
-                attribute.size() as u32,
+                id,
+                data as *const _ as *const c_void,
+                u32::try_from(data.len()).unwrap_or(u32::MAX),
             )
         };
 
@@ -1274,15 +1278,14 @@ mod tests {
                     {
                         println!("path: {:?}", entry.path());
 
-                        let mut attribute = Attribute::new(37);
-                        if entry.file_type().is_dir() {
-                            attribute.set_data(b"directory alarm");
+                        let attribute: &[u8] = if entry.file_type().is_dir() {
+                            b"directory alarm"
                         } else {
-                            attribute.set_data(b"ceci n'est pas une pipe");
                             // not 100% sure this is allowed, but if seems to work :)
                             fs.write(entry.path(), b"Alles neu macht n\xc3\xa4chstens der Mai")?;
-                        }
-                        fs.set_attribute(entry.path(), &attribute)?;
+                            b"ceci n'est pas une pipe"
+                        };
+                        fs.set_attribute(entry.path(), 37, attribute)?;
                     }
                 }
                 Ok(())
@@ -1301,7 +1304,8 @@ mod tests {
                         // fs.remove(entry.path())?;
                     }
 
-                    if let Some(attribute) = fs.attribute(entry.path(), 37)? {
+                    let mut buffer = [0; Attribute::MAX_SIZE as _];
+                    if let Some(attribute) = fs.attribute(entry.path(), 37, &mut buffer)? {
                         println!(
                             "attribute 37: {:?}",
                             core::str::from_utf8(attribute.data()).unwrap()

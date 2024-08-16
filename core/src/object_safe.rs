@@ -73,9 +73,14 @@ pub trait DynFilesystem {
         path: &Path,
         f: FileCallback<'_>,
     ) -> Result<()>;
-    fn attribute(&self, path: &Path, id: u8) -> Result<Option<Attribute>>;
+    fn attribute<'a>(
+        &self,
+        path: &Path,
+        id: u8,
+        buffer: &'a mut [u8],
+    ) -> Result<Option<Attribute<'a>>>;
     fn remove_attribute(&self, path: &Path, id: u8) -> Result<()>;
-    fn set_attribute(&self, path: &Path, attribute: &Attribute) -> Result<()>;
+    fn set_attribute(&self, path: &Path, id: u8, data: &[u8]) -> Result<()>;
     fn read_dir_and_then_unit(&self, path: &Path, f: DirEntriesCallback<'_>) -> Result<()>;
     fn create_dir(&self, path: &Path) -> Result<()>;
     fn create_dir_all(&self, path: &Path) -> Result<()>;

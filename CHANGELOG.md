@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   - Remove `Error::Success` and enforce negative values for `Error`.
 - Replace `Path::exists` with `Filesystem::exists`
 - Replace `DynFilesystem::open_file_with_options_and_then{,unit}` with `DynFilesystem::open_file_with_flags_and_then{,unit}` using `FileOpenFlags` instead of `OpenOptionsCallback`
+- Refactor attributes API:
+  - Change the `set_attribute` function in `DynFilesystem` and `Filesystem` to accept an ID and a slice instead of an `Attribute`.
+  - Add a buffer argument to the `attribute` function in `DynFilesystem` and `Filesystem` and return a slice of that buffer containing the read data.
+  - Change the `Attribute` struct to store a slice with the read data and the total size of the attribute on the filesystem.
 
 ### Removed
 

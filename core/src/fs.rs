@@ -82,61 +82,31 @@ impl Metadata {
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Custom user attribute that can be set on files and directories.
 ///
-/// Consists of an numerical identifier between 0 and 255, and arbitrary
-/// binary data up to size `ATTRBYTES_MAX`.
+/// This struct stores the data that has been read from the filesystem and
+/// the total size of the attribute on the filesystem.  The maximum size of an
+/// attribute is [`Attribute::MAX_SIZE`][].
 ///
-/// Use [`Filesystem::attribute`](struct.Filesystem.html#method.attribute),
-/// [`Filesystem::set_attribute`](struct.Filesystem.html#method.set_attribute), and
-/// [`Filesystem::clear_attribute`](struct.Filesystem.html#method.clear_attribute).
-pub struct Attribute {
-    id: u8,
-    data: [u8; Attribute::MAX_SIZE as _],
-    // invariant: size <= data.len()
-    size: usize,
+/// See [`DynFilesystem::attribute`](`crate::object_safe::DynFilesystem::attribute`).
+pub struct Attribute<'a> {
+    data: &'a [u8],
+    total_size: usize,
 }
 
-impl Attribute {
+impl<'a> Attribute<'a> {
     pub const MAX_SIZE: u32 = 1_022;
 
-    pub fn new(id: u8) -> Self {
-        Attribute {
-            id,
-            data: [0; Self::MAX_SIZE as _],
-            size: 0,
-        }
-    }
-
-    pub fn id(&self) -> u8 {
-        self.id
+    pub fn new(data: &'a [u8], total_size: usize) -> Self {
+        let n = cmp::min(data.len(), total_size);
+        let data = &data[..n];
+        Attribute { data, total_size }
     }
 
     pub fn data(&self) -> &[u8] {
-        let attr_max = Self::MAX_SIZE as _;
-        let len = cmp::min(attr_max, self.size);
-        &self.data[..len]
+        self.data
     }
 
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    pub fn set_data(&mut self, data: &[u8]) -> &mut Self {
-        let attr_max = Self::MAX_SIZE as _;
-        let len = cmp::min(attr_max, data.len());
-        self.data[..len].copy_from_slice(&data[..len]);
-        self.size = len;
-        for entry in self.data[len..].iter_mut() {
-            *entry = 0;
-        }
-        self
-    }
-
-    pub fn buffer_mut(&mut self) -> &mut [u8] {
-        &mut self.data
-    }
-
-    pub fn set_size(&mut self, size: usize) {
-        self.size = cmp::min(size, self.data.len());
+    pub fn total_size(&self) -> usize {
+        self.total_size
     }
 }
 
