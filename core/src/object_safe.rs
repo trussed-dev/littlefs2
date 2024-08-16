@@ -1,5 +1,3 @@
-use heapless::Vec;
-
 use crate::{
     fs::{Attribute, DirEntry, FileOpenFlags, Metadata},
     io::{Error, OpenSeekFrom, Read, Result, Seek, Write},
@@ -15,6 +13,33 @@ pub type DirEntriesCallback<'a, R = ()> =
 pub type FileCallback<'a, R = ()> = &'a mut dyn FnMut(&dyn DynFile) -> Result<R>;
 pub type Predicate<'a> = &'a dyn Fn(&DirEntry) -> bool;
 
+pub trait Vec: Default + AsRef<[u8]> + AsMut<[u8]> {
+    fn resize_to_capacity(&mut self);
+    fn truncate(&mut self, n: usize);
+}
+
+#[cfg(feature = "heapless07")]
+impl<const N: usize> Vec for heapless07::Vec<u8, N> {
+    fn resize_to_capacity(&mut self) {
+        self.resize_default(self.capacity()).unwrap();
+    }
+
+    fn truncate(&mut self, n: usize) {
+        heapless07::Vec::truncate(self, n)
+    }
+}
+
+#[cfg(feature = "heapless08")]
+impl<const N: usize> Vec for heapless08::Vec<u8, N> {
+    fn resize_to_capacity(&mut self) {
+        self.resize_default(self.capacity()).unwrap();
+    }
+
+    fn truncate(&mut self, n: usize) {
+        heapless08::Vec::truncate(self, n)
+    }
+}
+
 /// Object-safe trait for files.
 ///
 /// The methods for opening files cannot be implemented in this trait.  Use these methods instead:
@@ -29,10 +54,10 @@ pub trait DynFile: Read + Seek + Write {
 }
 
 impl dyn DynFile + '_ {
-    pub fn read_to_end<const N: usize>(&self, buf: &mut Vec<u8, N>) -> Result<usize> {
-        let had = buf.len();
-        buf.resize_default(buf.capacity()).unwrap();
-        let read = self.read(&mut buf[had..])?;
+    pub fn read_to_end<V: Vec>(&self, buf: &mut V) -> Result<usize> {
+        let had = buf.as_ref().len();
+        buf.resize_to_capacity();
+        let read = self.read(&mut buf.as_mut()[had..])?;
         buf.truncate(had + read);
         Ok(read)
     }
@@ -87,8 +112,8 @@ pub trait DynFilesystem {
 }
 
 impl dyn DynFilesystem + '_ {
-    pub fn read<const N: usize>(&self, path: &Path) -> Result<Vec<u8, N>> {
-        let mut contents = Vec::new();
+    pub fn read<V: Vec>(&self, path: &Path) -> Result<V> {
+        let mut contents = V::default();
         self.open_file_and_then(path, &mut |file| {
             file.read_to_end(&mut contents)?;
             Ok(())
@@ -96,15 +121,12 @@ impl dyn DynFilesystem + '_ {
         Ok(contents)
     }
 
-    pub fn read_chunk<const N: usize>(
-        &self,
-        path: &Path,
-        pos: OpenSeekFrom,
-    ) -> Result<(Vec<u8, N>, usize)> {
-        let mut contents = Vec::new();
+    pub fn read_chunk<V: Vec>(&self, path: &Path, pos: OpenSeekFrom) -> Result<(V, usize)> {
+        let mut contents = V::default();
+        contents.resize_to_capacity();
         let file_len = self.open_file_and_then(path, &mut |file| {
             file.seek(pos.into())?;
-            let read_n = file.read(&mut contents)?;
+            let read_n = file.read(contents.as_mut())?;
             contents.truncate(read_n);
             file.len()
         })?;

@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   - Change the `set_attribute` function in `DynFilesystem` and `Filesystem` to accept an ID and a slice instead of an `Attribute`.
   - Add a buffer argument to the `attribute` function in `DynFilesystem` and `Filesystem` and return a slice of that buffer containing the read data.
   - Change the `Attribute` struct to store a slice with the read data and the total size of the attribute on the filesystem.
+- Introduce `object_safe::Vec` trait and change `DynFile::read_to_end`, `DynFilesystem::read` and `DynFilesstem::read_chunk` to be generic over a `Vec` implementation to support multiple `heapless` versions (disabled by default).
 
 ### Removed
 

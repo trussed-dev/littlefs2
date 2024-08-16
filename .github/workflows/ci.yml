@@ -30,6 +30,11 @@ jobs:
 
       - name: Check
         run: |
+          cargo check --package littlefs2-core
+          cargo check --package littlefs2-core --features heapless07
+          cargo check --package littlefs2-core --features heapless08
+          cargo check --package littlefs2-core --features serde
+          cargo check --package littlefs2-core --all-features
           cargo check --workspace --all-targets
           cargo check --workspace --all-targets --all-features
           cargo check --workspace --all-targets --no-default-features
