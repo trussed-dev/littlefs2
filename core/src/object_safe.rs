@@ -18,6 +18,30 @@ pub trait Vec: Default + AsRef<[u8]> + AsMut<[u8]> {
     fn truncate(&mut self, n: usize);
 }
 
+#[cfg(feature = "heapless-bytes03")]
+impl<const N: usize> Vec for heapless_bytes03::Bytes<N> {
+    fn resize_to_capacity(&mut self) {
+        heapless_bytes03::Bytes::resize_to_capacity(self)
+    }
+
+    fn truncate(&mut self, n: usize) {
+        use core::ops::DerefMut as _;
+
+        self.deref_mut().truncate(n)
+    }
+}
+
+#[cfg(feature = "heapless-bytes04")]
+impl<const N: usize> Vec for heapless_bytes04::Bytes<N> {
+    fn resize_to_capacity(&mut self) {
+        heapless_bytes04::Bytes::resize_to_capacity(self)
+    }
+
+    fn truncate(&mut self, n: usize) {
+        heapless_bytes04::Bytes::truncate(self, n)
+    }
+}
+
 #[cfg(feature = "heapless07")]
 impl<const N: usize> Vec for heapless07::Vec<u8, N> {
     fn resize_to_capacity(&mut self) {

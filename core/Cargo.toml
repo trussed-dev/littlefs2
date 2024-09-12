@@ -10,11 +10,15 @@ repository.workspace = true
 
 [dependencies]
 bitflags = "2.6.0"
+heapless-bytes03 = { package = "heapless-bytes", version = "0.3", optional = true }
+heapless-bytes04 = { package = "heapless-bytes", version = "0.4", optional = true }
 heapless07 = { package = "heapless", version = "0.7", optional = true }
 heapless08 = { package = "heapless", version = "0.8", optional = true }
 serde = { version = "1", default-features = false, features = ["derive"], optional = true }
 
 [features]
+heapless-bytes03 = ["dep:heapless-bytes03"]
+heapless-bytes04 = ["dep:heapless-bytes04"]
 heapless07 = ["dep:heapless07"]
 heapless08 = ["dep:heapless08"]
 serde = ["dep:serde"]
