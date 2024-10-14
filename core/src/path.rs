@@ -503,6 +503,7 @@ impl PathBuf {
 }
 
 impl From<&Path> for PathBuf {
+    #[inline(never)]
     fn from(path: &Path) -> Self {
         let bytes = path.as_ref().as_bytes();
 
