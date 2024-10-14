@@ -193,50 +193,16 @@ impl Error {
     pub const fn code(&self) -> c_int {
         self.code
     }
-
-    const fn kind(&self) -> Option<&'static str> {
-        Some(match *self {
-            Self::IO => "Io",
-            Self::CORRUPTION => "Corruption",
-            Self::NO_SUCH_ENTRY => "NoSuchEntry",
-            Self::ENTRY_ALREADY_EXISTED => "EntryAlreadyExisted",
-            Self::PATH_NOT_DIR => "PathNotDir",
-            Self::PATH_IS_DIR => "PathIsDir",
-            Self::DIR_NOT_EMPTY => "DirNotEmpty",
-            Self::BAD_FILE_DESCRIPTOR => "BadFileDescriptor",
-            Self::FILE_TOO_BIG => "FileTooBig",
-            Self::INVALID => "Invalid",
-            Self::NO_SPACE => "NoSpace",
-            Self::NO_MEMORY => "NoMemory",
-            Self::NO_ATTRIBUTE => "NoAttribute",
-            Self::FILENAME_TOO_LONG => "FilenameTooLong",
-            _ => {
-                return None;
-            }
-        })
-    }
 }
 
-/// Prints the numeric error code and the name of the error (if known).
+/// Prints a static string as the debug representation.
 ///
-/// ```
-/// # use littlefs2_core::Error;
-/// assert_eq!(
-///     &format!("{:?}", Error::IO),
-///     "Error { code: -5, kind: Some(\"Io\") }",
-/// );
-/// assert_eq!(
-///     &format!("{:?}", Error::new(-128).unwrap()),
-///     "Error { code: -128, kind: None }",
-/// );
-/// ```
+/// If unwrap or expect is used on a `Result<_, Error>`, the `Debug` implementation is not
+/// always optimized out.  This leads to a significant increase of the binary size.
+/// As a short-term fix, the `Debug` implementation currently always returns a static string.
 impl Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // add pseudo-field kind to debug output to make errors easier to read
-        f.debug_struct("Error")
-            .field("code", &self.code)
-            .field("kind", &self.kind())
-            .finish()
+        f.debug_struct("Error").finish()
     }
 }
 
