@@ -234,8 +234,8 @@ impl Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // add pseudo-field kind to debug output to make errors easier to read
         f.debug_struct("Error")
-            .field("code", &self.code)
-            .field("kind", &self.kind())
+            // .field("code", &self.code)
+            // .field("kind", &self.kind())
             .finish()
     }
 }
