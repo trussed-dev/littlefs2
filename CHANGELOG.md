@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+-
+
+## [v0.5.0](https://github.com/trussed-dev/littlefs2/releases/tag/0.5.0) - 2024-10-25
+
+This release contains many small changes to the public API.  It also introduces the
+`littlefs2-core` crate that can be used for crates that want to access `littlefs2`
+filesystems without depending on a specific implementation version.
+
 ### Added
 - Added object-safe traits `DynFile`, `DynFilesystem` and `DynStorage` for
   accessing `Storage`, `Filesystem` and `File` implementations for any storage.

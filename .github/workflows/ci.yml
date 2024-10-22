@@ -108,7 +108,9 @@ jobs:
           EOT
 
       - name: Patch delog
-        run: echo 'delog = { version = "0.1.6", git = "https://github.com/LechevSpace/delog.git", rev = "e83f3fd" }' >> Cargo.toml
+        run: |
+          echo '[patch.crates-io]' >> Cargo.toml
+          echo 'delog = { version = "0.1.6", git = "https://github.com/LechevSpace/delog.git", rev = "e83f3fd" }' >> Cargo.toml
 
       - name: Build avr
         run: cargo +nightly build -Z build-std=core --target=./avr-atmega328p.json --workspace --release
