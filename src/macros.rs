@@ -24,11 +24,17 @@ macro_rules! ram_storage { (
             buf: [u8; $block_size * $block_count],
         }
 
-        impl Default for $Backend {
-            fn default() -> Self {
-                $Backend {
+        impl $Backend {
+            pub const fn new() -> Self {
+                Self {
                     buf: [$erase_value; $block_size * $block_count],
                 }
+            }
+        }
+
+        impl Default for $Backend {
+            fn default() -> Self {
+                Self::new()
             }
         }
 
