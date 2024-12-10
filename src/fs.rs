@@ -573,7 +573,6 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
     ///
     /// It is equivalent to OpenOptions::new() but allows you to write more readable code.
     /// This also avoids the need to import OpenOptions`.
-
     pub fn with_options() -> OpenOptions {
         OpenOptions::new()
     }
@@ -936,7 +935,7 @@ pub struct ReadDir<'a, 'b, S: driver::Storage> {
     path: &'b Path,
 }
 
-impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S> {
+impl<S: driver::Storage> Iterator for ReadDir<'_, '_, S> {
     type Item = Result<DirEntry>;
 
     // remove this allowance again, once path overflow is properly handled
@@ -972,9 +971,9 @@ impl<'a, 'b, S: driver::Storage> Iterator for ReadDir<'a, 'b, S> {
     }
 }
 
-impl<'a, 'b, S: driver::Storage> ReadDir<'a, 'b, S> {
+impl<'a, S: driver::Storage> ReadDir<'a, '_, S> {
     // Safety-hatch to experiment with missing parts of API
-    pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c Filesystem<'a, S> {
+    pub unsafe fn borrow_filesystem<'b>(&'b mut self) -> &'b Filesystem<'a, S> {
         self.fs
     }
 }
