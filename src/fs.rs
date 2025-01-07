@@ -573,7 +573,6 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
     ///
     /// It is equivalent to OpenOptions::new() but allows you to write more readable code.
     /// This also avoids the need to import OpenOptions`.
-
     pub fn with_options() -> OpenOptions {
         OpenOptions::new()
     }
