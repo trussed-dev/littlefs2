@@ -87,7 +87,7 @@ pub struct Ancestors<'a> {
     path: &'a str,
 }
 
-impl<'a> Iterator for Ancestors<'a> {
+impl Iterator for Ancestors<'_> {
     type Item = PathBuf;
     fn next(&mut self) -> Option<PathBuf> {
         if self.path.is_empty() {
@@ -118,7 +118,7 @@ impl<'a> Iterator for Ancestors<'a> {
     }
 }
 
-impl<'a> FusedIterator for Ancestors<'a> {}
+impl FusedIterator for Ancestors<'_> {}
 
 /// Iterator over the components of a Path
 ///
@@ -127,7 +127,7 @@ pub struct Iter<'a> {
     path: &'a str,
 }
 
-impl<'a> Iterator for Iter<'a> {
+impl Iterator for Iter<'_> {
     type Item = PathBuf;
     fn next(&mut self) -> Option<PathBuf> {
         if self.path.is_empty() {
