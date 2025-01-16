@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+-
+
+## [v0.1.1](https://github.com/trussed-dev/littlefs2/releases/tag/core-0.1.1) - 2025-01-16
+
 - Make `Path` and `PathBuf` more const-friendly:
   - Make `Path::as_ptr` and `PathBuf::from_buffer_unchecked` const.
   - Add const `Path::const_eq`, `PathBuf::from_path`, `PathBuf::as_path` and `PathBuf::as_str` methods.

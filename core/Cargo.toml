@@ -1,6 +1,6 @@
 [package]
 name = "littlefs2-core"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["The Trussed developers"]
 description = "Core types for the littlefs2 crate"
 
