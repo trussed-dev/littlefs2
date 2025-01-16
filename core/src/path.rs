@@ -25,6 +25,40 @@ pub struct Path {
 }
 
 impl Path {
+    /// Checks two paths for equality.
+    ///
+    /// This provides an easy way to check paths in a const context.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use littlefs2_core::{Path, path};
+    /// const fn check(path: &Path) -> bool {
+    ///     !path.const_eq(path!("forbidden-path"))
+    /// }
+    ///
+    /// assert!(check(path!("allowed-path")));
+    /// assert!(!check(path!("forbidden-path")));
+    /// ```
+    pub const fn const_eq(&self, path: &Path) -> bool {
+        let a = self.inner.to_bytes();
+        let b = path.inner.to_bytes();
+
+        if a.len() != b.len() {
+            return false;
+        }
+
+        let mut i = 0;
+        while i < a.len() {
+            if a[i] != b[i] {
+                return false;
+            }
+            i += 1;
+        }
+
+        true
+    }
+
     /// Compare the path using their string representation
     /// This comarison function as would be expected for a `String` type.
     ///
@@ -281,7 +315,7 @@ impl Path {
     }
 
     /// Returns the inner pointer to this C string.
-    pub fn as_ptr(&self) -> *const c_char {
+    pub const fn as_ptr(&self) -> *const c_char {
         self.inner.as_ptr()
     }
 
@@ -408,7 +442,7 @@ pub struct PathBuf {
 
 /// # Safety
 /// `s` must point to valid memory; `s` will be treated as a null terminated string
-unsafe fn strlen(mut s: *const c_char) -> usize {
+const unsafe fn strlen(mut s: *const c_char) -> usize {
     let mut n = 0;
     while *s != 0 {
         s = s.add(1);
@@ -434,6 +468,45 @@ impl PathBuf {
         }
     }
 
+    /// Creates a `PathBuf` from a `Path`.
+    ///
+    /// This method is a const-friendly version of the `From<&Path>` implementation.  If you don’t
+    /// need a const method, prefer `From<&Path>` as it is more idiomatic and more efficient.
+    ///
+    /// # Example
+    ///
+    /// ```        
+    /// # use littlefs2_core::{path, PathBuf};
+    /// const PATH: PathBuf = PathBuf::from_path(path!("test"));
+    /// ```
+    pub const fn from_path(path: &Path) -> Self {
+        let bytes = path.inner.to_bytes();
+
+        let mut buf = [0; Self::MAX_SIZE_PLUS_ONE];
+        let len = bytes.len();
+        assert!(len < Self::MAX_SIZE_PLUS_ONE);
+
+        let mut i = 0;
+        while i < len {
+            buf[i] = bytes[i] as _;
+            i += 1;
+        }
+
+        Self { buf, len: len + 1 }
+    }
+
+    pub const fn as_path(&self) -> &Path {
+        unsafe {
+            let bytes = slice::from_raw_parts(self.buf.as_ptr().cast(), self.len);
+            let cstr = CStr::from_bytes_with_nul_unchecked(bytes);
+            Path::from_cstr_unchecked(cstr)
+        }
+    }
+
+    pub const fn as_str(&self) -> &str {
+        self.as_path().as_str()
+    }
+
     pub fn clear(&mut self) {
         self.buf = [0; Self::MAX_SIZE_PLUS_ONE];
         self.len = 1;
@@ -444,7 +517,7 @@ impl PathBuf {
     /// # Safety
     ///
     /// The buffer must contain only ASCII characters and at least one null byte.
-    pub unsafe fn from_buffer_unchecked(buf: [c_char; Self::MAX_SIZE_PLUS_ONE]) -> Self {
+    pub const unsafe fn from_buffer_unchecked(buf: [c_char; Self::MAX_SIZE_PLUS_ONE]) -> Self {
         let len = strlen(buf.as_ptr()) + 1 /* null byte */;
         PathBuf { buf, len }
     }
@@ -559,11 +632,7 @@ impl ops::Deref for PathBuf {
     type Target = Path;
 
     fn deref(&self) -> &Path {
-        unsafe {
-            let bytes = slice::from_raw_parts(self.buf.as_ptr().cast(), self.len);
-            let cstr = CStr::from_bytes_with_nul_unchecked(bytes);
-            Path::from_cstr_unchecked(cstr)
-        }
+        self.as_path()
     }
 }
 
