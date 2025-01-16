@@ -473,11 +473,15 @@ impl PathBuf {
     /// This method is a const-friendly version of the `From<&Path>` implementation.  If you don’t
     /// need a const method, prefer `From<&Path>` as it is more idiomatic and more efficient.
     ///
+    /// The [`path_buf`][`crate::path_buf`] macro can be used instead to construct a `PathBuf` from
+    /// a string literal.
+    ///
     /// # Example
     ///
     /// ```        
-    /// # use littlefs2_core::{path, PathBuf};
+    /// # use littlefs2_core::{path, path_buf, PathBuf};
     /// const PATH: PathBuf = PathBuf::from_path(path!("test"));
+    /// assert_eq!(PATH, path_buf!("test"));
     /// ```
     pub const fn from_path(path: &Path) -> Self {
         let bytes = path.inner.to_bytes();
