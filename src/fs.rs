@@ -19,6 +19,7 @@ use crate::{
     driver,
     io::{self, Error, OpenSeekFrom, Result},
     path::{Path, PathBuf},
+    DISK_VERSION,
 };
 
 fn error_code_from<T>(result: Result<T>) -> ll::lfs_error {
@@ -161,7 +162,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
             compact_thresh: 0,
             metadata_max: 0,
             inline_max: 0,
-            disk_version: 0x0002_0000,
+            disk_version: DISK_VERSION.into(),
         };
 
         Self {
@@ -1244,7 +1245,7 @@ mod tests {
             let return_code =
                 unsafe { ll::lfs_fs_stat(&mut fs.alloc.borrow_mut().state, &mut fs_info) };
             result_from((), return_code).unwrap();
-            assert_eq!(fs_info.disk_version, 0x0002_0000);
+            assert_eq!(fs_info.disk_version, DISK_VERSION.into());
             Ok(())
         })
         .unwrap();

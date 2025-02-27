@@ -5,7 +5,7 @@ use crate::{
     driver,
     fs::{Attribute, File, Filesystem},
     io::{Error, OpenSeekFrom, Read, Result, SeekFrom},
-    path,
+    path, BACKEND_VERSION, DISK_VERSION,
 };
 
 ram_storage!(
@@ -42,8 +42,8 @@ ram_storage!(
 
 #[test]
 fn version() {
-    assert_eq!(crate::version().format, (2, 1));
-    assert_eq!(crate::version().backend, (2, 9));
+    assert_eq!((BACKEND_VERSION.major(), BACKEND_VERSION.minor()), (2, 9));
+    assert_eq!((DISK_VERSION.major(), DISK_VERSION.minor()), (2, 0));
 }
 
 #[test]

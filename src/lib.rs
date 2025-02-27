@@ -164,21 +164,44 @@ pub mod driver;
 pub mod fs;
 pub mod object_safe;
 
-/// get information about the C backend
-pub fn version() -> Version {
-    Version {
-        format: (ll::LFS_DISK_VERSION_MAJOR, ll::LFS_DISK_VERSION_MINOR),
-        backend: (ll::LFS_VERSION_MAJOR, ll::LFS_VERSION_MINOR),
+/// The version of the C backend.
+pub const BACKEND_VERSION: Version = Version(ll::LFS_VERSION);
+
+/// The on-disk version used by [`Filesystem`][`fs::Filesystem`].
+///
+/// Note that this is not the same as the littlefs [`LFS_DISK_VERSION`][`ll::LFS_DISK_VERSION`]
+/// constant as this crate uses the multiversion feature to select on-disk version 2.0 instead of
+/// using the latest on-disk version (currently 2.1).
+pub const DISK_VERSION: Version = Version(0x0002_0000);
+
+/// A littlefs version number.
+#[derive(Clone, Copy, Debug)]
+pub struct Version(u32);
+
+impl Version {
+    /// The major version component (top-nibble).
+    pub const fn major(&self) -> u16 {
+        let [high, low, _, _] = self.0.to_be_bytes();
+        u16::from_be_bytes([high, low])
+    }
+
+    /// The minor version component (bottom-nibble).
+    pub const fn minor(&self) -> u16 {
+        let [_, _, high, low] = self.0.to_be_bytes();
+        u16::from_be_bytes([high, low])
     }
 }
 
-/// Information about the C backend
-#[derive(Clone, Copy, Debug)]
-pub struct Version {
-    /// On-disk format
-    pub format: (u32, u32),
-    /// Backend release
-    pub backend: (u32, u32),
+impl From<u32> for Version {
+    fn from(version: u32) -> Self {
+        Self(version)
+    }
+}
+
+impl From<Version> for u32 {
+    fn from(version: Version) -> u32 {
+        version.0
+    }
 }
 
 #[cfg(test)]
