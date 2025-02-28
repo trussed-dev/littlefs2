@@ -1225,8 +1225,6 @@ mod tests {
     use super::*;
     use crate::path;
     use core::convert::TryInto;
-    use driver::Storage as LfsStorage;
-    use io::Result as LfsResult;
     const_ram_storage!(TestStorage, 4096);
 
     #[test]

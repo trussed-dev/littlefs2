@@ -2,42 +2,37 @@ use core::convert::TryInto;
 use generic_array::typenum::consts;
 
 use crate::{
-    driver,
     fs::{Attribute, File, Filesystem},
     io::{Error, OpenSeekFrom, Read, Result, SeekFrom},
     path, BACKEND_VERSION, DISK_VERSION,
 };
 
 ram_storage!(
-    name=OtherRamStorage,
-    backend=OtherRam,
-    trait=driver::Storage,
-    erase_value=0xff,
-    read_size=1,
-    write_size=32,
-    cache_size_ty=consts::U32,
-    block_size=256,
-    block_count=512,
-    lookahead_size_ty=consts::U1,
-    filename_max_plus_one_ty=consts::U256,
-    path_max_plus_one_ty=consts::U256,
-    result=Result,
+    name = OtherRamStorage,
+    backend = OtherRam,
+    erase_value = 0xff,
+    read_size = 1,
+    write_size = 32,
+    cache_size_ty = consts::U32,
+    block_size = 256,
+    block_count = 512,
+    lookahead_size_ty = consts::U1,
+    filename_max_plus_one_ty = consts::U256,
+    path_max_plus_one_ty = consts::U256,
 );
 
 ram_storage!(
-    name=RamStorage,
-    backend=Ram,
-    trait=driver::Storage,
-    erase_value=0xff,
-    read_size=20*5,
-    write_size=20*7,
-    cache_size_ty=consts::U700,
-    block_size=20*35,
-    block_count=32,
-    lookahead_size_ty=consts::U16,
-    filename_max_plus_one_ty=consts::U256,
-    path_max_plus_one_ty=consts::U256,
-    result=Result,
+    name = RamStorage,
+    backend = Ram,
+    erase_value = 0xff,
+    read_size = 20 * 5,
+    write_size = 20 * 7,
+    cache_size_ty = consts::U700,
+    block_size = 20 * 35,
+    block_count = 32,
+    lookahead_size_ty = consts::U16,
+    filename_max_plus_one_ty = consts::U256,
+    path_max_plus_one_ty = consts::U256,
 );
 
 #[test]

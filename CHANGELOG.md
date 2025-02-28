@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
     We use the multiversion feature to keep the old on-disk format (lfs2.0) to not break compatibility with older versions of this crate.
 - Replaced the `version` function with the `BACKEND_VERSION` and `DISK_VERSION` constants.
   - Changed the `Version` struct to be a wrapper for a littlefs version number.
+- Removed the `trait` and `result` arguments from the `const_ram_storage!` and `ram_storage!` macros and replaced them with `$crate::driver::Storage` and `$crate::io::Result`.
 
 ## [v0.5.0](https://github.com/trussed-dev/littlefs2/releases/tag/0.5.0) - 2024-10-25
 
