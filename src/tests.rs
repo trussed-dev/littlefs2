@@ -8,6 +8,7 @@ use crate::{
     path::PathBuf,
     BACKEND_VERSION, DISK_VERSION,
 };
+use littlefs2_core::DirIterator;
 
 ram_storage!(
     name = OtherRamStorage,

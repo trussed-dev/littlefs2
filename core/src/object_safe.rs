@@ -8,8 +8,7 @@ use crate::{
 const _: Option<&dyn DynFile> = None;
 const _: Option<&dyn DynFilesystem> = None;
 
-pub type DirEntriesCallback<'a, R = ()> =
-    &'a mut dyn FnMut(&mut dyn Iterator<Item = Result<DirEntry>>) -> Result<R>;
+pub type DirEntriesCallback<'a, R = ()> = &'a mut dyn FnMut(&mut dyn DirIterator) -> Result<R>;
 pub type FileCallback<'a, R = ()> = &'a mut dyn FnMut(&dyn DynFile) -> Result<R>;
 pub type Predicate<'a> = &'a dyn Fn(&DirEntry) -> bool;
 
@@ -85,6 +84,31 @@ impl dyn DynFile + '_ {
         buf.truncate(had + read);
         Ok(read)
     }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct DirIterationTell {
+    #[doc(hidden)]
+    pub tell_result: u32,
+}
+
+pub trait DirIterator: Iterator<Item = Result<DirEntry>> {
+    /// Return the position of the directory
+    ///
+    /// The returned offset is only meant to be consumed by seek and may not make
+    /// sense, but does indicate the current position in the directory iteration.
+    ///
+    /// Returns the position of the directory, which can be returned to using [`seek`](Self::seek).
+    fn tell(&self) -> Result<DirIterationTell>;
+
+    /// Change the position of the directory
+    ///
+    /// The new off must be a value previous returned from [`tell`](Self::tell) and specifies
+    /// an absolute offset in the directory seek.
+    fn seek(&self, state: DirIterationTell) -> Result<()>;
+
+    /// Change the position of the directory to the beginning of the directory
+    fn rewind(&self) -> Result<()>;
 }
 
 /// Object-safe trait for filesystems.
