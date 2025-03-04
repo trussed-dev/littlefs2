@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+-
+
+## [v0.6.1](https://github.com/trussed-dev/littlefs2/releases/tag/0.6.1) - 2025-03-04
+
 ### Added
 
 - Added `DynStorageAlloc` trait behind the `alloc` feature.
