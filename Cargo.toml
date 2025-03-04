@@ -19,6 +19,9 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
 delog = "0.1.0"
 generic-array = "0.14"
@@ -33,6 +36,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 [features]
 default = ["serde"]
+alloc = []
 serde = ["littlefs2-core/serde"]
 # enable assertions in backend C code
 ll-assertions = ["littlefs2-sys/assertions"]

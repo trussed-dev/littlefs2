@@ -15,6 +15,9 @@ pub use littlefs2_core::{DirEntriesCallback, DynFile, DynFilesystem, FileCallbac
 const _: Option<&dyn DynStorage> = None;
 
 pub type FilesystemCallback<'a, R = ()> = &'a mut dyn FnMut(&dyn DynFilesystem) -> Result<R>;
+#[cfg(feature = "alloc")]
+pub type FilesystemCallbackOnce<'a, R = ()> =
+    alloc::boxed::Box<dyn FnOnce(&dyn DynFilesystem) -> Result<R> + 'a>;
 
 impl<S: Storage> DynFile for File<'_, '_, S> {
     fn sync(&self) -> Result<()> {
@@ -235,6 +238,36 @@ impl dyn DynStorage + '_ {
             result = Ok(f(fs)?);
             Ok(())
         })?;
+        result
+    }
+}
+
+#[cfg(feature = "alloc")]
+/// Extension trait for [`DynStorage`][] that requires `alloc`.
+///
+/// This extension trait uses owned `FnOnce` callbacks instead of references to `FnMut`.
+pub trait DynStorageAlloc: DynStorage {
+    fn mount_and_then_unit_once(&mut self, f: FilesystemCallbackOnce<'_>) -> Result<()>;
+}
+
+#[cfg(feature = "alloc")]
+impl<T: Storage> DynStorageAlloc for T {
+    fn mount_and_then_unit_once(&mut self, f: FilesystemCallbackOnce<'_>) -> Result<()> {
+        Filesystem::mount_and_then(self, |fs| f(fs))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl dyn DynStorageAlloc + '_ {
+    pub fn mount_and_then_once<F, R>(&mut self, f: F) -> Result<R>
+    where
+        F: FnOnce(&dyn DynFilesystem) -> Result<R>,
+    {
+        let mut result = Err(Error::IO);
+        self.mount_and_then_unit_once(alloc::boxed::Box::new(|fs| {
+            result = Ok(f(fs)?);
+            Ok(())
+        }))?;
         result
     }
 }

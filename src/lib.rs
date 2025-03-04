@@ -1,4 +1,5 @@
 #![cfg_attr(not(test), no_std)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 // FIXME
 #![allow(clippy::missing_safety_doc)]
 
@@ -124,6 +125,9 @@ fs.open_file_with_options_and_then(
 assert_eq!(&buf, b"black smoke");
 ```
 */
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 /// Low-level bindings
 pub use littlefs2_sys as ll;
