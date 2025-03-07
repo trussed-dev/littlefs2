@@ -79,7 +79,7 @@ impl Storage for FileStorage {
     const BLOCK_COUNT: usize = BLOCK_COUNT;
 
     fn read(&mut self, off: usize, buf: &mut [u8]) -> Result<usize> {
-        assert!(off + buf.len() < BLOCK_SIZE * BLOCK_COUNT);
+        assert!(off + buf.len() <= BLOCK_SIZE * BLOCK_COUNT);
         if off >= self.len {
             // blocks that are not in the file are assumed to be empty
             buf.iter_mut().for_each(|byte| *byte = 0);
