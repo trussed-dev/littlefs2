@@ -1,5 +1,4 @@
 use core::convert::TryInto;
-use generic_array::typenum::consts;
 
 use crate::{
     fs::{Attribute, File, Filesystem},
@@ -13,12 +12,10 @@ ram_storage!(
     erase_value = 0xff,
     read_size = 1,
     write_size = 32,
-    cache_size_ty = consts::U32,
+    cache_size = 32,
     block_size = 256,
     block_count = 512,
-    lookahead_size_ty = consts::U1,
-    filename_max_plus_one_ty = consts::U256,
-    path_max_plus_one_ty = consts::U256,
+    lookahead_size = 1,
 );
 
 ram_storage!(
@@ -27,12 +24,10 @@ ram_storage!(
     erase_value = 0xff,
     read_size = 20 * 5,
     write_size = 20 * 7,
-    cache_size_ty = consts::U700,
+    cache_size = 700,
     block_size = 20 * 35,
     block_count = 32,
-    lookahead_size_ty = consts::U16,
-    filename_max_plus_one_ty = consts::U256,
-    path_max_plus_one_ty = consts::U256,
+    lookahead_size = 16,
 );
 
 #[test]
@@ -45,7 +40,7 @@ fn version() {
 fn format() {
     let mut backend = OtherRam::default();
     let mut storage = OtherRamStorage::new(&mut backend);
-    let mut alloc = Filesystem::allocate();
+    let mut alloc = Filesystem::allocate(&storage);
 
     // should fail: FS is not formatted
     assert_eq!(
@@ -77,7 +72,7 @@ fn borrow_fs_allocation() {
     let mut backend = OtherRam::default();
 
     let mut storage = OtherRamStorage::new(&mut backend);
-    let mut alloc_fs = Filesystem::allocate();
+    let mut alloc_fs = Filesystem::allocate(&storage);
     Filesystem::format(&mut storage).unwrap();
     let _fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
     // previous `_fs` is fine as it's masked, due to NLL
@@ -94,7 +89,7 @@ fn borrow_fs_allocation2() {
     let mut backend = OtherRam::default();
 
     let mut storage = OtherRamStorage::new(&mut backend);
-    let mut alloc_fs = Filesystem::allocate();
+    let mut alloc_fs = Filesystem::allocate(&storage);
     Filesystem::format(&mut storage).unwrap();
     let _fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
     // previous `_fs` is fine as it's masked, due to NLL

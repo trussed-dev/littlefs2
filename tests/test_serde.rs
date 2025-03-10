@@ -19,7 +19,7 @@ fn main() {
     let mut storage = RamStorage::new(&mut ram);
     Filesystem::format(&mut storage).unwrap();
 
-    let mut alloc = Filesystem::allocate();
+    let mut alloc = Filesystem::allocate(&storage);
     let fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
     let entity = Entity::default();

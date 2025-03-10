@@ -11,12 +11,10 @@ macro_rules! ram_storage {
     erase_value=$erase_value:expr,
     read_size=$read_size:expr,
     write_size=$write_size:expr,
-    cache_size_ty=$cache_size:path,
+    cache_size=$cache_size:expr,
     block_size=$block_size:expr,
     block_count=$block_count:expr,
-    lookahead_size_ty=$lookahead_size:path,
-    filename_max_plus_one_ty=$filename_max_plus_one:path,
-    path_max_plus_one_ty=$path_max_plus_one:path,
+    lookahead_size=$lookahead_size:expr,
 
 ) => {
         pub struct $Backend {
@@ -43,15 +41,30 @@ macro_rules! ram_storage {
         }
 
         impl<'backend> $crate::driver::Storage for $Name<'backend> {
-            const READ_SIZE: usize = $read_size;
-            const WRITE_SIZE: usize = $write_size;
-            type CACHE_SIZE = $cache_size;
-            const BLOCK_SIZE: usize = $block_size;
-            const BLOCK_COUNT: usize = $block_count;
-            type LOOKAHEAD_SIZE = $lookahead_size;
+            fn read_size(&self) -> usize {
+                $read_size
+            }
+            fn write_size(&self) -> usize {
+                $write_size
+            }
+            fn block_size(&self) -> usize {
+                $block_size
+            }
+            fn cache_size(&self) -> usize {
+                $cache_size
+            }
+            type CACHE_BUFFER = [u8; $cache_size];
+            fn block_count(&self) -> usize {
+                $block_count
+            }
+
+            fn lookahead_size(&self) -> usize {
+                $lookahead_size
+            }
+            type LOOKAHEAD_BUFFER = [u8; $lookahead_size * 8];
 
             fn read(&mut self, offset: usize, buf: &mut [u8]) -> $crate::io::Result<usize> {
-                let read_size: usize = Self::READ_SIZE;
+                let read_size: usize = self.read_size();
                 debug_assert!(offset % read_size == 0);
                 debug_assert!(buf.len() % read_size == 0);
                 for (from, to) in self.backend.buf[offset..].iter().zip(buf.iter_mut()) {
@@ -61,7 +74,7 @@ macro_rules! ram_storage {
             }
 
             fn write(&mut self, offset: usize, data: &[u8]) -> $crate::io::Result<usize> {
-                let write_size: usize = Self::WRITE_SIZE;
+                let write_size: usize = self.write_size();
                 debug_assert!(offset % write_size == 0);
                 debug_assert!(data.len() % write_size == 0);
                 for (from, to) in data.iter().zip(self.backend.buf[offset..].iter_mut()) {
@@ -71,7 +84,7 @@ macro_rules! ram_storage {
             }
 
             fn erase(&mut self, offset: usize, len: usize) -> $crate::io::Result<usize> {
-                let block_size: usize = Self::BLOCK_SIZE;
+                let block_size: usize = self.block_size();
                 debug_assert!(offset % block_size == 0);
                 debug_assert!(len % block_size == 0);
                 for byte in self.backend.buf[offset..offset + len].iter_mut() {
@@ -88,12 +101,10 @@ macro_rules! ram_storage {
             erase_value = 0xff,
             read_size = 1,
             write_size = 1,
-            cache_size_ty = $crate::consts::U32,
+            cache_size = 32,
             block_size = 128,
             block_count = $bytes / 128,
-            lookahead_size_ty = $crate::consts::U1,
-            filename_max_plus_one_ty = $crate::consts::U256,
-            path_max_plus_one_ty = $crate::consts::U256,
+            lookahead_size = 1,
         );
     };
     (tiny) => {
@@ -103,12 +114,10 @@ macro_rules! ram_storage {
             erase_value = 0xff,
             read_size = 32,
             write_size = 32,
-            cache_size_ty = $crate::consts::U32,
+            cache_size = 32,
             block_size = 128,
             block_count = 8,
-            lookahead_size_ty = $crate::consts::U1,
-            filename_max_plus_one_ty = $crate::consts::U256,
-            path_max_plus_one_ty = $crate::consts::U256,
+            lookahead_size = 1,
         );
     };
     (large) => {
@@ -118,12 +127,10 @@ macro_rules! ram_storage {
             erase_value = 0xff,
             read_size = 32,
             write_size = 32,
-            cache_size_ty = $crate::consts::U32,
+            cache_size = 32,
             block_size = 256,
             block_count = 512,
-            lookahead_size_ty = $crate::consts::U4,
-            filename_max_plus_one_ty = $crate::consts::U256,
-            path_max_plus_one_ty = $crate::consts::U256,
+            lookahead_size = 4,
         );
     };
 }
@@ -136,12 +143,10 @@ macro_rules! const_ram_storage {
     erase_value=$erase_value:expr,
     read_size=$read_size:expr,
     write_size=$write_size:expr,
-    cache_size_ty=$cache_size:path,
+    cache_size=$cache_size:expr,
     block_size=$block_size:expr,
     block_count=$block_count:expr,
-    lookahead_size_ty=$lookahead_size:path,
-    filename_max_plus_one_ty=$filename_max_plus_one:path,
-    path_max_plus_one_ty=$path_max_plus_one:path,
+    lookahead_size=$lookahead_size:expr,
 
 ) => {
         pub struct $Name {
@@ -167,15 +172,32 @@ macro_rules! const_ram_storage {
         }
 
         impl $crate::driver::Storage for $Name {
-            const READ_SIZE: usize = $read_size;
-            const WRITE_SIZE: usize = $write_size;
-            type CACHE_SIZE = $cache_size;
-            const BLOCK_SIZE: usize = $block_size;
-            const BLOCK_COUNT: usize = $block_count;
-            type LOOKAHEAD_SIZE = $lookahead_size;
+            fn read_size(&self) -> usize {
+                $read_size
+            }
+
+            fn write_size(&self) -> usize {
+                $write_size
+            }
+
+            fn cache_size(&self) -> usize {
+                $cache_size
+            }
+            type CACHE_BUFFER = [u8; $cache_size];
+            fn block_size(&self) -> usize {
+                $block_size
+            }
+            fn block_count(&self) -> usize {
+                $block_count
+            }
+
+            fn lookahead_size(&self) -> usize {
+                $lookahead_size
+            }
+            type LOOKAHEAD_BUFFER = [u8; $lookahead_size * 8];
 
             fn read(&mut self, offset: usize, buf: &mut [u8]) -> $crate::io::Result<usize> {
-                let read_size: usize = Self::READ_SIZE;
+                let read_size = self.read_size();
                 debug_assert!(offset % read_size == 0);
                 debug_assert!(buf.len() % read_size == 0);
                 for (from, to) in self.buf[offset..].iter().zip(buf.iter_mut()) {
@@ -185,7 +207,7 @@ macro_rules! const_ram_storage {
             }
 
             fn write(&mut self, offset: usize, data: &[u8]) -> $crate::io::Result<usize> {
-                let write_size: usize = Self::WRITE_SIZE;
+                let write_size = self.write_size();
                 debug_assert!(offset % write_size == 0);
                 debug_assert!(data.len() % write_size == 0);
                 for (from, to) in data.iter().zip(self.buf[offset..].iter_mut()) {
@@ -195,7 +217,7 @@ macro_rules! const_ram_storage {
             }
 
             fn erase(&mut self, offset: usize, len: usize) -> $crate::io::Result<usize> {
-                let block_size: usize = Self::BLOCK_SIZE;
+                let block_size: usize = self.block_size();
                 debug_assert!(offset % block_size == 0);
                 debug_assert!(len % block_size == 0);
                 for byte in self.buf[offset..offset + len].iter_mut() {
@@ -211,12 +233,10 @@ macro_rules! const_ram_storage {
             erase_value = 0xff,
             read_size = 16,
             write_size = 512,
-            cache_size_ty = $crate::consts::U512,
+            cache_size = 512,
             block_size = 512,
             block_count = $bytes / 512,
-            lookahead_size_ty = $crate::consts::U1,
-            filename_max_plus_one_ty = $crate::consts::U256,
-            path_max_plus_one_ty = $crate::consts::U256,
+            lookahead_size = 1,
         );
     };
 }
