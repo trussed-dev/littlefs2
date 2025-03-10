@@ -12,7 +12,7 @@ use littlefs2_sys as ll;
 pub use littlefs2_core::{Attribute, DirEntry, FileOpenFlags, FileType, Metadata};
 
 use crate::{
-    driver::{self, Buffer},
+    driver::{self, Sealed},
     io::{self, Error, OpenSeekFrom, Result},
     path::{Path, PathBuf},
     DISK_VERSION,

@@ -4,36 +4,36 @@
 use crate::io::Result;
 
 mod private {
-    pub trait Sealed {}
+    pub trait Sealed {
+        /// The maximum capacity of the buffer type.
+        /// Can be [`usize::Max`]()
+        const MAX_CAPACITY: usize;
+
+        /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
+        /// its last call defines the minimum number of valid bytes
+        fn as_ptr(&self) -> *const u8;
+        /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
+        /// its last call defines the minimum number of valid bytes
+        fn as_mut_ptr(&mut self) -> *mut u8;
+
+        /// Current capacity, set by the last call to [`set_capacity`](Buffer::set_capacity)
+        /// or at initialization through [`with_capacity`](Buffer::with_capacity)
+        fn current_capacity(&self) -> usize;
+
+        /// Can panic if `capacity` > `Self::MAX_CAPACITY`
+        fn set_capacity(&mut self, capacity: usize);
+
+        /// Can panic if `capacity` > `Self::MAX_CAPACITY`
+        fn with_capacity(capacity: usize) -> Self;
+    }
 }
+
+pub(crate) use private::Sealed;
 
 /// Safety: implemented only by `[u8; N]` and `Vec<u8>` if the alloc feature is enabled
-pub unsafe trait Buffer: private::Sealed {
-    /// The maximum capacity of the buffer type.
-    /// Can be [`usize::Max`]()
-    const MAX_CAPACITY: usize;
+pub unsafe trait Buffer: private::Sealed {}
 
-    /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
-    /// its last call defines the minimum number of valid bytes
-    fn as_ptr(&self) -> *const u8;
-    /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
-    /// its last call defines the minimum number of valid bytes
-    fn as_mut_ptr(&mut self) -> *mut u8;
-
-    /// Current capacity, set by the last call to [`set_capacity`](Buffer::set_capacity)
-    /// or at initialization through [`with_capacity`](Buffer::with_capacity)
-    fn current_capacity(&self) -> usize;
-
-    /// Can panic if `capacity` > `Self::MAX_CAPACITY`
-    fn set_capacity(&mut self, capacity: usize);
-
-    /// Can panic if `capacity` > `Self::MAX_CAPACITY`
-    fn with_capacity(capacity: usize) -> Self;
-}
-
-impl<const N: usize> private::Sealed for [u8; N] {}
-
-unsafe impl<const N: usize> Buffer for [u8; N] {
+impl<const N: usize> private::Sealed for [u8; N] {
     const MAX_CAPACITY: usize = N;
 
     fn as_ptr(&self) -> *const u8 {
@@ -57,11 +57,10 @@ unsafe impl<const N: usize> Buffer for [u8; N] {
     }
 }
 
-#[cfg(feature = "alloc")]
-impl private::Sealed for alloc::vec::Vec<u8> {}
+unsafe impl<const N: usize> Buffer for [u8; N] {}
 
 #[cfg(feature = "alloc")]
-unsafe impl Buffer for alloc::vec::Vec<u8> {
+impl private::Sealed for alloc::vec::Vec<u8> {
     const MAX_CAPACITY: usize = usize::MAX;
 
     fn as_ptr(&self) -> *const u8 {
@@ -86,6 +85,9 @@ unsafe impl Buffer for alloc::vec::Vec<u8> {
         this
     }
 }
+
+#[cfg(feature = "alloc")]
+unsafe impl Buffer for alloc::vec::Vec<u8> {}
 
 /// Users of this library provide a "storage driver" by implementing this trait.
 ///
