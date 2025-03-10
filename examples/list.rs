@@ -5,7 +5,6 @@ use std::{
 };
 
 use littlefs2::{
-    consts::{U1, U512},
     driver::Storage,
     fs::{Allocation, FileType, Filesystem},
     io::{Error, Result},
@@ -30,7 +29,7 @@ fn main() {
         file,
         len: actual_len,
     };
-    let mut alloc = Allocation::new();
+    let mut alloc = Allocation::new(&s);
     let fs = Filesystem::mount(&mut alloc, &mut s).expect("failed to mount filesystem");
 
     let available_blocks = fs.available_blocks().unwrap();
@@ -70,13 +69,29 @@ struct FileStorage {
 }
 
 impl Storage for FileStorage {
-    type CACHE_SIZE = U512;
-    type LOOKAHEAD_SIZE = U1;
+    type CACHE_BUFFER = Vec<u8>;
+    type LOOKAHEAD_BUFFER = Vec<u8>;
 
-    const READ_SIZE: usize = 16;
-    const WRITE_SIZE: usize = 512;
-    const BLOCK_SIZE: usize = BLOCK_SIZE;
-    const BLOCK_COUNT: usize = BLOCK_COUNT;
+    fn read_size(&self) -> usize {
+        16
+    }
+    fn write_size(&self) -> usize {
+        512
+    }
+    fn block_size(&self) -> usize {
+        BLOCK_SIZE
+    }
+    fn block_count(&self) -> usize {
+        BLOCK_COUNT
+    }
+
+    fn cache_size(&self) -> usize {
+        512
+    }
+
+    fn lookahead_size(&self) -> usize {
+        1
+    }
 
     fn read(&mut self, off: usize, buf: &mut [u8]) -> Result<usize> {
         assert!(off + buf.len() <= BLOCK_SIZE * BLOCK_COUNT);

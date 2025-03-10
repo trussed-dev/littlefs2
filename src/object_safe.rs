@@ -1,7 +1,5 @@
 //! Object-safe traits for [`File`][], [`Filesystem`][] and [`Storage`][].
 
-use generic_array::typenum::Unsigned as _;
-
 use crate::{
     driver::Storage,
     fs::{Attribute, File, FileOpenFlags, Filesystem, Metadata},
@@ -179,31 +177,31 @@ pub trait DynStorage {
 
 impl<S: Storage> DynStorage for S {
     fn read_size(&self) -> usize {
-        Self::READ_SIZE
+        <S as Storage>::read_size(self)
     }
 
     fn write_size(&self) -> usize {
-        Self::WRITE_SIZE
+        <S as Storage>::write_size(self)
     }
 
     fn block_size(&self) -> usize {
-        Self::BLOCK_SIZE
+        <S as Storage>::block_size(self)
     }
 
     fn block_count(&self) -> usize {
-        Self::BLOCK_COUNT
+        <S as Storage>::block_count(self)
     }
 
     fn block_cycles(&self) -> isize {
-        Self::BLOCK_CYCLES
+        <S as Storage>::block_cycles(self)
     }
 
     fn cache_size(&self) -> usize {
-        S::CACHE_SIZE::to_usize()
+        <S as Storage>::cache_size(self)
     }
 
     fn lookahead_size(&self) -> usize {
-        S::LOOKAHEAD_SIZE::to_usize()
+        <S as Storage>::lookahead_size(self)
     }
 
     fn read(&mut self, off: usize, buf: &mut [u8]) -> Result<usize> {

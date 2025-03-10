@@ -1,9 +1,91 @@
 //! The `Storage`, `Read`, `Write` and `Seek` driver.
 #![allow(non_camel_case_types)]
 
-use generic_array::ArrayLength;
-
 use crate::io::Result;
+
+mod private {
+    pub trait Sealed {}
+}
+
+/// Safety: implemented only by `[u8; N]` and `Vec<u8>` if the alloc feature is enabled
+pub unsafe trait Buffer: private::Sealed {
+    /// The maximum capacity of the buffer type.
+    /// Can be [`usize::Max`]()
+    const MAX_CAPACITY: usize;
+
+    /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
+    /// its last call defines the minimum number of valid bytes
+    fn as_ptr(&self) -> *const u8;
+    /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
+    /// its last call defines the minimum number of valid bytes
+    fn as_mut_ptr(&mut self) -> *mut u8;
+
+    /// Current capacity, set by the last call to [`set_capacity`](Buffer::set_capacity)
+    /// or at initialization through [`with_capacity`](Buffer::with_capacity)
+    fn current_capacity(&self) -> usize;
+
+    /// Can panic if `capacity` > `Self::MAX_CAPACITY`
+    fn set_capacity(&mut self, capacity: usize);
+
+    /// Can panic if `capacity` > `Self::MAX_CAPACITY`
+    fn with_capacity(capacity: usize) -> Self;
+}
+
+impl<const N: usize> private::Sealed for [u8; N] {}
+
+unsafe impl<const N: usize> Buffer for [u8; N] {
+    const MAX_CAPACITY: usize = N;
+
+    fn as_ptr(&self) -> *const u8 {
+        <[u8]>::as_ptr(self)
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut u8 {
+        <[u8]>::as_mut_ptr(self)
+    }
+
+    fn current_capacity(&self) -> usize {
+        N
+    }
+
+    fn set_capacity(&mut self, _capacity: usize) {
+        // noop, fixed capacity
+    }
+    fn with_capacity(capacity: usize) -> Self {
+        assert!(capacity <= N);
+        [0; N]
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl private::Sealed for alloc::vec::Vec<u8> {}
+
+#[cfg(feature = "alloc")]
+unsafe impl Buffer for alloc::vec::Vec<u8> {
+    const MAX_CAPACITY: usize = usize::MAX;
+
+    fn as_ptr(&self) -> *const u8 {
+        <[u8]>::as_ptr(self)
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut u8 {
+        <[u8]>::as_mut_ptr(self)
+    }
+
+    fn current_capacity(&self) -> usize {
+        self.capacity()
+    }
+
+    fn set_capacity(&mut self, capacity: usize) {
+        self.resize(capacity, 0)
+    }
+
+    fn with_capacity(capacity: usize) -> Self {
+        let mut this = alloc::vec::Vec::with_capacity(capacity);
+        this.set_capacity(capacity);
+        this
+    }
+}
 
 /// Users of this library provide a "storage driver" by implementing this trait.
 ///
@@ -12,44 +94,43 @@ use crate::io::Result;
 /// Do note that due to caches, files still must be synched. And unfortunately,
 /// this can't be automatically done in `drop`, since it needs mut refs to both
 /// filesystem and storage.
-///
-/// The `*_SIZE` types must be `generic_array::typenume::consts` such as `U256`.
-///
-/// Why? Currently, associated constants can not be used (as constants...) to define
-/// arrays. This "will be fixed" as part of const generics.
-/// Once that's done, we can get rid of `generic-array`s, and replace the
-/// `*_SIZE` types with `usize`s.
 pub trait Storage {
     // /// Error type for user-provided read/write/erase methods
     // type Error = usize;
 
     /// Minimum size of block read in bytes. Not in superblock
-    const READ_SIZE: usize;
+    fn read_size(&self) -> usize;
 
     /// Minimum size of block write in bytes. Not in superblock
-    const WRITE_SIZE: usize;
+    fn write_size(&self) -> usize;
 
     /// Size of an erasable block in bytes, as unsigned typenum.
     /// Must be a multiple of both `READ_SIZE` and `WRITE_SIZE`.
     /// [At least 128](https://github.com/littlefs-project/littlefs/issues/264#issuecomment-519963153). Stored in superblock.
-    const BLOCK_SIZE: usize;
+    fn block_size(&self) -> usize;
 
     /// Number of erasable blocks.
     /// Hence storage capacity is `BLOCK_COUNT * BLOCK_SIZE`
-    const BLOCK_COUNT: usize;
+    fn block_count(&self) -> usize;
 
     /// Suggested values are 100-1000, higher is more performant but
     /// less wear-leveled.  Default of -1 disables wear-leveling.
     /// Value zero is invalid, must be positive or -1.
-    const BLOCK_CYCLES: isize = -1;
+    fn block_cycles(&self) -> isize {
+        -1
+    }
 
     /// littlefs uses a read cache, a write cache, and one cache per per file.
-    /// Must be a multiple of `READ_SIZE` and `WRITE_SIZE`.
-    /// Must be a factor of `BLOCK_SIZE`.
-    type CACHE_SIZE: ArrayLength<u8>;
+    type CACHE_BUFFER: Buffer;
 
+    /// Must be a multiple of `read_size` and `write_size`.
+    /// Must be a factor of `block_size`.
+    fn cache_size(&self) -> usize;
+
+    /// Lookahead buffer used by littlefs
+    type LOOKAHEAD_BUFFER: Buffer;
     /// Size of the lookahead buffer used by littlefs, measured in multiples of 8 bytes.
-    type LOOKAHEAD_SIZE: ArrayLength<u64>;
+    fn lookahead_size(&self) -> usize;
 
     ///// Maximum length of a filename plus one. Stored in superblock.
     ///// Should default to 255+1, but associated type defaults don't exist currently.
