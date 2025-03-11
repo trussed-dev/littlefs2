@@ -44,18 +44,16 @@ struct Cache<Storage: driver::Storage> {
     write: UnsafeCell<Storage::CACHE_BUFFER>,
     // lookahead: aligned::Aligned<aligned::A4, Bytes<Storage::LOOKAHEAD_SIZE>>,
     lookahead: UnsafeCell<Storage::LOOKAHEAD_BUFFER>,
-    size: usize,
+    cache_size: usize,
 }
 
 impl<S: driver::Storage> Cache<S> {
-    pub fn new(storage: &S) -> Self {
-        let cache_size = storage.cache_size();
-        let lookahaed_size = storage.lookahead_size();
+    pub fn new(cache_size: usize, lookahead_size: usize) -> Self {
         Self {
             read: UnsafeCell::new(S::CACHE_BUFFER::with_len(cache_size)),
             write: UnsafeCell::new(S::CACHE_BUFFER::with_len(cache_size)),
-            lookahead: UnsafeCell::new(S::LOOKAHEAD_BUFFER::with_len(lookahaed_size * 8)),
-            size: cache_size,
+            lookahead: UnsafeCell::new(S::LOOKAHEAD_BUFFER::with_len(lookahead_size)),
+            cache_size,
         }
     }
 }
@@ -100,7 +98,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
         debug_assert!(cache_size <= block_size);
         debug_assert!(block_size % cache_size == 0);
 
-        let cache = Cache::new(storage);
+        let cache = Cache::new(cache_size as _, lookahead_size as _);
 
         let filename_max_plus_one: u32 = crate::consts::FILENAME_MAX_PLUS_ONE;
         debug_assert!(filename_max_plus_one > 1);
@@ -169,8 +167,8 @@ impl<Storage: driver::Storage> Allocation<Storage> {
 // also consider "erasing" the lifetime completely
 pub struct Filesystem<'a, Storage: driver::Storage> {
     alloc: RefCell<&'a mut Allocation<Storage>>,
-    cache_size: usize,
     storage: &'a mut Storage,
+    cache_size: usize,
 }
 
 fn metadata(info: ll::lfs_info) -> Metadata {
@@ -1075,7 +1073,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         alloc.config.lookahead_buffer = alloc.cache.lookahead.get_mut().as_mut_ptr() as *mut c_void;
 
         Filesystem {
-            cache_size: alloc.cache.size,
+            cache_size: alloc.cache.cache_size,
             alloc: RefCell::new(alloc),
             storage,
         }
