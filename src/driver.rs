@@ -18,13 +18,10 @@ mod private {
 
         /// Current capacity, set by the last call to [`set_capacity`](Buffer::set_capacity)
         /// or at initialization through [`with_capacity`](Buffer::with_capacity)
-        fn current_capacity(&self) -> usize;
+        fn current_len(&self) -> usize;
 
         /// Can panic if `capacity` > `Self::MAX_CAPACITY`
-        fn set_capacity(&mut self, capacity: usize);
-
-        /// Can panic if `capacity` > `Self::MAX_CAPACITY`
-        fn with_capacity(capacity: usize) -> Self;
+        fn with_len(capacity: usize) -> Self;
     }
 }
 
@@ -44,15 +41,12 @@ impl<const N: usize> private::Sealed for [u8; N] {
         <[u8]>::as_mut_ptr(self)
     }
 
-    fn current_capacity(&self) -> usize {
+    fn current_len(&self) -> usize {
         N
     }
 
-    fn set_capacity(&mut self, _capacity: usize) {
-        // noop, fixed capacity
-    }
-    fn with_capacity(capacity: usize) -> Self {
-        assert!(capacity <= N);
+    fn with_len(len: usize) -> Self {
+        assert!(len <= N);
         [0; N]
     }
 }
@@ -71,17 +65,13 @@ impl private::Sealed for alloc::vec::Vec<u8> {
         <[u8]>::as_mut_ptr(self)
     }
 
-    fn current_capacity(&self) -> usize {
-        self.capacity()
+    fn current_len(&self) -> usize {
+        self.len()
     }
 
-    fn set_capacity(&mut self, capacity: usize) {
-        self.resize(capacity, 0)
-    }
-
-    fn with_capacity(capacity: usize) -> Self {
-        let mut this = alloc::vec::Vec::with_capacity(capacity);
-        this.set_capacity(capacity);
+    fn with_len(len: usize) -> Self {
+        let mut this = alloc::vec::Vec::with_capacity(len);
+        this.resize(len, 0);
         this
     }
 }

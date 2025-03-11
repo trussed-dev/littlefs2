@@ -43,17 +43,18 @@ struct Cache<Storage: driver::Storage> {
     read: UnsafeCell<Storage::CACHE_BUFFER>,
     write: UnsafeCell<Storage::CACHE_BUFFER>,
     // lookahead: aligned::Aligned<aligned::A4, Bytes<Storage::LOOKAHEAD_SIZE>>,
-    lookahead: UnsafeCell<Storage::CACHE_BUFFER>,
+    lookahead: UnsafeCell<Storage::LOOKAHEAD_BUFFER>,
     size: usize,
 }
 
 impl<S: driver::Storage> Cache<S> {
     pub fn new(storage: &S) -> Self {
         let cache_size = storage.cache_size();
+        let lookahaed_size = storage.lookahead_size();
         Self {
-            read: UnsafeCell::new(S::CACHE_BUFFER::with_capacity(cache_size)),
-            write: UnsafeCell::new(S::CACHE_BUFFER::with_capacity(cache_size)),
-            lookahead: UnsafeCell::new(S::CACHE_BUFFER::with_capacity(cache_size)),
+            read: UnsafeCell::new(S::CACHE_BUFFER::with_len(cache_size)),
+            write: UnsafeCell::new(S::CACHE_BUFFER::with_len(cache_size)),
+            lookahead: UnsafeCell::new(S::LOOKAHEAD_BUFFER::with_len(lookahaed_size * 8)),
             size: cache_size,
         }
     }
@@ -537,7 +538,7 @@ impl<S: driver::Storage> FileAllocation<S> {
     pub fn new(cache_size: usize) -> Self {
         debug_assert!(cache_size > 0);
         Self {
-            cache: UnsafeCell::new(S::CACHE_BUFFER::with_capacity(cache_size)),
+            cache: UnsafeCell::new(S::CACHE_BUFFER::with_len(cache_size)),
             cache_size,
             state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
             config: unsafe { mem::MaybeUninit::zeroed().assume_init() },
