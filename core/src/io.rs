@@ -111,7 +111,7 @@ pub trait Seek {
     fn seek(&self, pos: SeekFrom) -> Result<usize>;
 }
 
-pub type Result<T> = core::result::Result<T, Error>;
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// The error type for filesystem operations.
 ///
