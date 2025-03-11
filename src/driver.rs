@@ -6,15 +6,14 @@ use crate::io::Error;
 mod private {
     pub struct NotEnoughCapacity;
     pub trait Sealed {
-        /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
+        /// Returns a buffer of bytes initialized and valid. If [`set_len`]() was called previously successfully,
         /// its last call defines the minimum number of valid bytes
         fn as_ptr(&self) -> *const u8;
-        /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
+        /// Returns a buffer of bytes initialized and valid. If [`set_len`]() was called previously successfully,
         /// its last call defines the minimum number of valid bytes
         fn as_mut_ptr(&mut self) -> *mut u8;
 
-        /// Current capacity, set by the last call to [`set_capacity`](Buffer::set_capacity)
-        /// or at initialization through [`with_capacity`](Buffer::with_capacity)
+        /// Current lenght, set by the last call to [`set_len`](Buffer::set_len)
         fn current_len(&self) -> usize;
 
         /// Atempts to set the length of the buffer to `len`
