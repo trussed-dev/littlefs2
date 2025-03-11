@@ -538,6 +538,12 @@ impl<S: driver::Storage> FileAllocation<S> {
     }
 }
 
+impl<S: driver::Storage> Default for FileAllocation<S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct File<'a, 'b, S: driver::Storage> {
     // We must store a raw pointer here since the FFI retains a copy of a pointer
     // to the field alloc.state, so we cannot assert unique mutable access.
