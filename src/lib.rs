@@ -107,7 +107,7 @@ let mut storage = RamStorage::new(&mut ram);
 // must format before first mount
 Filesystem::format(&mut storage).unwrap();
 // must allocate state statically before use
-let mut alloc = Filesystem::allocate();
+let mut alloc = Filesystem::allocate(&storage);
 let mut fs = Filesystem::mount(&mut alloc, &mut storage).unwrap();
 
 // may use common `OpenOptions`
