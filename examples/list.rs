@@ -27,6 +27,8 @@ struct Args {
     lookahead_size: Option<usize>,
     #[arg(short, long)]
     block_count: Option<usize>,
+    #[arg(short, long)]
+    show_hex: bool,
 }
 
 const BLOCK_COUNT: usize = 288;
@@ -64,21 +66,26 @@ fn main() {
     println!();
 
     let path = PathBuf::new();
-    list(&fs, &path);
+    list(&fs, &path, args.show_hex);
 }
 
-fn list(fs: &dyn DynFilesystem, path: &Path) {
+fn list(fs: &dyn DynFilesystem, path: &Path, show_hex: bool) {
     fs.read_dir_and_then(path, &mut |iter| {
         for entry in iter {
             let entry = entry.unwrap();
             match entry.file_type() {
-                FileType::File => println!("F {}", entry.path()),
+                FileType::File => {
+                    println!("F {}", entry.path());
+                    if show_hex {
+                        let bytes: heapless::Vec<u8, 4096> = fs.read(entry.path()).unwrap();
+                        println!("  {}", hex::encode_upper(&bytes));
+                    }
+                }
                 FileType::Dir => match entry.file_name().as_str() {
                     "." => (),
                     ".." => (),
                     _ => {
-                        println!("D {}", entry.path());
-                        list(fs, entry.path());
+                        list(fs, entry.path(), show_hex);
                     }
                 },
             }

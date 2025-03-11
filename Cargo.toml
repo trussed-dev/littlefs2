@@ -24,7 +24,7 @@ all-features = true
 
 [[example]]
 name = "list"
-required-features = ["alloc"]
+required-features = ["alloc", "littlefs2-core/heapless07"]
 
 [dependencies]
 bitflags = "2.9.0"
@@ -37,6 +37,7 @@ littlefs2-sys = { version = "0.3.1", features = ["multiversion"] }
 ssmarshal = "1"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 clap = { version = "4.5.31", features = ["derive"] }
+hex = "0.4.3"
 # trybuild = "1"
 
 [features]
