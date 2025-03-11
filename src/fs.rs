@@ -1492,11 +1492,11 @@ mod tests {
                 Ok(())
             })?;
 
-            let mut a1 = File::allocate(fs);
+            let mut a1 = File::allocate();
             let f1 = unsafe { File::create(fs, &mut a1, b"a.txt\0".try_into().unwrap())? };
             f1.write(b"some text")?;
 
-            let mut a2 = File::allocate(fs);
+            let mut a2 = File::allocate();
             let f2 = unsafe { File::create(fs, &mut a2, b"b.txt\0".try_into().unwrap())? };
             f2.write(b"more text")?;
 
