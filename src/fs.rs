@@ -274,6 +274,20 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         f(&fs)
     }
 
+    pub fn shrink(&self, block_count: usize) -> Result<()> {
+        let mut alloc = self.alloc.borrow_mut();
+        let return_code = unsafe { ll::lfs_fs_shrink(&mut alloc.state, block_count as _) };
+        drop(alloc);
+        result_from((), return_code)
+    }
+
+    pub fn grow(&self, block_count: usize) -> Result<()> {
+        let mut alloc = self.alloc.borrow_mut();
+        let return_code = unsafe { ll::lfs_fs_grow(&mut alloc.state, block_count as _) };
+        drop(alloc);
+        result_from((), return_code)
+    }
+
     /// Total number of blocks in the filesystem
     pub fn total_blocks(&self) -> usize {
         Storage::BLOCK_COUNT
