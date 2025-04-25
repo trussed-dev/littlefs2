@@ -79,8 +79,25 @@ impl<Storage: driver::Storage> Default for Allocation<Storage> {
         Self::new()
     }
 }
+
+#[derive(Default, Clone, Debug)]
+#[non_exhaustive]
+pub struct Config {
+    pub mount_flags: MountFlags,
+}
+
+bitflags::bitflags! {
+    #[derive(Default, Clone, Copy,Debug)]
+    pub struct MountFlags: u32 {
+        const DISABLE_BLOCK_COUNT_CHECK = ll::lfs_fs_flags_LFS_CFG_DISABLE_BLOCK_COUNT_CHECK;
+    }
+}
+
 impl<Storage: driver::Storage> Allocation<Storage> {
-    pub fn new() -> Allocation<Storage> {
+    pub fn new() -> Self {
+        Self::with_config(Config::default())
+    }
+    pub fn with_config(config: Config) -> Allocation<Storage> {
         let read_size: u32 = Storage::READ_SIZE as _;
         let write_size: u32 = Storage::WRITE_SIZE as _;
         let block_size: u32 = Storage::BLOCK_SIZE as _;
@@ -163,6 +180,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
             metadata_max: 0,
             inline_max: 0,
             disk_version: DISK_VERSION.into(),
+            flags: config.mount_flags.bits(),
         };
 
         Self {
@@ -208,7 +226,11 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     }
 
     pub fn format(storage: &mut Storage) -> Result<()> {
-        let alloc = &mut Allocation::new();
+        Self::format_with_config(storage, Config::default())
+    }
+
+    pub fn format_with_config(storage: &mut Storage, config: Config) -> Result<()> {
+        let alloc = &mut Allocation::with_config(config);
         let fs = Filesystem::new(alloc, storage);
         let mut alloc = fs.alloc.borrow_mut();
         let return_code = unsafe { ll::lfs_format(&mut alloc.state, &alloc.config) };
@@ -217,7 +239,12 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     // TODO: check if this is equivalent to `is_formatted`.
     pub fn is_mountable(storage: &mut Storage) -> bool {
-        let alloc = &mut Allocation::new();
+        Self::is_mountable_with_config(storage, Config::default())
+    }
+
+    // TODO: check if this is equivalent to `is_formatted`.
+    pub fn is_mountable_with_config(storage: &mut Storage, config: Config) -> bool {
+        let alloc = &mut Allocation::with_config(config);
         Filesystem::mount(alloc, storage).is_ok()
     }
 
@@ -233,7 +260,16 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         storage: &mut Storage,
         f: impl FnOnce(&Filesystem<'_, Storage>) -> Result<R>,
     ) -> Result<R> {
-        let mut alloc = Allocation::new();
+        Self::mount_and_then_with_config(storage, Config::default(), f)
+    }
+
+    /// This API avoids the need for using `Allocation`.
+    pub fn mount_and_then_with_config<R>(
+        storage: &mut Storage,
+        config: Config,
+        f: impl FnOnce(&Filesystem<'_, Storage>) -> Result<R>,
+    ) -> Result<R> {
+        let mut alloc = Allocation::with_config(config);
         let fs = Filesystem::mount(&mut alloc, storage)?;
         f(&fs)
     }

@@ -23,6 +23,7 @@ repository.workspace = true
 all-features = true
 
 [dependencies]
+bitflags = "2.9.0"
 delog = "0.1.0"
 generic-array = "0.14"
 heapless = "0.7"
@@ -57,3 +58,5 @@ log-error = []
 # member `char name[LFS_NAME_MAX+1]`.
 # This means that if we change `traits::Storage::FILENAME_MAX_PLUS_ONE`,
 # we need to pass this on!
+[patch.crates-io]
+littlefs2-sys = { git = "https://github.com/sosthene-nitrokey/littlefs2-sys", rev = "c0f90bd7c12b41984c8eff550004f1de89c8b1d6" }
