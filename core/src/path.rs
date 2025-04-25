@@ -338,7 +338,7 @@ impl Path {
     }
 
     pub fn parent(&self) -> Option<PathBuf> {
-        let rk_path_bytes = self.as_ref()[..].as_bytes();
+        let rk_path_bytes = self.as_ref().as_bytes();
         match rk_path_bytes.iter().rposition(|x| *x == b'/') {
             Some(0) if rk_path_bytes.len() != 1 => Some(path!("/").into()),
             Some(slash_index) => {
