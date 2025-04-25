@@ -1111,11 +1111,11 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         f: F,
     ) -> Result<Self>
     where
-        F: FnOnce(Error, &mut Storage) -> Result<()>,
+        F: FnOnce(Error, &mut Storage, &mut Allocation<Storage>) -> Result<()>,
     {
         let fs = Self::new(alloc, storage);
         if let Err(err) = fs.raw_mount() {
-            f(err, fs.storage)?;
+            f(err, fs.storage, &mut fs.alloc.borrow_mut())?;
             fs.raw_mount()?;
         }
         Ok(fs)
