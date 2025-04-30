@@ -88,8 +88,8 @@ pub struct Config {
 
 bitflags::bitflags! {
     #[derive(Default, Clone, Copy,Debug)]
-    pub struct MountFlags: ll::lfs_fs_flags {
-        const DISABLE_BLOCK_COUNT_CHECK = ll::lfs_fs_flags_LFS_CFG_DISABLE_BLOCK_COUNT_CHECK;
+    pub struct MountFlags: u32 {
+        const DISABLE_BLOCK_COUNT_CHECK = ll::lfs_fs_flags_LFS_CFG_DISABLE_BLOCK_COUNT_CHECK as _;
     }
 }
 
