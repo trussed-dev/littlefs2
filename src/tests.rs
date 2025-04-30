@@ -2,7 +2,7 @@ use core::convert::TryInto;
 use generic_array::typenum::consts;
 
 use crate::{
-    fs::{Attribute, File, Filesystem},
+    fs::{Allocation, Attribute, File, Filesystem},
     io::{Error, OpenSeekFrom, Read, Result, SeekFrom},
     path, BACKEND_VERSION, DISK_VERSION,
 };
@@ -517,6 +517,19 @@ fn test_iter_dirs() {
 
             Ok(())
         })
+    })
+    .unwrap();
+}
+
+#[test]
+fn test_mount_or_else_clobber_alloc() {
+    let mut backend = Ram::default();
+    let mut storage = RamStorage::new(&mut backend);
+    let alloc = &mut Allocation::new();
+    Filesystem::mount_or_else(alloc, &mut storage, |_, storage, alloc| {
+        *alloc = Allocation::new();
+        Filesystem::format(storage).unwrap();
+        Ok(())
     })
     .unwrap();
 }

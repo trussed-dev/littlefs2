@@ -1104,6 +1104,13 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         Ok(fs)
     }
 
+    fn set_alloc_config(alloc: &mut Allocation<Storage>, storage: &mut Storage) {
+        alloc.config.context = storage as *mut _ as *mut c_void;
+        alloc.config.read_buffer = alloc.cache.read.get() as *mut c_void;
+        alloc.config.prog_buffer = alloc.cache.write.get() as *mut c_void;
+        alloc.config.lookahead_buffer = alloc.cache.lookahead.get() as *mut c_void;
+    }
+
     /// Mount the filesystem or, if that fails, call `f` with the mount error and the storage and then try again.
     pub fn mount_or_else<F>(
         alloc: &'a mut Allocation<Storage>,
@@ -1113,9 +1120,11 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     where
         F: FnOnce(Error, &mut Storage, &mut Allocation<Storage>) -> Result<()>,
     {
-        let fs = Self::new(alloc, storage);
+        let mut fs = Self::new(alloc, storage);
         if let Err(err) = fs.raw_mount() {
-            f(err, fs.storage, &mut fs.alloc.borrow_mut())?;
+            let alloc = fs.alloc.get_mut();
+            f(err, fs.storage, alloc)?;
+            Self::set_alloc_config(alloc, fs.storage);
             fs.raw_mount()?;
         }
         Ok(fs)
@@ -1130,12 +1139,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 
     // Not public, user should use `mount`, possibly after `format`
     fn new(alloc: &'a mut Allocation<Storage>, storage: &'a mut Storage) -> Self {
-        alloc.config.context = storage as *mut _ as *mut c_void;
-
-        alloc.config.read_buffer = alloc.cache.read.get() as *mut c_void;
-        alloc.config.prog_buffer = alloc.cache.write.get() as *mut c_void;
-        alloc.config.lookahead_buffer = alloc.cache.lookahead.get() as *mut c_void;
-
+        Self::set_alloc_config(alloc, storage);
         Filesystem {
             alloc: RefCell::new(alloc),
             storage,
