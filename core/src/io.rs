@@ -202,7 +202,30 @@ impl Error {
 /// As a short-term fix, the `Debug` implementation currently always returns a static string.
 impl Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Error").finish()
+        #[cfg(not(feature = "debug-error"))]
+        {
+            f.debug_struct("Error").finish()
+        }
+        #[cfg(feature = "debug-error")]
+        {
+            match self {
+                &Self::IO => f.write_str("IO"),
+                &Self::CORRUPTION => f.write_str("CORRUPTION"),
+                &Self::NO_SUCH_ENTRY => f.write_str("NO_SUCH_ENTRY"),
+                &Self::ENTRY_ALREADY_EXISTED => f.write_str("ENTRY_ALREADY_EXISTED"),
+                &Self::PATH_NOT_DIR => f.write_str("PATH_NOT_DIR"),
+                &Self::PATH_IS_DIR => f.write_str("PATH_IS_DIR"),
+                &Self::DIR_NOT_EMPTY => f.write_str("DIR_NOT_EMPTY"),
+                &Self::BAD_FILE_DESCRIPTOR => f.write_str("BAD_FILE_DESCRIPTOR"),
+                &Self::FILE_TOO_BIG => f.write_str("FILE_TOO_BIG"),
+                &Self::INVALID => f.write_str("INVALID"),
+                &Self::NO_SPACE => f.write_str("NO_SPACE"),
+                &Self::NO_MEMORY => f.write_str("NO_MEMORY"),
+                &Self::NO_ATTRIBUTE => f.write_str("NO_ATTRIBUTE"),
+                &Self::FILENAME_TOO_LONG => f.write_str("FILENAME_TOO_LONG"),
+                other => f.debug_tuple("Error").field(&other.code).finish(),
+            }
+        }
     }
 }
 
