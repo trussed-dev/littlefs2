@@ -1,8 +1,10 @@
 use core::convert::TryInto;
 use generic_array::typenum::consts;
+use littlefs2_core::PathBuf;
 
 use crate::{
-    fs::{Allocation, Attribute, File, Filesystem},
+    driver::Storage,
+    fs::{Allocation, Attribute, File, Filesystem, MountFlags},
     io::{Error, OpenSeekFrom, Read, Result, SeekFrom},
     path, BACKEND_VERSION, DISK_VERSION,
 };
@@ -30,6 +32,20 @@ ram_storage!(
     cache_size_ty = consts::U700,
     block_size = 20 * 35,
     block_count = 32,
+    lookahead_size_ty = consts::U16,
+    filename_max_plus_one_ty = consts::U256,
+    path_max_plus_one_ty = consts::U256,
+);
+
+ram_storage!(
+    name = LargerRamStorage,
+    backend = LargerRam,
+    erase_value = 0xff,
+    read_size = 20 * 5,
+    write_size = 20 * 7,
+    cache_size_ty = consts::U700,
+    block_size = 20 * 35,
+    block_count = 64,
     lookahead_size_ty = consts::U16,
     filename_max_plus_one_ty = consts::U256,
     path_max_plus_one_ty = consts::U256,
@@ -545,3 +561,54 @@ fn test_mount_or_else_clobber_alloc() {
 //     t.compile_fail("tests/ui/*-fail.rs");
 //     t.pass("tests/ui/*-pass.rs");
 // }
+
+#[test]
+fn shrinking() {
+    let backend = &mut Ram::default();
+    let storage = &mut RamStorage::new(backend);
+    let alloc = &mut Allocation::new();
+
+    Filesystem::format(storage).unwrap();
+    let _fs = Filesystem::mount(alloc, storage).unwrap();
+
+    let larger_backend = &mut LargerRam::default();
+    larger_backend.buf[..backend.buf.len()].copy_from_slice(&backend.buf);
+    let larger_storage = &mut LargerRamStorage::new(larger_backend);
+    let larger_alloc = &mut Allocation::new();
+    assert!(matches!(
+        Filesystem::mount(larger_alloc, larger_storage),
+        Err(Error::INVALID)
+    ));
+
+    let larger_alloc = &mut Allocation::with_config(crate::fs::Config {
+        mount_flags: MountFlags::DISABLE_BLOCK_COUNT_CHECK,
+    });
+
+    let fs = Filesystem::mount(larger_alloc, larger_storage).unwrap();
+    fs.grow(LargerRamStorage::BLOCK_COUNT).unwrap();
+    fs.shrink(RamStorage::BLOCK_COUNT).unwrap();
+}
+
+#[test]
+fn shrinking_full() {
+    let larger_backend = &mut LargerRam::default();
+    let larger_storage = &mut LargerRamStorage::new(larger_backend);
+    let larger_alloc = &mut Allocation::new();
+    Filesystem::format(larger_storage).unwrap();
+    let fs = Filesystem::mount(larger_alloc, larger_storage).unwrap();
+
+    for i in 0.. {
+        let path = format!("file-{i}");
+        let contents = &[0; 1024];
+        match fs.write(&PathBuf::try_from(&*path).unwrap(), contents) {
+            Ok(_) => continue,
+            Err(Error::NO_SPACE) => break,
+            Err(err) => panic!("{err:?}"),
+        }
+    }
+
+    assert!(matches!(
+        fs.shrink(RamStorage::BLOCK_COUNT),
+        Err(Error::DIR_NOT_EMPTY)
+    ))
+}
