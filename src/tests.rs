@@ -569,7 +569,15 @@ fn shrinking() {
     let alloc = &mut Allocation::new();
 
     Filesystem::format(storage).unwrap();
-    let _fs = Filesystem::mount(alloc, storage).unwrap();
+    let fs = Filesystem::mount(alloc, storage).unwrap();
+    fs.write(path!("some-file"), &[42; 10]).unwrap();
+    fs.write(path!("some-large-file"), &[42; 1024]).unwrap();
+
+    assert_eq!(fs.read::<10>(path!("some-file")).unwrap(), &[42; 10]);
+    assert_eq!(
+        fs.read::<1024>(path!("some-large-file")).unwrap(),
+        &[42; 1024]
+    );
 
     let larger_backend = &mut LargerRam::default();
     larger_backend.buf[..backend.buf.len()].copy_from_slice(&backend.buf);
@@ -585,8 +593,25 @@ fn shrinking() {
     });
 
     let fs = Filesystem::mount(larger_alloc, larger_storage).unwrap();
+    assert_eq!(fs.read::<10>(path!("some-file")).unwrap(), &[42; 10]);
+    assert_eq!(
+        fs.read::<1024>(path!("some-large-file")).unwrap(),
+        &[42; 1024]
+    );
+
     fs.grow(LargerRamStorage::BLOCK_COUNT).unwrap();
+    assert_eq!(fs.read::<10>(path!("some-file")).unwrap(), &[42; 10]);
+    assert_eq!(
+        fs.read::<1024>(path!("some-large-file")).unwrap(),
+        &[42; 1024]
+    );
+
     fs.shrink(RamStorage::BLOCK_COUNT).unwrap();
+    assert_eq!(fs.read::<10>(path!("some-file")).unwrap(), &[42; 10]);
+    assert_eq!(
+        fs.read::<1024>(path!("some-large-file")).unwrap(),
+        &[42; 1024]
+    );
 }
 
 #[test]
