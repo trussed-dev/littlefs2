@@ -46,10 +46,10 @@ pub trait Storage {
     /// littlefs uses a read cache, a write cache, and one cache per per file.
     /// Must be a multiple of `READ_SIZE` and `WRITE_SIZE`.
     /// Must be a factor of `BLOCK_SIZE`.
-    type CACHE_SIZE: ArrayLength<u8>;
+    type CACHE_SIZE: ArrayLength;
 
     /// Size of the lookahead buffer used by littlefs, measured in multiples of 8 bytes.
-    type LOOKAHEAD_SIZE: ArrayLength<u64>;
+    type LOOKAHEAD_SIZE: ArrayLength;
 
     ///// Maximum length of a filename plus one. Stored in superblock.
     ///// Should default to 255+1, but associated type defaults don't exist currently.
