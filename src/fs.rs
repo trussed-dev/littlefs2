@@ -1,6 +1,7 @@
 //! Experimental Filesystem version using closures.
 
 use core::ffi::{c_int, c_void};
+use core::marker::PhantomData;
 use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 use core::{
@@ -597,7 +598,8 @@ impl<S: driver::Storage> Default for FileAllocation<S> {
 pub struct File<'a, 'b, S: driver::Storage> {
     // We must store a raw pointer here since the FFI retains a copy of a pointer
     // to the field alloc.state, so we cannot assert unique mutable access.
-    alloc: RefCell<*mut FileAllocation<S>>,
+    alloc: *mut FileAllocation<S>,
+    phantom: PhantomData<&'b mut FileAllocation<S>>,
     fs: &'b Filesystem<'a, S>,
 }
 
@@ -672,7 +674,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
             // We need to use addr_of_mut! here instead of & mut since
             // the FFI stores a copy of a pointer to the field state,
             // so we cannot assert unique mutable access.
-            addr_of_mut!((*(*self.alloc.borrow_mut())).state),
+            addr_of_mut!((*self.alloc).state),
         );
         result_from((), return_code)
     }
@@ -685,7 +687,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
             // so we cannot assert unique mutable access.
             ll::lfs_file_sync(
                 &mut self.fs.alloc.borrow_mut().state,
-                addr_of_mut!((*(*self.alloc.borrow_mut())).state),
+                addr_of_mut!((*self.alloc).state),
             )
         };
         result_from((), return_code)
@@ -699,7 +701,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
             // so we cannot assert unique mutable access.
             ll::lfs_file_size(
                 &mut self.fs.alloc.borrow_mut().state,
-                addr_of_mut!((*(*self.alloc.borrow_mut())).state),
+                addr_of_mut!((*self.alloc).state),
             )
         };
         u32_result(return_code).map(|n| n as usize)
@@ -721,7 +723,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
             // so we cannot assert unique mutable access.
             ll::lfs_file_truncate(
                 &mut self.fs.alloc.borrow_mut().state,
-                addr_of_mut!((*(*self.alloc.borrow_mut())).state),
+                addr_of_mut!((*self.alloc).state),
                 size as u32,
             )
         };
@@ -788,7 +790,7 @@ impl OpenOptions {
     pub unsafe fn open<'a, 'b, S: driver::Storage>(
         &self,
         fs: &'b Filesystem<'a, S>,
-        alloc: &mut FileAllocation<S>,
+        alloc: &'b mut FileAllocation<S>,
         path: &Path,
     ) -> Result<File<'a, 'b, S>> {
         alloc.cache.get_mut().set_len(fs.cache_size).map_err(|_| {
@@ -808,7 +810,8 @@ impl OpenOptions {
         );
 
         let file = File {
-            alloc: RefCell::new(alloc),
+            alloc,
+            phantom: PhantomData,
             fs,
         };
 
@@ -908,7 +911,7 @@ impl<S: driver::Storage> io::Read for File<'_, '_, S> {
             // so we cannot assert unique mutable access.
             ll::lfs_file_read(
                 &mut self.fs.alloc.borrow_mut().state,
-                addr_of_mut!((*(*self.alloc.borrow_mut())).state),
+                addr_of_mut!((*self.alloc).state),
                 buf.as_mut_ptr() as *mut c_void,
                 buf.len() as u32,
             )
@@ -925,7 +928,7 @@ impl<S: driver::Storage> io::Seek for File<'_, '_, S> {
             // so we cannot assert unique mutable access.
             ll::lfs_file_seek(
                 &mut self.fs.alloc.borrow_mut().state,
-                addr_of_mut!((*(*self.alloc.borrow_mut())).state),
+                addr_of_mut!((*self.alloc).state),
                 pos.off(),
                 pos.whence(),
             )
@@ -942,7 +945,7 @@ impl<S: driver::Storage> io::Write for File<'_, '_, S> {
             // so we cannot assert unique mutable access.
             ll::lfs_file_write(
                 &mut self.fs.alloc.borrow_mut().state,
-                addr_of_mut!((*(*self.alloc.borrow_mut())).state),
+                addr_of_mut!((*self.alloc).state),
                 buf.as_ptr() as *const c_void,
                 buf.len() as u32,
             )
@@ -974,7 +977,8 @@ impl ReadDirAllocation {
 pub struct ReadDir<'a, 'b, S: driver::Storage> {
     // We must store a raw pointer here since the FFI retains a copy of a pointer
     // to the field alloc.state, so we cannot assert unique mutable access.
-    alloc: RefCell<*mut ReadDirAllocation>,
+    alloc: *mut ReadDirAllocation,
+    phantom: PhantomData<&'b mut ReadDirAllocation>,
     fs: &'b Filesystem<'a, S>,
     path: &'b Path,
 }
@@ -992,7 +996,7 @@ impl<S: driver::Storage> Iterator for ReadDir<'_, '_, S> {
         let return_code = unsafe {
             ll::lfs_dir_read(
                 &mut self.fs.alloc.borrow_mut().state,
-                addr_of_mut!((*(*self.alloc.borrow_mut())).state),
+                addr_of_mut!((*self.alloc).state),
                 &mut info,
             )
         };
@@ -1037,7 +1041,7 @@ impl<S: driver::Storage> ReadDir<'_, '_, S> {
             // so we cannot assert unique mutable access.
             ll::lfs_dir_close(
                 &mut self.fs.alloc.borrow_mut().state,
-                addr_of_mut!((*(*self.alloc.borrow_mut())).state),
+                addr_of_mut!((*self.alloc).state),
             )
         };
         result_from((), return_code)
@@ -1077,7 +1081,8 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         );
 
         let read_dir = ReadDir {
-            alloc: RefCell::new(alloc),
+            alloc,
+            phantom: PhantomData,
             fs: self,
             path,
         };
