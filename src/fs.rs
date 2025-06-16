@@ -62,6 +62,19 @@ pub struct Allocation<Storage: driver::Storage> {
     state: ll::lfs_t,
 }
 
+/// # Safety
+///
+/// All operations are done on `&mut Allocation, and the reference is held
+/// during the entire lifetime of the filesystem, so once the reference is
+/// available again, the filesystem is closed
+unsafe impl<Storage: driver::Storage> Sync for Allocation<Storage> {}
+/// # Safety
+///
+/// All operations are done on `&mut Allocation, and the reference is held
+/// during the entire lifetime of the filesystem, so once the reference is
+/// available again, the filesystem is closed
+unsafe impl<Storage: driver::Storage> Send for Allocation<Storage> {}
+
 #[derive(Default, Clone, Debug)]
 #[non_exhaustive]
 pub struct Config {
@@ -1573,5 +1586,22 @@ mod tests {
             Ok(())
         })
         .unwrap();
+    }
+
+    #[allow(unreachable_code)]
+    fn _filesystem_is_sync() {
+        fn assert_is_sync<T: Sync, R>(_: &T) -> R {
+            todo!()
+        }
+        fn assert_is_send<T: Send, R>(_: &T) -> R {
+            todo!()
+        }
+
+        assert_is_sync::<Allocation<TestStorage>, ()>(todo!());
+        assert_is_send::<&mut Allocation<TestStorage>, ()>(todo!());
+        assert_is_send::<RefCell<&mut Allocation<TestStorage>>, ()>(todo!());
+
+        let mut test_storage = TestStorage::new();
+        Filesystem::mount_and_then(&mut test_storage, |fs| assert_is_send(fs)).unwrap()
     }
 }
