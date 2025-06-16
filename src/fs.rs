@@ -1,6 +1,7 @@
 //! Experimental Filesystem version using closures.
 
 use core::ffi::{c_int, c_void};
+use core::marker::PhantomData;
 use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 use core::{
@@ -613,6 +614,7 @@ pub struct File<'a, 'b, S: driver::Storage> {
     // We must store a raw pointer here since the FFI retains a copy of a pointer
     // to the field alloc.state, so we cannot assert unique mutable access.
     alloc: RefCell<*mut FileAllocation<S>>,
+    phantom: PhantomData<RefCell<&'b mut FileAllocation<S>>>,
     fs: &'b Filesystem<'a, S>,
 }
 
@@ -803,7 +805,7 @@ impl OpenOptions {
     pub unsafe fn open<'a, 'b, S: driver::Storage>(
         &self,
         fs: &'b Filesystem<'a, S>,
-        alloc: &mut FileAllocation<S>,
+        alloc: &'b mut FileAllocation<S>,
         path: &Path,
     ) -> Result<File<'a, 'b, S>> {
         alloc.config.buffer = alloc.cache.get() as *mut _;
@@ -820,6 +822,7 @@ impl OpenOptions {
 
         let file = File {
             alloc: RefCell::new(alloc),
+            phantom: PhantomData,
             fs,
         };
 
