@@ -12,7 +12,7 @@ use littlefs2_sys as ll;
 pub use littlefs2_core::{Attribute, DirEntry, FileOpenFlags, FileType, Metadata};
 
 use crate::{
-    driver::{self, Buffer},
+    driver::{self, Sealed},
     io::{self, Error, OpenSeekFrom, Result},
     path::{Path, PathBuf},
     DISK_VERSION,
@@ -42,19 +42,15 @@ pub fn u32_result(return_value: i32) -> Result<u32> {
 struct Cache<Storage: driver::Storage> {
     read: UnsafeCell<Storage::CACHE_BUFFER>,
     write: UnsafeCell<Storage::CACHE_BUFFER>,
-    // lookahead: aligned::Aligned<aligned::A4, Bytes<Storage::LOOKAHEAD_SIZE>>,
-    lookahead: UnsafeCell<Storage::CACHE_BUFFER>,
-    size: usize,
+    lookahead: UnsafeCell<Storage::LOOKAHEAD_BUFFER>,
 }
 
 impl<S: driver::Storage> Cache<S> {
-    pub fn new(storage: &S) -> Self {
-        let cache_size = storage.cache_size();
+    pub fn new() -> Self {
         Self {
-            read: UnsafeCell::new(S::CACHE_BUFFER::with_capacity(cache_size)),
-            write: UnsafeCell::new(S::CACHE_BUFFER::with_capacity(cache_size)),
-            lookahead: UnsafeCell::new(S::CACHE_BUFFER::with_capacity(cache_size)),
-            size: cache_size,
+            read: UnsafeCell::new(S::CACHE_BUFFER::empty()),
+            write: UnsafeCell::new(S::CACHE_BUFFER::empty()),
+            lookahead: UnsafeCell::new(S::LOOKAHEAD_BUFFER::empty()),
         }
     }
 }
@@ -116,7 +112,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
         debug_assert!(cache_size <= block_size);
         debug_assert!(block_size % cache_size == 0);
 
-        let cache = Cache::new(storage);
+        let cache = Cache::new();
 
         let filename_max_plus_one: u32 = crate::consts::FILENAME_MAX_PLUS_ONE;
         debug_assert!(filename_max_plus_one > 1);
@@ -186,8 +182,8 @@ impl<Storage: driver::Storage> Allocation<Storage> {
 // also consider "erasing" the lifetime completely
 pub struct Filesystem<'a, Storage: driver::Storage> {
     alloc: RefCell<&'a mut Allocation<Storage>>,
-    cache_size: usize,
     storage: &'a mut Storage,
+    cache_size: usize,
 }
 
 fn metadata(info: ll::lfs_info) -> Metadata {
@@ -218,7 +214,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
     pub fn format_with_config(storage: &mut Storage, config: Config) -> Result<()> {
         let alloc = &mut Allocation::with_config(storage, config);
-        let fs = Filesystem::new(alloc, storage);
+        let fs = Filesystem::new(alloc, storage)?;
         let mut alloc = fs.alloc.borrow_mut();
         let return_code = unsafe { ll::lfs_format(&mut alloc.state, &alloc.config) };
         result_from((), return_code)
@@ -578,20 +574,23 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 /// The state of a `File`. Pre-allocate with `File::allocate`.
 pub struct FileAllocation<S: driver::Storage> {
     cache: UnsafeCell<S::CACHE_BUFFER>,
-    cache_size: usize,
     state: ll::lfs_file_t,
     config: ll::lfs_file_config,
 }
 
 impl<S: driver::Storage> FileAllocation<S> {
-    pub fn new(cache_size: usize) -> Self {
-        debug_assert!(cache_size > 0);
+    pub fn new() -> Self {
         Self {
-            cache: UnsafeCell::new(S::CACHE_BUFFER::with_capacity(cache_size)),
-            cache_size,
+            cache: UnsafeCell::new(S::CACHE_BUFFER::empty()),
             state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
             config: unsafe { mem::MaybeUninit::zeroed().assume_init() },
         }
+    }
+}
+
+impl<S: driver::Storage> Default for FileAllocation<S> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -603,8 +602,8 @@ pub struct File<'a, 'b, S: driver::Storage> {
 }
 
 impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
-    pub fn allocate(fs: &Filesystem<'_, Storage>) -> FileAllocation<Storage> {
-        FileAllocation::new(fs.cache_size)
+    pub fn allocate() -> FileAllocation<Storage> {
+        FileAllocation::new()
     }
 
     /// Returns a new OpenOptions object.
@@ -792,7 +791,10 @@ impl OpenOptions {
         alloc: &mut FileAllocation<S>,
         path: &Path,
     ) -> Result<File<'a, 'b, S>> {
-        assert_eq!(fs.cache_size, alloc.cache_size);
+        alloc.cache.get_mut().set_len(fs.cache_size).map_err(|_| {
+            error_now!("Buffer is not large enough for cache size of {cache_size}");
+            Error::NO_MEMORY
+        })?;
         alloc.config.buffer = alloc.cache.get_mut().as_mut_ptr() as *mut _;
         // We need to use addr_of_mut! here instead of & mut since
         // the FFI stores a copy of a pointer to the field state,
@@ -820,7 +822,7 @@ impl OpenOptions {
         path: &Path,
         f: impl FnOnce(&File<'a, '_, S>) -> Result<R>,
     ) -> Result<R> {
-        let mut alloc = File::allocate(fs); // lifetime 'c
+        let mut alloc = File::allocate(); // lifetime 'c
         let mut file = unsafe { self.open(fs, &mut alloc, path)? };
         // Q: what is the actually correct behaviour?
         // E.g. if res is Ok but closing gives an error.
@@ -1086,16 +1088,51 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
 
 impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     pub fn mount(alloc: &'a mut Allocation<Storage>, storage: &'a mut Storage) -> Result<Self> {
-        let fs = Self::new(alloc, storage);
+        let fs = Self::new(alloc, storage)?;
         fs.raw_mount()?;
         Ok(fs)
     }
 
-    fn set_alloc_config(alloc: &mut Allocation<Storage>, storage: &mut Storage) {
+    fn set_alloc_config(alloc: &mut Allocation<Storage>, storage: &mut Storage) -> Result<usize> {
+        let cache_size = storage.cache_size();
+        let lookahead_size = storage.lookahead_size();
+
+        alloc
+            .cache
+            .read
+            .get_mut()
+            .set_len(cache_size)
+            .map_err(|_| {
+                error_now!("Buffer is not large enough for cache size of {cache_size}");
+                Error::NO_MEMORY
+            })?;
+        alloc
+            .cache
+            .write
+            .get_mut()
+            .set_len(cache_size)
+            .map_err(|_| {
+                error_now!("Buffer is not large enough for cache size of {cache_size}");
+                Error::NO_MEMORY
+            })?;
+        alloc
+            .cache
+            .lookahead
+            .get_mut()
+            .set_len(lookahead_size)
+            .map_err(|_| {
+                error_now!("Buffer is not large enough for lookahead size of {lookahead_size}");
+                Error::NO_MEMORY
+            })?;
+
         alloc.config.context = storage as *mut _ as *mut c_void;
-        alloc.config.read_buffer = alloc.cache.read.get() as *mut c_void;
-        alloc.config.prog_buffer = alloc.cache.write.get() as *mut c_void;
-        alloc.config.lookahead_buffer = alloc.cache.lookahead.get() as *mut c_void;
+
+        alloc.config.read_buffer = alloc.cache.read.get_mut().as_mut_ptr() as *mut c_void;
+        alloc.config.prog_buffer = alloc.cache.write.get_mut().as_mut_ptr() as *mut c_void;
+        alloc.config.lookahead_buffer = alloc.cache.lookahead.get_mut().as_mut_ptr() as *mut c_void;
+        alloc.config.cache_size = cache_size as _;
+        alloc.config.lookahead_size = lookahead_size as _;
+        Ok(cache_size)
     }
 
     /// Mount the filesystem or, if that fails, call `f` with the mount error and the storage and then try again.
@@ -1107,11 +1144,11 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     where
         F: FnOnce(Error, &mut Storage, &mut Allocation<Storage>) -> Result<()>,
     {
-        let mut fs = Self::new(alloc, storage);
+        let mut fs = Self::new(alloc, storage)?;
         if let Err(err) = fs.raw_mount() {
             let alloc = fs.alloc.get_mut();
             f(err, fs.storage, alloc)?;
-            Self::set_alloc_config(alloc, fs.storage);
+            Self::set_alloc_config(alloc, fs.storage)?;
             fs.raw_mount()?;
         }
         Ok(fs)
@@ -1125,13 +1162,13 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     }
 
     // Not public, user should use `mount`, possibly after `format`
-    fn new(alloc: &'a mut Allocation<Storage>, storage: &'a mut Storage) -> Self {
-        Self::set_alloc_config(alloc, storage);
-        Filesystem {
-            cache_size: alloc.cache.size,
+    fn new(alloc: &'a mut Allocation<Storage>, storage: &'a mut Storage) -> Result<Self> {
+        let cache_size = Self::set_alloc_config(alloc, storage)?;
+        Ok(Filesystem {
+            cache_size,
             alloc: RefCell::new(alloc),
             storage,
-        }
+        })
     }
 
     /// Deconstruct `Filesystem`, intention is to allow access to
@@ -1517,11 +1554,11 @@ mod tests {
                 Ok(())
             })?;
 
-            let mut a1 = File::allocate(fs);
+            let mut a1 = File::allocate();
             let f1 = unsafe { File::create(fs, &mut a1, b"a.txt\0".try_into().unwrap())? };
             f1.write(b"some text")?;
 
-            let mut a2 = File::allocate(fs);
+            let mut a2 = File::allocate();
             let f2 = unsafe { File::create(fs, &mut a2, b"b.txt\0".try_into().unwrap())? };
             f2.write(b"more text")?;
 

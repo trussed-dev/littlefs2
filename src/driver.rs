@@ -1,41 +1,37 @@
 //! The `Storage`, `Read`, `Write` and `Seek` driver.
 #![allow(non_camel_case_types)]
 
-use crate::io::Result;
+use crate::io::Error;
 
 mod private {
-    pub trait Sealed {}
+    pub struct NotEnoughCapacity;
+    pub trait Sealed {
+        /// Returns a buffer of bytes initialized and valid. If [`set_len`]() was called previously successfully,
+        /// its last call defines the minimum number of valid bytes
+        fn as_ptr(&self) -> *const u8;
+        /// Returns a buffer of bytes initialized and valid. If [`set_len`]() was called previously successfully,
+        /// its last call defines the minimum number of valid bytes
+        fn as_mut_ptr(&mut self) -> *mut u8;
+
+        /// Current lenght, set by the last call to [`set_len`](Buffer::set_len)
+        fn current_len(&self) -> usize;
+
+        /// Atempts to set the length of the buffer to `len`
+        ///
+        /// If succeeded, the buffer obtained through the pointer operation **must** be of at least `len` bytes
+        fn set_len(&mut self, len: usize) -> Result<(), NotEnoughCapacity>;
+
+        // We could use a `Default` trait bound but it's not implemented  for all array sizes
+        fn empty() -> Self;
+    }
 }
+
+pub(crate) use private::Sealed;
 
 /// Safety: implemented only by `[u8; N]` and `Vec<u8>` if the alloc feature is enabled
-pub unsafe trait Buffer: private::Sealed {
-    /// The maximum capacity of the buffer type.
-    /// Can be [`usize::Max`]()
-    const MAX_CAPACITY: usize;
+pub unsafe trait Buffer: private::Sealed {}
 
-    /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
-    /// its last call defines the minimum number of valid bytes
-    fn as_ptr(&self) -> *const u8;
-    /// Returns a buffer of bytes initialized and valid. If [`set_capacity`]() was called previously,
-    /// its last call defines the minimum number of valid bytes
-    fn as_mut_ptr(&mut self) -> *mut u8;
-
-    /// Current capacity, set by the last call to [`set_capacity`](Buffer::set_capacity)
-    /// or at initialization through [`with_capacity`](Buffer::with_capacity)
-    fn current_capacity(&self) -> usize;
-
-    /// Can panic if `capacity` > `Self::MAX_CAPACITY`
-    fn set_capacity(&mut self, capacity: usize);
-
-    /// Can panic if `capacity` > `Self::MAX_CAPACITY`
-    fn with_capacity(capacity: usize) -> Self;
-}
-
-impl<const N: usize> private::Sealed for [u8; N] {}
-
-unsafe impl<const N: usize> Buffer for [u8; N] {
-    const MAX_CAPACITY: usize = N;
-
+impl<const N: usize> private::Sealed for [u8; N] {
     fn as_ptr(&self) -> *const u8 {
         <[u8]>::as_ptr(self)
     }
@@ -44,26 +40,27 @@ unsafe impl<const N: usize> Buffer for [u8; N] {
         <[u8]>::as_mut_ptr(self)
     }
 
-    fn current_capacity(&self) -> usize {
+    fn current_len(&self) -> usize {
         N
     }
 
-    fn set_capacity(&mut self, _capacity: usize) {
-        // noop, fixed capacity
+    fn set_len(&mut self, len: usize) -> Result<(), private::NotEnoughCapacity> {
+        if len > N {
+            Err(private::NotEnoughCapacity)
+        } else {
+            Ok(())
+        }
     }
-    fn with_capacity(capacity: usize) -> Self {
-        assert!(capacity <= N);
+
+    fn empty() -> Self {
         [0; N]
     }
 }
 
-#[cfg(feature = "alloc")]
-impl private::Sealed for alloc::vec::Vec<u8> {}
+unsafe impl<const N: usize> Buffer for [u8; N] {}
 
 #[cfg(feature = "alloc")]
-unsafe impl Buffer for alloc::vec::Vec<u8> {
-    const MAX_CAPACITY: usize = usize::MAX;
-
+impl private::Sealed for alloc::vec::Vec<u8> {
     fn as_ptr(&self) -> *const u8 {
         <[u8]>::as_ptr(self)
     }
@@ -72,20 +69,22 @@ unsafe impl Buffer for alloc::vec::Vec<u8> {
         <[u8]>::as_mut_ptr(self)
     }
 
-    fn current_capacity(&self) -> usize {
-        self.capacity()
+    fn current_len(&self) -> usize {
+        self.len()
     }
 
-    fn set_capacity(&mut self, capacity: usize) {
-        self.resize(capacity, 0)
+    fn set_len(&mut self, len: usize) -> Result<(), private::NotEnoughCapacity> {
+        self.resize(len, 0);
+        Ok(())
     }
 
-    fn with_capacity(capacity: usize) -> Self {
-        let mut this = alloc::vec::Vec::with_capacity(capacity);
-        this.set_capacity(capacity);
-        this
+    fn empty() -> Self {
+        Self::new()
     }
 }
+
+#[cfg(feature = "alloc")]
+unsafe impl Buffer for alloc::vec::Vec<u8> {}
 
 /// Users of this library provide a "storage driver" by implementing this trait.
 ///
@@ -164,13 +163,13 @@ pub trait Storage {
 
     /// Read data from the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of READ_SIZE.
-    fn read(&mut self, off: usize, buf: &mut [u8]) -> Result<usize>;
+    fn read(&mut self, off: usize, buf: &mut [u8]) -> Result<usize, Error>;
     /// Write data to the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of WRITE_SIZE.
-    fn write(&mut self, off: usize, data: &[u8]) -> Result<usize>;
+    fn write(&mut self, off: usize, data: &[u8]) -> Result<usize, Error>;
     /// Erase data from the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of BLOCK_SIZE.
-    fn erase(&mut self, off: usize, len: usize) -> Result<usize>;
+    fn erase(&mut self, off: usize, len: usize) -> Result<usize, Error>;
     // /// Synchronize writes to the storage device.
     // fn sync(&mut self) -> Result<usize>;
 }
