@@ -2,6 +2,7 @@
 
 use core::ffi::{c_int, c_void};
 use core::marker::PhantomData;
+use core::pin::{pin, Pin};
 use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 use core::{
@@ -9,6 +10,7 @@ use core::{
     mem, slice,
 };
 use littlefs2_sys as ll;
+use pin_project::{pin_project, pinned_drop};
 
 pub use littlefs2_core::{Attribute, DirEntry, FileOpenFlags, FileType, Metadata};
 
@@ -217,7 +219,7 @@ struct RemoveDirAllProgress {
     skipped_any: bool,
 }
 
-impl<Storage: driver::Storage> Filesystem<'_, Storage> {
+impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     pub fn allocate(storage: &Storage) -> Allocation<Storage> {
         Allocation::new(storage)
     }
@@ -445,7 +447,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     pub fn create_file_and_then<R>(
         &self,
         path: &Path,
-        f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
+        f: impl FnOnce(&File<'_, '_, '_, Storage>) -> Result<R>,
     ) -> Result<R> {
         File::create_and_then(self, path, f)
     }
@@ -453,7 +455,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     pub fn open_file_and_then<R>(
         &self,
         path: &Path,
-        f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
+        f: impl FnOnce(&File<'_, '_, '_, Storage>) -> Result<R>,
     ) -> Result<R> {
         File::open_and_then(self, path, f)
     }
@@ -462,23 +464,23 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         OpenOptions::new()
     }
 
-    pub fn open_file_with_options_and_then<R>(
-        &self,
+    pub fn open_file_with_options_and_then<'b, R>(
+        &'b self,
         o: impl FnOnce(&mut OpenOptions) -> &OpenOptions,
         path: &Path,
-        f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
+        f: impl FnOnce(&File<'a, 'b, '_, Storage>) -> Result<R>,
     ) -> Result<R> {
         let mut options = OpenOptions::new();
         o(&mut options).open_and_then(self, path, f)
     }
 
     /// Read attribute.
-    pub fn attribute<'a>(
+    pub fn attribute<'b>(
         &self,
         path: &Path,
         id: u8,
-        buffer: &'a mut [u8],
-    ) -> Result<Option<Attribute<'a>>> {
+        buffer: &'b mut [u8],
+    ) -> Result<Option<Attribute<'b>>> {
         let n = u32::try_from(buffer.len()).unwrap_or(u32::MAX);
 
         let return_code = unsafe {
@@ -585,39 +587,63 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     }
 }
 
+#[pin_project(PinnedDrop)]
 /// The state of a `File`. Pre-allocate with `File::allocate`.
-pub struct FileAllocation<S: driver::Storage> {
+pub struct FileAllocation<'a, 'b, S: driver::Storage> {
     cache: UnsafeCell<S::CACHE_BUFFER>,
     state: ll::lfs_file_t,
     config: ll::lfs_file_config,
+    // If filesystem is Some, the file was opened
+    filesystem: Option<&'b Filesystem<'a, S>>,
 }
 
-impl<S: driver::Storage> FileAllocation<S> {
+impl<'a, 'b, S: driver::Storage> FileAllocation<'a, 'b, S> {
     pub fn new() -> Self {
         Self {
             cache: UnsafeCell::new(S::CACHE_BUFFER::empty()),
             state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
             config: unsafe { mem::MaybeUninit::zeroed().assume_init() },
+            filesystem: None,
         }
     }
 }
 
-impl<S: driver::Storage> Default for FileAllocation<S> {
+impl<'a, 'b, S: driver::Storage> FileAllocation<'a, 'b, S> {
+    fn close(self: Pin<&mut Self>) -> Result<()> {
+        let this = self.project();
+        let Some(fs) = this.filesystem.take() else {
+            return Ok(());
+        };
+
+        let return_code = unsafe {
+            ll::lfs_file_close(
+                &mut fs.alloc.borrow_mut().state,
+                // We need to use addr_of_mut! here instead of & mut since
+                // the FFI stores a copy of a pointer to the field state,
+                // so we cannot assert unique mutable access.
+                addr_of_mut!(*this.state),
+            )
+        };
+        result_from((), return_code)
+    }
+}
+
+impl<'a, 'b, S: driver::Storage> Default for FileAllocation<'a, 'b, S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-pub struct File<'a, 'b, S: driver::Storage> {
+pub struct File<'a, 'b, 'c, S: driver::Storage> {
     // We must store a raw pointer here since the FFI retains a copy of a pointer
     // to the field alloc.state, so we cannot assert unique mutable access.
-    alloc: *mut FileAllocation<S>,
-    phantom: PhantomData<&'b mut FileAllocation<S>>,
+    alloc: *mut FileAllocation<'a, 'b, S>,
+    phantom: PhantomData<Pin<&'c mut FileAllocation<'a, 'b, S>>>,
     fs: &'b Filesystem<'a, S>,
 }
 
-impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
-    pub fn allocate() -> FileAllocation<Storage> {
+impl<'a, 'b, 'c, Storage: driver::Storage> File<'a, 'b, 'c, Storage> {
+    pub fn allocate() -> FileAllocation<'a, 'b, Storage> {
         FileAllocation::new()
     }
 
@@ -632,25 +658,25 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
         OpenOptions::new()
     }
 
-    pub unsafe fn open(
+    pub fn open(
         fs: &'b Filesystem<'a, Storage>,
-        alloc: &'b mut FileAllocation<Storage>,
+        alloc: Pin<&'c mut FileAllocation<'a, 'b, Storage>>,
         path: &Path,
     ) -> Result<Self> {
         OpenOptions::new().read(true).open(fs, alloc, path)
     }
 
     pub fn open_and_then<R>(
-        fs: &Filesystem<'a, Storage>,
+        fs: &'b Filesystem<'a, Storage>,
         path: &Path,
-        f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
+        f: impl FnOnce(&File<'a, 'b, '_, Storage>) -> Result<R>,
     ) -> Result<R> {
         OpenOptions::new().read(true).open_and_then(fs, path, f)
     }
 
-    pub unsafe fn create(
+    pub fn create(
         fs: &'b Filesystem<'a, Storage>,
-        alloc: &'b mut FileAllocation<Storage>,
+        alloc: Pin<&'c mut FileAllocation<'a, 'b, Storage>>,
         path: &Path,
     ) -> Result<Self> {
         OpenOptions::new()
@@ -661,9 +687,9 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
     }
 
     pub fn create_and_then<R>(
-        fs: &Filesystem<'a, Storage>,
+        fs: &'b Filesystem<'a, Storage>,
         path: &Path,
-        f: impl FnOnce(&File<'_, '_, Storage>) -> Result<R>,
+        f: impl FnOnce(&File<'a, '_, '_, Storage>) -> Result<R>,
     ) -> Result<R> {
         OpenOptions::new()
             .write(true)
@@ -673,7 +699,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
     }
 
     // Safety-hatch to experiment with missing parts of API
-    pub unsafe fn borrow_filesystem<'c>(&'c mut self) -> &'c Filesystem<'a, Storage> {
+    pub unsafe fn borrow_filesystem(&mut self) -> &Filesystem<'a, Storage> {
         self.fs
     }
 
@@ -681,15 +707,9 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
     /// Not doing this is UB, which is why we have all the closure-based APIs.
     ///
     /// This must not be called twice.
-    pub unsafe fn close(self) -> Result<()> {
-        let return_code = ll::lfs_file_close(
-            &mut self.fs.alloc.borrow_mut().state,
-            // We need to use addr_of_mut! here instead of & mut since
-            // the FFI stores a copy of a pointer to the field state,
-            // so we cannot assert unique mutable access.
-            addr_of_mut!((*self.alloc).state),
-        );
-        result_from((), return_code)
+    pub fn close(self) -> Result<()> {
+        // Safety: alloc was gotten pinned
+        unsafe { Pin::new_unchecked(&mut *self.alloc) }.close()
     }
 
     /// Synchronize file contents to storage.
@@ -772,6 +792,13 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
     }
 }
 
+#[pinned_drop]
+impl<'a, 'b, S: driver::Storage> PinnedDrop for FileAllocation<'a, 'b, S> {
+    fn drop(self: Pin<&mut Self>) {
+        self.close().ok();
+    }
+}
+
 /// Options and flags which can be used to configure how a file is opened.
 ///
 /// This builder exposes the ability to configure how a File is opened and what operations
@@ -800,30 +827,43 @@ impl OpenOptions {
     ///   closing removes them from there
     /// - since littlefs is supposed to be *fail-safe*, we can't just close files in
     ///   Drop and panic if something went wrong.
-    pub unsafe fn open<'a, 'b, S: driver::Storage>(
+    pub fn open<'a, 'b, 'c, S: driver::Storage>(
         &self,
         fs: &'b Filesystem<'a, S>,
-        alloc: &'b mut FileAllocation<S>,
+        mut alloc: Pin<&'c mut FileAllocation<'a, 'b, S>>,
         path: &Path,
-    ) -> Result<File<'a, 'b, S>> {
-        alloc.cache.get_mut().set_len(fs.cache_size).map_err(|_| {
-            error_now!("Buffer is not large enough for cache size of {cache_size}");
-            Error::NO_MEMORY
-        })?;
-        alloc.config.buffer = alloc.cache.get_mut().as_mut_ptr() as *mut _;
+    ) -> Result<File<'a, 'b, 'c, S>> {
+        let alloc_proj = alloc.as_mut().project();
+        alloc_proj
+            .cache
+            .get_mut()
+            .set_len(fs.cache_size)
+            .map_err(|_| {
+                error_now!("Buffer is not large enough for cache size of {cache_size}");
+                Error::NO_MEMORY
+            })?;
+        alloc_proj.config.buffer = alloc_proj.cache.get_mut().as_mut_ptr() as *mut _;
+
         // We need to use addr_of_mut! here instead of & mut since
         // the FFI stores a copy of a pointer to the field state,
         // so we cannot assert unique mutable access.
-        let return_code = ll::lfs_file_opencfg(
-            &mut fs.alloc.borrow_mut().state,
-            addr_of_mut!(alloc.state),
-            path.as_ptr(),
-            self.0.bits(),
-            addr_of!(alloc.config),
-        );
+        let return_code = unsafe {
+            ll::lfs_file_opencfg(
+                &mut fs.alloc.borrow_mut().state,
+                addr_of_mut!(*alloc_proj.state),
+                path.as_ptr(),
+                self.0.bits(),
+                addr_of!(*alloc_proj.config),
+            )
+        };
+
+        // The file was opened
+        if return_code >= 0 {
+            *alloc_proj.filesystem = Some(fs);
+        }
 
         let file = File {
-            alloc,
+            alloc: unsafe { alloc.get_unchecked_mut() },
             phantom: PhantomData,
             fs,
         };
@@ -832,20 +872,21 @@ impl OpenOptions {
     }
 
     /// (Hopefully) safe abstraction around `open`.
-    pub fn open_and_then<'a, R, S: driver::Storage>(
+    pub fn open_and_then<'a, 'b, R, S: driver::Storage>(
         &self,
-        fs: &Filesystem<'a, S>,
+        fs: &'b Filesystem<'a, S>,
         path: &Path,
-        f: impl FnOnce(&File<'a, '_, S>) -> Result<R>,
+        f: impl FnOnce(&File<'a, 'b, '_, S>) -> Result<R>,
     ) -> Result<R> {
-        let mut alloc = File::allocate(); // lifetime 'c
-        let mut file = unsafe { self.open(fs, &mut alloc, path)? };
+        let alloc = File::allocate();
+        let alloc = pin!(alloc);
+        let mut file = self.open(fs, alloc, path)?;
         // Q: what is the actually correct behaviour?
         // E.g. if res is Ok but closing gives an error.
         // Or if closing fails because something is broken and
         // we'd already know that from an Err res.
         let res = f(&mut file);
-        unsafe { file.close()? };
+        file.close()?;
         res
     }
 
@@ -916,7 +957,7 @@ impl From<FileOpenFlags> for OpenOptions {
     }
 }
 
-impl<S: driver::Storage> io::Read for File<'_, '_, S> {
+impl<S: driver::Storage> io::Read for File<'_, '_, '_, S> {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let return_code = unsafe {
             // We need to use addr_of_mut! here instead of & mut since
@@ -933,7 +974,7 @@ impl<S: driver::Storage> io::Read for File<'_, '_, S> {
     }
 }
 
-impl<S: driver::Storage> io::Seek for File<'_, '_, S> {
+impl<S: driver::Storage> io::Seek for File<'_, '_, '_, S> {
     fn seek(&self, pos: io::SeekFrom) -> Result<usize> {
         let return_code = unsafe {
             // We need to use addr_of_mut! here instead of & mut since
@@ -950,7 +991,7 @@ impl<S: driver::Storage> io::Seek for File<'_, '_, S> {
     }
 }
 
-impl<S: driver::Storage> io::Write for File<'_, '_, S> {
+impl<S: driver::Storage> io::Write for File<'_, '_, '_, S> {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let return_code = unsafe {
             // We need to use addr_of_mut! here instead of & mut since
@@ -1572,16 +1613,18 @@ mod tests {
                 Ok(())
             })?;
 
-            let mut a1 = File::allocate();
-            let f1 = unsafe { File::create(fs, &mut a1, b"a.txt\0".try_into().unwrap())? };
+            let a1 = File::allocate();
+            let a1 = pin!(a1);
+            let f1 = File::create(fs, a1, b"a.txt\0".try_into().unwrap())?;
             f1.write(b"some text")?;
 
-            let mut a2 = File::allocate();
-            let f2 = unsafe { File::create(fs, &mut a2, b"b.txt\0".try_into().unwrap())? };
+            let a2 = File::allocate();
+            let a2 = pin!(a2);
+            let f2 = File::create(fs, a2, b"b.txt\0".try_into().unwrap())?;
             f2.write(b"more text")?;
 
-            unsafe { f1.close()? }; // program hangs here
-            unsafe { f2.close()? }; // this statement is never reached
+            f1.close()?; // program hangs here
+            f2.close()?; // this statement is never reached
 
             Ok(())
         })

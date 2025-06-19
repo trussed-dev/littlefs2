@@ -17,7 +17,7 @@ pub type FilesystemCallback<'a, R = ()> = &'a mut dyn FnMut(&dyn DynFilesystem) 
 pub type FilesystemCallbackOnce<'a, R = ()> =
     alloc::boxed::Box<dyn FnOnce(&dyn DynFilesystem) -> Result<R> + 'a>;
 
-impl<S: Storage> DynFile for File<'_, '_, S> {
+impl<S: Storage> DynFile for File<'_, '_, '_, S> {
     fn sync(&self) -> Result<()> {
         File::sync(self)
     }
