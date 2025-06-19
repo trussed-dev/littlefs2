@@ -587,7 +587,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     }
 }
 
-#[pin_project(PinnedDrop)]
+#[pin_project(PinnedDrop, !Unpin)]
 /// The state of a `File`. Pre-allocate with `File::allocate`.
 pub struct FileAllocation<'a, 'b, S: driver::Storage> {
     cache: UnsafeCell<S::CACHE_BUFFER>,
@@ -1012,7 +1012,7 @@ impl<S: driver::Storage> io::Write for File<'_, '_, '_, S> {
     }
 }
 
-#[pin_project(PinnedDrop)]
+#[pin_project(PinnedDrop, !Unpin)]
 pub struct ReadDirAllocation<'a, 'b, S: driver::Storage> {
     state: ll::lfs_dir_t,
     fs: Option<&'b Filesystem<'a, S>>,
