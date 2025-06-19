@@ -708,7 +708,7 @@ impl<'a, 'b, 'c, Storage: driver::Storage> File<'a, 'b, 'c, Storage> {
     ///
     /// This must not be called twice.
     pub fn close(self) -> Result<()> {
-        // Safety: alloc was gotten pinned
+        // Safety: alloc was obtained pinned
         unsafe { Pin::new_unchecked(&mut *self.alloc) }.close()
     }
 
@@ -1012,32 +1012,58 @@ impl<S: driver::Storage> io::Write for File<'_, '_, '_, S> {
     }
 }
 
-pub struct ReadDirAllocation {
+#[pin_project(PinnedDrop)]
+pub struct ReadDirAllocation<'a, 'b, S: driver::Storage> {
     state: ll::lfs_dir_t,
+    fs: Option<&'b Filesystem<'a, S>>,
 }
 
-impl Default for ReadDirAllocation {
+#[pinned_drop]
+impl<S: driver::Storage> PinnedDrop for ReadDirAllocation<'_, '_, S> {
+    fn drop(self: Pin<&mut Self>) {
+        self.close().ok();
+    }
+}
+
+impl<S: driver::Storage> Default for ReadDirAllocation<'_, '_, S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ReadDirAllocation {
+impl<S: driver::Storage> ReadDirAllocation<'_, '_, S> {
     pub fn new() -> Self {
-        unsafe { mem::MaybeUninit::zeroed().assume_init() }
+        Self {
+            state: unsafe { mem::MaybeUninit::zeroed().assume_init() },
+            fs: None,
+        }
+    }
+
+    fn close(self: Pin<&mut Self>) -> Result<()> {
+        let this = self.project();
+
+        let Some(fs) = this.fs else { return Ok(()) };
+
+        let return_code = unsafe {
+            // We need to use addr_of_mut! here instead of & mut since
+            // the FFI stores a copy of a pointer to the field state,
+            // so we cannot assert unique mutable access.
+            ll::lfs_dir_close(&mut fs.alloc.borrow_mut().state, addr_of_mut!(*this.state))
+        };
+        result_from((), return_code)
     }
 }
 
-pub struct ReadDir<'a, 'b, S: driver::Storage> {
+pub struct ReadDir<'a, 'b, 'c, S: driver::Storage> {
     // We must store a raw pointer here since the FFI retains a copy of a pointer
     // to the field alloc.state, so we cannot assert unique mutable access.
-    alloc: *mut ReadDirAllocation,
-    phantom: PhantomData<&'b mut ReadDirAllocation>,
+    alloc: *mut ReadDirAllocation<'a, 'b, S>,
+    phantom: PhantomData<Pin<&'c mut ReadDirAllocation<'a, 'b, S>>>,
     fs: &'b Filesystem<'a, S>,
     path: &'b Path,
 }
 
-impl<S: driver::Storage> Iterator for ReadDir<'_, '_, S> {
+impl<S: driver::Storage> Iterator for ReadDir<'_, '_, '_, S> {
     type Item = Result<DirEntry>;
 
     // remove this allowance again, once path overflow is properly handled
@@ -1073,14 +1099,14 @@ impl<S: driver::Storage> Iterator for ReadDir<'_, '_, S> {
     }
 }
 
-impl<'a, S: driver::Storage> ReadDir<'a, '_, S> {
+impl<'a, S: driver::Storage> ReadDir<'a, '_, '_, S> {
     // Safety-hatch to experiment with missing parts of API
     pub unsafe fn borrow_filesystem<'b>(&'b mut self) -> &'b Filesystem<'a, S> {
         self.fs
     }
 }
 
-impl<S: driver::Storage> ReadDir<'_, '_, S> {
+impl<S: driver::Storage> ReadDir<'_, '_, '_, S> {
     // Again, not sure if this can be called twice
     // Update: This one seems to be safe to call multiple times,
     // it just goes through the "mlist" and removes itself.
@@ -1089,28 +1115,21 @@ impl<S: driver::Storage> ReadDir<'_, '_, S> {
     // have an (unsafely genereated) ReadDir with that handle; on the other hand
     // as long as ReadDir is not Copy.
     pub fn close(self) -> Result<()> {
-        let return_code = unsafe {
-            // We need to use addr_of_mut! here instead of & mut since
-            // the FFI stores a copy of a pointer to the field state,
-            // so we cannot assert unique mutable access.
-            ll::lfs_dir_close(
-                &mut self.fs.alloc.borrow_mut().state,
-                addr_of_mut!((*self.alloc).state),
-            )
-        };
-        result_from((), return_code)
+        unsafe { Pin::new_unchecked(&mut *self.alloc) }.close()
     }
 }
+impl<S: driver::Storage> ReadDir<'_, '_, '_, S> {}
 
 impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     pub fn read_dir_and_then<R>(
         &self,
         path: &Path,
         // *not* &ReadDir, as Iterator takes &mut
-        f: impl FnOnce(&mut ReadDir<'_, '_, Storage>) -> Result<R>,
+        f: impl FnOnce(&mut ReadDir<'_, '_, '_, Storage>) -> Result<R>,
     ) -> Result<R> {
         let mut alloc = ReadDirAllocation::new();
-        let mut read_dir = unsafe { self.read_dir(&mut alloc, path)? };
+        let alloc = pin!(alloc);
+        let mut read_dir = self.read_dir(alloc, path)?;
         let res = f(&mut read_dir);
         // unsafe { read_dir.close()? };
         read_dir.close()?;
@@ -1120,22 +1139,29 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     /// Returns a pseudo-iterator over the entries within a directory.
     ///
     /// This is unsafe since it can induce UB just like File::open.
-    pub unsafe fn read_dir<'b>(
+    pub fn read_dir<'b, 'c>(
         &'b self,
-        alloc: &'b mut ReadDirAllocation,
+        mut alloc: Pin<&'c mut ReadDirAllocation<'a, 'b, Storage>>,
         path: &'b Path,
-    ) -> Result<ReadDir<'a, 'b, Storage>> {
+    ) -> Result<ReadDir<'a, 'b, 'b, Storage>> {
+        let alloc_proj = alloc.as_mut().project();
         // ll::lfs_dir_open stores a copy of the pointer to alloc.state, so
         // we must use addr_of_mut! here, since &mut alloc.state asserts unique
         // mutable access, and we need shared mutable access.
-        let return_code = ll::lfs_dir_open(
-            &mut self.alloc.borrow_mut().state,
-            addr_of_mut!(alloc.state),
-            path.as_ptr(),
-        );
+        let return_code = unsafe {
+            ll::lfs_dir_open(
+                &mut self.alloc.borrow_mut().state,
+                addr_of_mut!(*alloc_proj.state),
+                path.as_ptr(),
+            )
+        };
+
+        if return_code >= 0 {
+            *alloc_proj.fs = Some(self);
+        }
 
         let read_dir = ReadDir {
-            alloc,
+            alloc: unsafe { alloc.get_unchecked_mut() },
             phantom: PhantomData,
             fs: self,
             path,
