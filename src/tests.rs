@@ -1,5 +1,4 @@
 use core::convert::TryInto;
-use generic_array::typenum::consts;
 use littlefs2_core::PathBuf;
 
 use crate::{
@@ -9,18 +8,19 @@ use crate::{
     path, BACKEND_VERSION, DISK_VERSION,
 };
 
+const RAM_STORAGE_BLOCK_COUNT: usize = 32;
+const LARGER_RAM_STORAGE_BLOCK_COUNT: usize = 64;
+
 ram_storage!(
     name = OtherRamStorage,
     backend = OtherRam,
     erase_value = 0xff,
     read_size = 1,
     write_size = 32,
-    cache_size_ty = consts::U32,
+    cache_size = 32,
     block_size = 256,
     block_count = 512,
-    lookahead_size_ty = consts::U1,
-    filename_max_plus_one_ty = consts::U256,
-    path_max_plus_one_ty = consts::U256,
+    lookahead_size = 1,
 );
 
 ram_storage!(
@@ -29,12 +29,10 @@ ram_storage!(
     erase_value = 0xff,
     read_size = 20 * 5,
     write_size = 20 * 7,
-    cache_size_ty = consts::U700,
+    cache_size = 700,
     block_size = 20 * 35,
-    block_count = 32,
-    lookahead_size_ty = consts::U16,
-    filename_max_plus_one_ty = consts::U256,
-    path_max_plus_one_ty = consts::U256,
+    block_count = RAM_STORAGE_BLOCK_COUNT,
+    lookahead_size = 16,
 );
 
 ram_storage!(
@@ -43,12 +41,10 @@ ram_storage!(
     erase_value = 0xff,
     read_size = 20 * 5,
     write_size = 20 * 7,
-    cache_size_ty = consts::U700,
+    cache_size = 700,
     block_size = 20 * 35,
-    block_count = 64,
-    lookahead_size_ty = consts::U16,
-    filename_max_plus_one_ty = consts::U256,
-    path_max_plus_one_ty = consts::U256,
+    block_count = LARGER_RAM_STORAGE_BLOCK_COUNT,
+    lookahead_size = 16,
 );
 
 #[test]
@@ -61,7 +57,7 @@ fn version() {
 fn format() {
     let mut backend = OtherRam::default();
     let mut storage = OtherRamStorage::new(&mut backend);
-    let mut alloc = Filesystem::allocate();
+    let mut alloc = Filesystem::allocate(&storage);
 
     // should fail: FS is not formatted
     assert_eq!(
@@ -93,7 +89,7 @@ fn borrow_fs_allocation() {
     let mut backend = OtherRam::default();
 
     let mut storage = OtherRamStorage::new(&mut backend);
-    let mut alloc_fs = Filesystem::allocate();
+    let mut alloc_fs = Filesystem::allocate(&storage);
     Filesystem::format(&mut storage).unwrap();
     let _fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
     // previous `_fs` is fine as it's masked, due to NLL
@@ -110,7 +106,7 @@ fn borrow_fs_allocation2() {
     let mut backend = OtherRam::default();
 
     let mut storage = OtherRamStorage::new(&mut backend);
-    let mut alloc_fs = Filesystem::allocate();
+    let mut alloc_fs = Filesystem::allocate(&storage);
     Filesystem::format(&mut storage).unwrap();
     let _fs = Filesystem::mount(&mut alloc_fs, &mut storage).unwrap();
     // previous `_fs` is fine as it's masked, due to NLL
@@ -541,9 +537,9 @@ fn test_iter_dirs() {
 fn test_mount_or_else_clobber_alloc() {
     let mut backend = Ram::default();
     let mut storage = RamStorage::new(&mut backend);
-    let alloc = &mut Allocation::new();
+    let alloc = &mut Allocation::new(&storage);
     Filesystem::mount_or_else(alloc, &mut storage, |_, storage, alloc| {
-        *alloc = Allocation::new();
+        *alloc = Allocation::new(storage);
         Filesystem::format(storage).unwrap();
         Ok(())
     })
@@ -566,7 +562,7 @@ fn test_mount_or_else_clobber_alloc() {
 fn shrinking() {
     let backend = &mut Ram::default();
     let storage = &mut RamStorage::new(backend);
-    let alloc = &mut Allocation::new();
+    let alloc = &mut Allocation::new(storage);
 
     Filesystem::format(storage).unwrap();
     let fs = Filesystem::mount(alloc, storage).unwrap();
@@ -582,15 +578,18 @@ fn shrinking() {
     let larger_backend = &mut LargerRam::default();
     larger_backend.buf[..backend.buf.len()].copy_from_slice(&backend.buf);
     let larger_storage = &mut LargerRamStorage::new(larger_backend);
-    let larger_alloc = &mut Allocation::new();
+    let larger_alloc = &mut Allocation::new(larger_storage);
     assert!(matches!(
         Filesystem::mount(larger_alloc, larger_storage),
         Err(Error::INVALID)
     ));
 
-    let larger_alloc = &mut Allocation::with_config(crate::fs::Config {
-        mount_flags: MountFlags::DISABLE_BLOCK_COUNT_CHECK,
-    });
+    let larger_alloc = &mut Allocation::with_config(
+        larger_storage,
+        crate::fs::Config {
+            mount_flags: MountFlags::DISABLE_BLOCK_COUNT_CHECK,
+        },
+    );
 
     let fs = Filesystem::mount(larger_alloc, larger_storage).unwrap();
     assert_eq!(fs.read::<10>(path!("some-file")).unwrap(), &[42; 10]);
@@ -599,14 +598,14 @@ fn shrinking() {
         &[42; 1024]
     );
 
-    fs.grow(LargerRamStorage::BLOCK_COUNT).unwrap();
+    fs.grow(LARGER_RAM_STORAGE_BLOCK_COUNT).unwrap();
     assert_eq!(fs.read::<10>(path!("some-file")).unwrap(), &[42; 10]);
     assert_eq!(
         fs.read::<1024>(path!("some-large-file")).unwrap(),
         &[42; 1024]
     );
 
-    fs.shrink(RamStorage::BLOCK_COUNT).unwrap();
+    fs.shrink(RAM_STORAGE_BLOCK_COUNT).unwrap();
     assert_eq!(fs.read::<10>(path!("some-file")).unwrap(), &[42; 10]);
     assert_eq!(
         fs.read::<1024>(path!("some-large-file")).unwrap(),
@@ -618,7 +617,7 @@ fn shrinking() {
 fn shrinking_full() {
     let larger_backend = &mut LargerRam::default();
     let larger_storage = &mut LargerRamStorage::new(larger_backend);
-    let larger_alloc = &mut Allocation::new();
+    let larger_alloc = &mut Allocation::new(larger_storage);
     Filesystem::format(larger_storage).unwrap();
     let fs = Filesystem::mount(larger_alloc, larger_storage).unwrap();
 
@@ -632,8 +631,11 @@ fn shrinking_full() {
         }
     }
 
+    let backend = &mut Ram::default();
+    let storage = RamStorage::new(backend);
+
     assert!(matches!(
-        fs.shrink(RamStorage::BLOCK_COUNT),
+        fs.shrink(storage.block_count()),
         Err(Error::DIR_NOT_EMPTY)
     ))
 }

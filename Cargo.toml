@@ -22,17 +22,23 @@ repository.workspace = true
 [package.metadata.docs.rs]
 all-features = true
 
+[[example]]
+name = "list"
+required-features = ["alloc", "littlefs2-core/heapless07"]
+
 [dependencies]
 bitflags = "2.9.0"
 delog = "0.1.0"
-generic-array = "0.14"
 heapless = "0.7"
 littlefs2-core = { version = "0.1", path = "core" }
 littlefs2-sys = { version = "0.3.1", features = ["multiversion"] }
+pin-project = "1.1.10"
 
 [dev-dependencies]
 ssmarshal = "1"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
+clap = { version = "4.5.31", features = ["derive"] }
+hex = "0.4.3"
 # trybuild = "1"
 
 [features]
