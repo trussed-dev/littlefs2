@@ -242,7 +242,7 @@ impl Path {
     /// assert_eq!(&*ancestors.next().unwrap(), path!("/"));
     /// assert!(ancestors.next().is_none());
     /// ```
-    pub fn ancestors(&self) -> Ancestors {
+    pub fn ancestors(&self) -> Ancestors<'_> {
         Ancestors {
             path: self.as_str(),
         }
@@ -260,7 +260,7 @@ impl Path {
     /// assert_eq!(&*iter.next().unwrap(), path!("file.extension"));
     /// assert!(iter.next().is_none());
     /// ```
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             path: self.as_str(),
         }
