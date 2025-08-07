@@ -1157,7 +1157,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     /// Creates a new, empty directory at the provided path.
     pub fn create_dir(&self, path: &Path) -> Result<()> {
         #[cfg(test)]
-        println!("creating {:?}", path);
+        println!("creating {path:?}");
         let return_code =
             unsafe { ll::lfs_mkdir(&mut self.alloc.borrow_mut().state, path.as_ptr()) };
         result_from((), return_code)
@@ -1175,7 +1175,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
             if path_slice[i] == b'/' {
                 let dir = PathBuf::try_from(&path_slice[..i]).map_err(|_| Error::IO)?;
                 #[cfg(test)]
-                println!("generated PathBuf dir {:?} using i = {}", &dir, i);
+                println!("generated PathBuf dir {dir:?} using i = {i}");
                 if let Err(error) = self.create_dir(&dir) {
                     if error != Error::ENTRY_ALREADY_EXISTED {
                         return Err(error);
@@ -1246,7 +1246,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     /// and will entirely replace its contents if it does.
     pub fn write(&self, path: &Path, contents: &[u8]) -> Result<()> {
         #[cfg(test)]
-        println!("writing {:?}", path);
+        println!("writing {path:?}");
         File::create_and_then(self, path, |file| {
             use io::Write;
             file.write_all(contents)
@@ -1260,7 +1260,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
     /// it will fail if the file is not already large enough with regard to the `pos` parameter
     pub fn write_chunk(&self, path: &Path, contents: &[u8], pos: OpenSeekFrom) -> Result<()> {
         #[cfg(test)]
-        println!("writing {:?}", path);
+        println!("writing {path:?}");
         OpenOptions::new()
             .read(true)
             .write(true)
