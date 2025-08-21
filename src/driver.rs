@@ -1,9 +1,90 @@
 //! The `Storage`, `Read`, `Write` and `Seek` driver.
 #![allow(non_camel_case_types)]
 
-use generic_array::ArrayLength;
+use crate::io::Error;
 
-use crate::io::Result;
+mod private {
+    pub struct NotEnoughCapacity;
+    pub trait Sealed {
+        /// Returns a buffer of bytes initialized and valid. If [`set_len`]() was called previously successfully,
+        /// its last call defines the minimum number of valid bytes
+        fn as_ptr(&self) -> *const u8;
+        /// Returns a buffer of bytes initialized and valid. If [`set_len`]() was called previously successfully,
+        /// its last call defines the minimum number of valid bytes
+        fn as_mut_ptr(&mut self) -> *mut u8;
+
+        /// Current lenght, set by the last call to [`set_len`](Buffer::set_len)
+        fn current_len(&self) -> usize;
+
+        /// Atempts to set the length of the buffer to `len`
+        ///
+        /// If succeeded, the buffer obtained through the pointer operation **must** be of at least `len` bytes
+        fn set_len(&mut self, len: usize) -> Result<(), NotEnoughCapacity>;
+
+        // We could use a `Default` trait bound but it's not implemented  for all array sizes
+        fn empty() -> Self;
+    }
+}
+
+pub(crate) use private::Sealed;
+
+/// Safety: implemented only by `[u8; N]` and `Vec<u8>` if the alloc feature is enabled
+pub unsafe trait Buffer: private::Sealed {}
+
+impl<const N: usize> private::Sealed for [u8; N] {
+    fn as_ptr(&self) -> *const u8 {
+        <[u8]>::as_ptr(self)
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut u8 {
+        <[u8]>::as_mut_ptr(self)
+    }
+
+    fn current_len(&self) -> usize {
+        N
+    }
+
+    fn set_len(&mut self, len: usize) -> Result<(), private::NotEnoughCapacity> {
+        if len > N {
+            Err(private::NotEnoughCapacity)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn empty() -> Self {
+        [0; N]
+    }
+}
+
+unsafe impl<const N: usize> Buffer for [u8; N] {}
+
+#[cfg(feature = "alloc")]
+impl private::Sealed for alloc::vec::Vec<u8> {
+    fn as_ptr(&self) -> *const u8 {
+        <[u8]>::as_ptr(self)
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut u8 {
+        <[u8]>::as_mut_ptr(self)
+    }
+
+    fn current_len(&self) -> usize {
+        self.len()
+    }
+
+    fn set_len(&mut self, len: usize) -> Result<(), private::NotEnoughCapacity> {
+        self.resize(len, 0);
+        Ok(())
+    }
+
+    fn empty() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "alloc")]
+unsafe impl Buffer for alloc::vec::Vec<u8> {}
 
 /// Users of this library provide a "storage driver" by implementing this trait.
 ///
@@ -12,44 +93,43 @@ use crate::io::Result;
 /// Do note that due to caches, files still must be synched. And unfortunately,
 /// this can't be automatically done in `drop`, since it needs mut refs to both
 /// filesystem and storage.
-///
-/// The `*_SIZE` types must be `generic_array::typenume::consts` such as `U256`.
-///
-/// Why? Currently, associated constants can not be used (as constants...) to define
-/// arrays. This "will be fixed" as part of const generics.
-/// Once that's done, we can get rid of `generic-array`s, and replace the
-/// `*_SIZE` types with `usize`s.
 pub trait Storage {
     // /// Error type for user-provided read/write/erase methods
     // type Error = usize;
 
     /// Minimum size of block read in bytes. Not in superblock
-    const READ_SIZE: usize;
+    fn read_size(&self) -> usize;
 
     /// Minimum size of block write in bytes. Not in superblock
-    const WRITE_SIZE: usize;
+    fn write_size(&self) -> usize;
 
     /// Size of an erasable block in bytes, as unsigned typenum.
     /// Must be a multiple of both `READ_SIZE` and `WRITE_SIZE`.
     /// [At least 128](https://github.com/littlefs-project/littlefs/issues/264#issuecomment-519963153). Stored in superblock.
-    const BLOCK_SIZE: usize;
+    fn block_size(&self) -> usize;
 
     /// Number of erasable blocks.
     /// Hence storage capacity is `BLOCK_COUNT * BLOCK_SIZE`
-    const BLOCK_COUNT: usize;
+    fn block_count(&self) -> usize;
 
     /// Suggested values are 100-1000, higher is more performant but
     /// less wear-leveled.  Default of -1 disables wear-leveling.
     /// Value zero is invalid, must be positive or -1.
-    const BLOCK_CYCLES: isize = -1;
+    fn block_cycles(&self) -> isize {
+        -1
+    }
 
     /// littlefs uses a read cache, a write cache, and one cache per per file.
-    /// Must be a multiple of `READ_SIZE` and `WRITE_SIZE`.
-    /// Must be a factor of `BLOCK_SIZE`.
-    type CACHE_SIZE: ArrayLength<u8>;
+    type CACHE_BUFFER: Buffer;
 
+    /// Must be a multiple of `read_size` and `write_size`.
+    /// Must be a factor of `block_size`.
+    fn cache_size(&self) -> usize;
+
+    /// Lookahead buffer used by littlefs
+    type LOOKAHEAD_BUFFER: Buffer;
     /// Size of the lookahead buffer used by littlefs, measured in multiples of 8 bytes.
-    type LOOKAHEAD_SIZE: ArrayLength<u64>;
+    fn lookahead_size(&self) -> usize;
 
     ///// Maximum length of a filename plus one. Stored in superblock.
     ///// Should default to 255+1, but associated type defaults don't exist currently.
@@ -83,13 +163,13 @@ pub trait Storage {
 
     /// Read data from the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of READ_SIZE.
-    fn read(&mut self, off: usize, buf: &mut [u8]) -> Result<usize>;
+    fn read(&mut self, off: usize, buf: &mut [u8]) -> Result<usize, Error>;
     /// Write data to the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of WRITE_SIZE.
-    fn write(&mut self, off: usize, data: &[u8]) -> Result<usize>;
+    fn write(&mut self, off: usize, data: &[u8]) -> Result<usize, Error>;
     /// Erase data from the storage device.
     /// Guaranteed to be called only with bufs of length a multiple of BLOCK_SIZE.
-    fn erase(&mut self, off: usize, len: usize) -> Result<usize>;
+    fn erase(&mut self, off: usize, len: usize) -> Result<usize, Error>;
     // /// Synchronize writes to the storage device.
     // fn sync(&mut self) -> Result<usize>;
 }
