@@ -8,12 +8,15 @@ use core::{
     mem, slice,
 };
 use generic_array::typenum::marker_traits::Unsigned;
+use littlefs2_core::DirIterator;
 use littlefs2_sys as ll;
 
 // so far, don't need `heapless-bytes`.
 pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 
-pub use littlefs2_core::{Attribute, DirEntry, FileOpenFlags, FileType, Metadata};
+pub use littlefs2_core::{
+    Attribute, DirEntry, DirIterationTell, FileOpenFlags, FileType, Metadata,
+};
 
 use crate::{
     driver,
@@ -988,6 +991,65 @@ pub struct ReadDir<'a, 'b, S: driver::Storage> {
     alloc: RefCell<*mut ReadDirAllocation>,
     fs: &'b Filesystem<'a, S>,
     path: &'b Path,
+}
+
+impl<S: driver::Storage> DirIterator for ReadDir<'_, '_, S> {
+    /// Return the position of the directory
+    ///
+    /// The returned offset is only meant to be consumed by seek and may not make
+    /// sense, but does indicate the current position in the directory iteration.
+    ///
+    /// Returns the position of the directory, which can be returned to using [`seek`](Self::seek).
+    fn tell(&self) -> Result<DirIterationTell> {
+        let value = unsafe {
+            ll::lfs_dir_tell(
+                &mut self.fs.alloc.borrow_mut().state,
+                &mut (**self.alloc.borrow_mut()).state,
+            )
+        };
+        if let Ok(value_positive) = value.try_into() {
+            Ok(DirIterationTell {
+                tell_result: value_positive,
+            })
+        } else {
+            Err(result_from((), value as _).unwrap_err())
+        }
+    }
+
+    /// Change the position of the directory
+    ///
+    /// The new off must be a value previous returned from [`tell`](Self::tell) and specifies
+    /// an absolute offset in the directory seek.
+    fn seek(&self, state: DirIterationTell) -> Result<()> {
+        let value = unsafe {
+            ll::lfs_dir_seek(
+                &mut self.fs.alloc.borrow_mut().state,
+                &mut (**self.alloc.borrow_mut()).state,
+                state.tell_result,
+            )
+        };
+        if value < 0 {
+            Err(result_from((), value as _).unwrap_err())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Change the position of the directory to the beginning of the directory
+    fn rewind(&self) -> Result<()> {
+        let res = unsafe {
+            ll::lfs_dir_rewind(
+                &mut self.fs.alloc.borrow_mut().state,
+                &mut (**self.alloc.borrow_mut()).state,
+            )
+        };
+
+        if res < 0 {
+            Err(result_from((), res).unwrap_err())
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl<S: driver::Storage> Iterator for ReadDir<'_, '_, S> {
