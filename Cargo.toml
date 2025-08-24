@@ -28,7 +28,7 @@ delog = "0.1.0"
 generic-array = "0.14"
 heapless = "0.7"
 littlefs2-core = { version = "0.1", path = "core" }
-littlefs2-sys = { version = "0.3.1", features = ["multiversion"] }
+littlefs2-sys = { version = "0.3.1" }
 
 [dev-dependencies]
 ssmarshal = "1"
@@ -36,7 +36,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 # trybuild = "1"
 
 [features]
-default = ["serde"]
+default = ["disk-version-20", "serde"]
 alloc = []
 serde = ["littlefs2-core/serde"]
 # enable assertions in backend C code
@@ -44,6 +44,9 @@ ll-assertions = ["littlefs2-sys/assertions"]
 # enable trace in backend C code
 ll-trace = ["littlefs2-sys/trace"]
 c-stubs = []
+multiversion = ["littlefs2-sys/multiversion"]
+disk-version-20 = ["multiversion"]
+disk-version-21 = ["multiversion"]
 
 log-all = []
 log-none = []
