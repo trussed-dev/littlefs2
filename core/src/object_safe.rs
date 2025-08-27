@@ -42,6 +42,17 @@ impl<const N: usize> Vec for heapless_bytes04::Bytes<N> {
     }
 }
 
+#[cfg(feature = "heapless-bytes05")]
+impl<const N: usize> Vec for heapless_bytes05::Bytes<N> {
+    fn resize_to_capacity(&mut self) {
+        heapless_bytes05::Bytes::resize_to_capacity(self)
+    }
+
+    fn truncate(&mut self, n: usize) {
+        heapless_bytes05::Bytes::truncate(self, n)
+    }
+}
+
 #[cfg(feature = "heapless07")]
 impl<const N: usize> Vec for heapless07::Vec<u8, N> {
     fn resize_to_capacity(&mut self) {
@@ -61,6 +72,17 @@ impl<const N: usize> Vec for heapless08::Vec<u8, N> {
 
     fn truncate(&mut self, n: usize) {
         heapless08::Vec::truncate(self, n)
+    }
+}
+
+#[cfg(feature = "heapless09")]
+impl<LenT: heapless09::LenType, const N: usize> Vec for heapless09::Vec<u8, N, LenT> {
+    fn resize_to_capacity(&mut self) {
+        self.resize_default(self.capacity()).unwrap();
+    }
+
+    fn truncate(&mut self, n: usize) {
+        heapless09::Vec::truncate(self, n)
     }
 }
 
