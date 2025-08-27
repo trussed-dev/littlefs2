@@ -744,7 +744,7 @@ impl<'a, 'b, Storage: driver::Storage> File<'a, 'b, Storage> {
     }
 
     // This belongs in `io::Read` but really don't want that to have a generic parameter
-    pub fn read_to_end<const N: usize>(&self, buf: &mut heapless::Vec<u8, N>) -> Result<usize> {
+    pub fn read_to_end(&self, buf: &mut heapless::VecView<u8>) -> Result<usize> {
         // My understanding of
         // https://github.com/littlefs-project/littlefs/blob/4c9146ea539f72749d6cc3ea076372a81b12cb11/lfs.c#L2816
         // is that littlefs keeps reading until either the buffer is full, or the file is exhausted
