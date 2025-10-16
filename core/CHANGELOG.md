@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 -
 
+## [v0.1.2](https://github.com/trussed-dev/littlefs2/releases/tag/core-0.1.2) - 2025-10-16
+
+- Make `io::Result` alias accept other error types
+- Add `debug-error` feature to have a proper debug implementation of errors
+- Add support for `heapless` v0.9 and `heapless-bytes` v0.5
+
 ## [v0.1.1](https://github.com/trussed-dev/littlefs2/releases/tag/core-0.1.1) - 2025-01-16
 
 - Make `Path` and `PathBuf` more const-friendly:
