@@ -120,17 +120,9 @@ impl<Storage: driver::Storage> Allocation<Storage> {
         debug_assert!(cache_size > 0);
         debug_assert!(lookahead_size > 0);
 
-        // cache must be multiple of read
-        debug_assert!(read_size <= cache_size);
-        debug_assert!(cache_size % read_size == 0);
-
-        // cache must be multiple of write
-        debug_assert!(write_size <= cache_size);
-        debug_assert!(cache_size % write_size == 0);
-
-        // block must be multiple of cache
-        debug_assert!(cache_size <= block_size);
-        debug_assert!(block_size % cache_size == 0);
+        debug_assert!(cache_size.is_multiple_of(read_size));
+        debug_assert!(cache_size.is_multiple_of(write_size));
+        debug_assert!(block_size.is_multiple_of(cache_size));
 
         let cache = Cache::new();
 
