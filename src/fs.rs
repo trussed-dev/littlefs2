@@ -16,11 +16,12 @@ pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 
 pub use littlefs2_core::{Attribute, DirEntry, FileOpenFlags, FileType, Metadata};
 
+#[cfg(feature = "multiversion")]
+use crate::DISK_VERSION;
 use crate::{
     driver,
     io::{self, Error, OpenSeekFrom, Result},
     path::{Path, PathBuf},
-    DISK_VERSION,
 };
 
 fn error_code_from<T>(result: Result<T>) -> ll::lfs_error {
@@ -173,6 +174,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
             compact_thresh: 0,
             metadata_max: 0,
             inline_max: 0,
+            #[cfg(feature = "multiversion")]
             disk_version: DISK_VERSION.into(),
             flags: config.mount_flags.bits(),
         };

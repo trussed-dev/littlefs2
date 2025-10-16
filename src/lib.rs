@@ -173,10 +173,21 @@ pub const BACKEND_VERSION: Version = Version(ll::LFS_VERSION);
 
 /// The on-disk version used by [`Filesystem`][`fs::Filesystem`].
 ///
-/// Note that this is not the same as the littlefs [`LFS_DISK_VERSION`][`ll::LFS_DISK_VERSION`]
-/// constant as this crate uses the multiversion feature to select on-disk version 2.0 instead of
-/// using the latest on-disk version (currently 2.1).
-pub const DISK_VERSION: Version = Version(0x0002_0000);
+/// The value is defined only if feature `multiversion` is enabled.
+/// If none of `disk-version-20` or `disk-version-21` features are enabled,
+/// defaults to littlefs [`LFS_DISK_VERSION`][`ll::LFS_DISK_VERSION`].
+#[cfg(feature = "multiversion")]
+pub const DISK_VERSION: Version = {
+    #[cfg(all(feature = "disk-version-20", feature = "disk-version-21"))]
+    compile_error!("features `disk-version-20` and `disk-version-21` are mutually exclusive");
+    if cfg!(feature = "disk-version-20") {
+        Version(0x0002_0000)
+    } else if cfg!(feature = "disk-version-21") {
+        Version(0x0002_0001)
+    } else {
+        Version(ll::LFS_DISK_VERSION)
+    }
+};
 
 /// A littlefs version number.
 #[derive(Clone, Copy, Debug)]
