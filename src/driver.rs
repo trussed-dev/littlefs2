@@ -1,6 +1,7 @@
 //! The `Storage`, `Read`, `Write` and `Seek` driver.
 #![allow(non_camel_case_types)]
 
+#[allow(deprecated)]
 use generic_array::ArrayLength;
 
 use crate::io::Result;
@@ -46,9 +47,11 @@ pub trait Storage {
     /// littlefs uses a read cache, a write cache, and one cache per per file.
     /// Must be a multiple of `READ_SIZE` and `WRITE_SIZE`.
     /// Must be a factor of `BLOCK_SIZE`.
+    #[allow(deprecated)]
     type CACHE_SIZE: ArrayLength<u8>;
 
     /// Size of the lookahead buffer used by littlefs, measured in multiples of 8 bytes.
+    #[allow(deprecated)]
     type LOOKAHEAD_SIZE: ArrayLength<u64>;
 
     ///// Maximum length of a filename plus one. Stored in superblock.

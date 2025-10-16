@@ -11,6 +11,7 @@ use generic_array::typenum::marker_traits::Unsigned;
 use littlefs2_sys as ll;
 
 // so far, don't need `heapless-bytes`.
+#[allow(deprecated)]
 pub type Bytes<SIZE> = generic_array::GenericArray<u8, SIZE>;
 
 pub use littlefs2_core::{Attribute, DirEntry, FileOpenFlags, FileType, Metadata};
@@ -47,6 +48,7 @@ struct Cache<Storage: driver::Storage> {
     read: UnsafeCell<Bytes<Storage::CACHE_SIZE>>,
     write: UnsafeCell<Bytes<Storage::CACHE_SIZE>>,
     // lookahead: aligned::Aligned<aligned::A4, Bytes<Storage::LOOKAHEAD_SIZE>>,
+    #[allow(deprecated)]
     lookahead: UnsafeCell<generic_array::GenericArray<u64, Storage::LOOKAHEAD_SIZE>>,
 }
 
