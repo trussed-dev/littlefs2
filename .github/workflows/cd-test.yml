@@ -1,0 +1,15 @@
+name: Continuous delivery - test
+
+on:
+  pull_request:
+    # opened, reopenened, synchronize are the default types for pull_request
+    # labeled, unlabeled ensure this check is also run if a label is added or removed
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+jobs:
+  test-publish:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-publish-check') }}
+    steps:
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+    - run: cargo publish --dry-run --package littlefs2-core
