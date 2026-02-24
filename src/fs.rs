@@ -85,11 +85,13 @@ impl<Storage: driver::Storage> Default for Allocation<Storage> {
 #[derive(Default, Clone, Debug)]
 #[non_exhaustive]
 pub struct Config {
+    #[cfg(feature = "unstable-littlefs-patched")]
     pub mount_flags: MountFlags,
 }
 
+#[cfg(feature = "unstable-littlefs-patched")]
 bitflags::bitflags! {
-    #[derive(Default, Clone, Copy,Debug)]
+    #[derive(Default, Clone, Copy, Debug)]
     pub struct MountFlags: u32 {
         const DISABLE_BLOCK_COUNT_CHECK = ll::lfs_fs_flags_LFS_CFG_DISABLE_BLOCK_COUNT_CHECK as _;
     }
@@ -100,6 +102,9 @@ impl<Storage: driver::Storage> Allocation<Storage> {
         Self::with_config(Config::default())
     }
     pub fn with_config(config: Config) -> Allocation<Storage> {
+        // only used with unstable-littlefs-patched feature
+        let _ = config;
+
         let read_size: u32 = Storage::READ_SIZE as _;
         let write_size: u32 = Storage::WRITE_SIZE as _;
         let block_size: u32 = Storage::BLOCK_SIZE as _;
@@ -174,6 +179,7 @@ impl<Storage: driver::Storage> Allocation<Storage> {
             metadata_max: 0,
             inline_max: 0,
             disk_version: DISK_VERSION.into(),
+            #[cfg(feature = "unstable-littlefs-patched")]
             flags: config.mount_flags.bits(),
         };
 
@@ -268,6 +274,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         f(&fs)
     }
 
+    #[cfg(feature = "unstable-littlefs-patched")]
     pub fn shrink(&self, block_count: usize) -> Result<()> {
         let mut alloc = self.alloc.borrow_mut();
         let return_code = unsafe { ll::lfs_fs_shrink(&mut alloc.state, block_count as _) };

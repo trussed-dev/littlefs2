@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Fixed offset calculation overflow in `lfs_config_read` and `lfs_config_prog` if the offset is larger than `u32::MAX`.
 
+### Added
+
+- Added support for setting configuration options:
+  - Added `Config` struct.
+  - `Allocation`: Added `with_config` function.
+  - `Filesystem`: Added `format_with_config`, `is_mountable_with_config`, `mount_and_then_with_config` functions.
+- Added support for growing filesystems with `Filesystem::grow`.
+- Added `unstable-littlefs-patched` feature. Enabling this feature may break semantic versioning guarantees. If this feature is enabled, a patched version of littlefs is used (see `littlefs2-sys`) and the following changes are applied:
+  - Added config flag to disable the block count check on mount:
+    - Added `MountFlags` enum.
+    - `Config`: Added `mount_flags` field.
+  - Added support for shrinking filesystems with `Filesystem::shrink`.
+
+### Changed
+
+- Updated to [`littlefs2-sys` v0.3.2](https://github.com/trussed-dev/littlefs2-sys/releases/tag/0.3.2).
+
 ## [v0.6.1](https://github.com/trussed-dev/littlefs2/releases/tag/0.6.1) - 2025-03-04
 
 ### Added
