@@ -536,8 +536,9 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         // println!("in lfs_config_read for {} bytes", size);
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
-        let block_size = unsafe { c.read().block_size };
-        let off = (block * block_size + off) as usize;
+        // let block_size = unsafe { c.read().block_size };
+        let block_size = Storage::BLOCK_SIZE;
+        let off = block as usize * block_size + off as usize;
         let buf: &mut [u8] = unsafe { slice::from_raw_parts_mut(buffer as *mut u8, size as usize) };
 
         error_code_from(storage.read(off, buf))
@@ -556,8 +557,8 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
         // let block_size = unsafe { c.read().block_size };
-        let block_size = Storage::BLOCK_SIZE as u32;
-        let off = (block * block_size + off) as usize;
+        let block_size = Storage::BLOCK_SIZE;
+        let off = block as usize * block_size + off as usize;
         let buf: &[u8] = unsafe { slice::from_raw_parts(buffer as *const u8, size as usize) };
 
         error_code_from(storage.write(off, buf))

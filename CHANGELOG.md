@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
--
+### Fixed
+
+- Fixed offset calculation overflow in `lfs_config_read` and `lfs_config_prog` if the offset is larger than `u32::MAX`.
 
 ## [v0.6.1](https://github.com/trussed-dev/littlefs2/releases/tag/0.6.1) - 2025-03-04
 
