@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 
 - Documented the MSRV 1.87
+- Fixed documentation build on docs.rs.
 
 ## [v0.7.0](https://github.com/trussed-dev/littlefs2/releases/tag/0.7.0) - 2026-03-09
 

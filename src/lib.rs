@@ -1,5 +1,5 @@
 #![cfg_attr(not(test), no_std)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 // FIXME
 #![allow(clippy::missing_safety_doc)]
 
