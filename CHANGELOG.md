@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+-
+
+## [v0.7.1](https://github.com/trussed-dev/littlefs2/releases/tag/0.7.1) - 2026-03-20
+
+### Fixed
+
+- Fixed documentation build on docs.rs.
+
 ### Changed
 
 - Documented the MSRV 1.87
-- Fixed documentation build on docs.rs.
 
 ## [v0.7.0](https://github.com/trussed-dev/littlefs2/releases/tag/0.7.0) - 2026-03-09
 
