@@ -85,3 +85,17 @@ jobs:
 
       - name: Build avr
         run: RUSTFLAGS="-C target-cpu=atmega328p" cargo +nightly build -Z build-std=core --target=avr-none --workspace --release
+
+  build-msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust toolchain for littlefs2-core
+        run: rustup override set 1.74
+      - name: Build littlefs2-core
+        # do not enable heapless09 and debug-error features as they require a newer Rust version
+        run: cargo build --package littlefs2-core --features heapless-bytes03,heapless-bytes04,heapless07,heapless08,serde
+      - name: Install Rust toolchain for littlefs2
+        run: rustup override set 1.87
+      - name: Build littlefs2
+        run: cargo build --package littlefs2 --all-features

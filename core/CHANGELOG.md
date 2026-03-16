@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
--
+### Changed
+
+- Documented the MSRV 1.74
 
 ## [v0.1.2](https://github.com/trussed-dev/littlefs2/releases/tag/core-0.1.2) - 2025-10-16
 

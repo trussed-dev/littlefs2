@@ -14,6 +14,7 @@ authors = ["Nicolas Stalder <n@stalder.io>", "Brandon Edens <brandonedens@gmail.
 readme = "README.md"
 categories = ["embedded", "filesystem", "no-std"]
 documentation = "https://docs.rs/littlefs2"
+rust-version = "1.87"
 
 edition.workspace = true
 license.workspace = true

@@ -3,6 +3,7 @@ name = "littlefs2-core"
 version = "0.1.2"
 authors = ["The Trussed developers"]
 description = "Core types for the littlefs2 crate"
+rust-version = "1.74"
 
 edition.workspace = true
 license.workspace = true
