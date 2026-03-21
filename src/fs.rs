@@ -540,15 +540,24 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         buffer: *mut c_void,
         size: ll::lfs_size_t,
     ) -> c_int {
-        // println!("in lfs_config_read for {} bytes", size);
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
-        // let block_size = unsafe { c.read().block_size };
         let block_size = Storage::BLOCK_SIZE;
-        let off = block as usize * block_size + off as usize;
+        let mut offset = block as usize * block_size + off as usize;
         let buf: &mut [u8] = unsafe { slice::from_raw_parts_mut(buffer as *mut u8, size as usize) };
 
-        error_code_from(storage.read(off, buf))
+        let mut remaining = buf;
+        while !remaining.is_empty() {
+            match storage.read(offset, remaining) {
+                Ok(0) => return Error::IO.into(),
+                Ok(n) => {
+                    offset += n;
+                    remaining = &mut remaining[n..];
+                }
+                Err(e) => return e.into(),
+            }
+        }
+        ll::lfs_error_LFS_ERR_OK
     }
 
     /// C callback interface used by LittleFS to program data with the lower level system below the
@@ -560,15 +569,24 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         buffer: *const c_void,
         size: ll::lfs_size_t,
     ) -> c_int {
-        // println!("in lfs_config_prog");
         let storage = unsafe { &mut *((*c).context as *mut Storage) };
         debug_assert!(!c.is_null());
-        // let block_size = unsafe { c.read().block_size };
         let block_size = Storage::BLOCK_SIZE;
-        let off = block as usize * block_size + off as usize;
+        let mut offset = block as usize * block_size + off as usize;
         let buf: &[u8] = unsafe { slice::from_raw_parts(buffer as *const u8, size as usize) };
 
-        error_code_from(storage.write(off, buf))
+        let mut remaining = buf;
+        while !remaining.is_empty() {
+            match storage.write(offset, remaining) {
+                Ok(0) => return Error::IO.into(),
+                Ok(n) => {
+                    offset += n;
+                    remaining = &remaining[n..];
+                }
+                Err(e) => return e.into(),
+            }
+        }
+        ll::lfs_error_LFS_ERR_OK
     }
 
     /// C callback interface used by LittleFS to erase data with the lower level system below the

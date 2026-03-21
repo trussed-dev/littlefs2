@@ -561,6 +561,151 @@ fn test_mount_or_else_clobber_alloc() {
 //     t.pass("tests/ui/*-pass.rs");
 // }
 
+/// A storage backend that returns partial reads/writes to exercise the
+/// looping logic in `lfs_config_read` and `lfs_config_prog`.
+mod partial_io {
+    use super::*;
+    use core::cell::Cell;
+
+    pub struct PartialBackend {
+        buf: [u8; 256 * 512],
+    }
+
+    impl Default for PartialBackend {
+        fn default() -> Self {
+            PartialBackend {
+                buf: [0xff; 256 * 512],
+            }
+        }
+    }
+
+    pub struct PartialStorage<'a> {
+        backend: &'a mut PartialBackend,
+        /// Maximum bytes to return per read/write call
+        max_chunk: Cell<usize>,
+    }
+
+    impl<'a> PartialStorage<'a> {
+        pub fn new(backend: &'a mut PartialBackend) -> Self {
+            PartialStorage {
+                backend,
+                max_chunk: Cell::new(usize::MAX),
+            }
+        }
+
+        /// Limit each read/write to return at most `n` bytes.
+        pub fn set_max_chunk(&self, n: usize) {
+            self.max_chunk.set(n);
+        }
+    }
+
+    impl crate::driver::Storage for PartialStorage<'_> {
+        const READ_SIZE: usize = 1;
+        const WRITE_SIZE: usize = 32;
+        type CACHE_SIZE = consts::U32;
+        const BLOCK_SIZE: usize = 256;
+        const BLOCK_COUNT: usize = 512;
+        type LOOKAHEAD_SIZE = consts::U1;
+
+        fn read(&mut self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+            let chunk = buf.len().min(self.max_chunk.get());
+            for (from, to) in self.backend.buf[offset..].iter().zip(buf[..chunk].iter_mut()) {
+                *to = *from;
+            }
+            Ok(chunk)
+        }
+
+        fn write(&mut self, offset: usize, data: &[u8]) -> Result<usize> {
+            let chunk = data.len().min(self.max_chunk.get());
+            for (from, to) in data[..chunk]
+                .iter()
+                .zip(self.backend.buf[offset..].iter_mut())
+            {
+                *to = *from;
+            }
+            Ok(chunk)
+        }
+
+        fn erase(&mut self, offset: usize, len: usize) -> Result<usize> {
+            for byte in self.backend.buf[offset..offset + len].iter_mut() {
+                *byte = 0xff;
+            }
+            Ok(len)
+        }
+    }
+}
+
+/// Test that the `lfs_config_read` callback correctly loops when
+/// `Storage::read()` returns fewer bytes than requested.
+///
+/// Without the fix, a single partial read was reported as success to the
+/// littlefs C code, leaving the rest of the buffer stale.  Even mounting
+/// fails because the superblock metadata is read incompletely.
+#[test]
+fn partial_read_storage() {
+    use partial_io::{PartialBackend, PartialStorage};
+
+    let mut backend = PartialBackend::default();
+    let mut storage = PartialStorage::new(&mut backend);
+
+    // Format and write data with full I/O.
+    Filesystem::format(&mut storage).unwrap();
+    Filesystem::mount_and_then(&mut storage, |fs| {
+        fs.write(path!("test.txt"), b"hello, partial world!")?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Enable partial reads (7 bytes per call).
+    // Without the looping fix, the very first metadata read during mount
+    // would return only 7 bytes and report success — corrupting the
+    // superblock and causing a CORRUPTION error.
+    storage.set_max_chunk(7);
+
+    // This mount + read succeeds only if the callback loops on partial reads.
+    Filesystem::mount_and_then(&mut storage, |fs| {
+        let contents: heapless::Vec<u8, 64> = fs.read(path!("test.txt"))?;
+        assert_eq!(contents.as_slice(), b"hello, partial world!");
+        Ok(())
+    })
+    .unwrap();
+}
+
+/// Test that the `lfs_config_prog` callback correctly loops when
+/// `Storage::write()` returns fewer bytes than requested.
+///
+/// Without the fix, a single partial write was reported as success,
+/// leaving the rest of the data unflushed to storage.
+#[test]
+fn partial_write_storage() {
+    use partial_io::{PartialBackend, PartialStorage};
+
+    let mut backend = PartialBackend::default();
+    let mut storage = PartialStorage::new(&mut backend);
+
+    // Format with full I/O.
+    Filesystem::format(&mut storage).unwrap();
+
+    // Write with partial I/O (7 bytes per call).
+    // Without the looping fix, only the first 7 bytes of each write
+    // would reach storage, corrupting filesystem metadata and file data.
+    storage.set_max_chunk(7);
+    Filesystem::mount_and_then(&mut storage, |fs| {
+        fs.write(path!("test.txt"), b"partial write test data")?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Read back with full I/O to verify the data is intact.
+    storage.set_max_chunk(usize::MAX);
+    Filesystem::mount_and_then(&mut storage, |fs| {
+        let contents: heapless::Vec<u8, 64> = fs.read(path!("test.txt"))?;
+        assert_eq!(contents.as_slice(), b"partial write test data");
+        Ok(())
+    })
+    .unwrap();
+}
+
 #[cfg(feature = "unstable-littlefs-patched")]
 #[test]
 fn shrinking() {
