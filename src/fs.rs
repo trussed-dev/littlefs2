@@ -23,13 +23,16 @@ use crate::{
     DISK_VERSION,
 };
 
-fn error_code_from<T>(result: Result<T>) -> ll::lfs_error {
+// This conversion is only useless when bindgen emits `lfs_error` as `c_int`.
+// With `-fshort-enums`, bindgen emits a narrower type that must be widened.
+#[allow(clippy::useless_conversion)]
+fn error_code_from<T>(result: Result<T>) -> c_int {
     result
-        .map(|_| ll::lfs_error_LFS_ERR_OK)
+        .map(|_| ll::lfs_error_LFS_ERR_OK.into())
         .unwrap_or_else(From::from)
 }
 
-fn result_from<T>(return_value: T, error_code: ll::lfs_error) -> Result<T> {
+fn result_from<T>(return_value: T, error_code: c_int) -> Result<T> {
     if let Some(error) = Error::new(error_code) {
         Err(error)
     } else {

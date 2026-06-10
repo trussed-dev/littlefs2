@@ -60,6 +60,13 @@ jobs:
           cargo test --workspace --release &&
           cargo test --workspace --features unstable-littlefs-patched
 
+      - name: Check bindgen short enums
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: cargo check --package littlefs2 --all-targets
+        env:
+          BINDGEN_EXTRA_CLANG_ARGS: -fshort-enums
+          CARGO_TARGET_DIR: target/bindgen-short-enums
+
       - name: Check documentation
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
