@@ -13,7 +13,10 @@ mod path;
 
 pub use fs::{Attribute, DirEntry, FileOpenFlags, FileType, Metadata};
 pub use io::{Error, OpenSeekFrom, Read, Result, Seek, SeekFrom, Write};
-pub use object_safe::{DirEntriesCallback, DynFile, DynFilesystem, FileCallback, Predicate, Vec};
+pub use object_safe::{
+    DirEntriesCallback, DirIterationTell, DirIterator, DynFile, DynFilesystem, FileCallback,
+    Predicate, Vec,
+};
 pub use path::{Ancestors, Iter, Path, PathBuf, PathError};
 
 /// Creates a path from a string without a trailing null.
