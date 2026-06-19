@@ -528,20 +528,14 @@ impl PathBuf {
 
     /// Extends `self` with `path`
     pub fn push(&mut self, path: &Path) {
-        match path.as_ref() {
-            // no-operation
-            "" => return,
+        if path.is_empty() {
+            return;
+        }
 
-            // `self` becomes `/` (root), to match `std::Path` implementation
-            // NOTE(allow) cast is necessary on some architectures (e.g. x86)
-            #[allow(clippy::unnecessary_cast)]
-            "/" => {
-                self.buf[0] = b'/' as c_char;
-                self.buf[1] = 0;
-                self.len = 2;
-                return;
-            }
-            _ => {}
+        if path.as_ref().starts_with("/") {
+            // Following the standard library, if the path being pushed is absolute
+            // then we make it replace the current path
+            self.clear();
         }
 
         let src = path.as_ref().as_bytes();
@@ -899,5 +893,21 @@ mod tests {
 
         let path = path!("/some/path/.././file.extension/");
         assert_eq!(path.file_name(), None);
+    }
+
+    #[test]
+    fn matching_std() {
+        for test_case in ["/", "/other", "eaiu"] {
+            let mut path_littlefs2 = PathBuf::from_path(path!("/root"));
+            let mut path_std = std::path::PathBuf::from("/root");
+
+            path_littlefs2.push(&PathBuf::try_from(test_case).unwrap());
+            path_std.push(test_case);
+
+            assert_eq!(
+                path_littlefs2.as_str(),
+                path_std.as_path().to_str().unwrap()
+            );
+        }
     }
 }

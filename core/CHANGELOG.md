@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 
 - Documented the MSRV 1.74
+- PathBuf::push: clear the original path whenever the pushed path is absolute
 
 ## [v0.1.2](https://github.com/trussed-dev/littlefs2/releases/tag/core-0.1.2) - 2025-10-16
 
