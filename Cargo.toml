@@ -29,7 +29,7 @@ delog = "0.1.0"
 generic-array = "0.14"
 heapless = "0.9"
 littlefs2-core = { version = "0.1", path = "core" }
-littlefs2-sys = { version = "0.3.2", features = ["multiversion"] }
+littlefs2-sys = { version = "0.4", features = ["multiversion"] }
 
 [dev-dependencies]
 ssmarshal = "1"
