@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+-
+
+## [v0.8.0](https://github.com/trussed-dev/littlefs2/releases/tag/0.8.0) - 2026-06-23
+
 ### Added
 
 - Added a const `new` function for backends generated with the `ram_storage!` macro.
