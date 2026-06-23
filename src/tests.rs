@@ -17,8 +17,6 @@ ram_storage!(
     block_size = 256,
     block_count = 512,
     lookahead_size_ty = consts::U1,
-    filename_max_plus_one_ty = consts::U256,
-    path_max_plus_one_ty = consts::U256,
 );
 
 ram_storage!(
@@ -31,8 +29,6 @@ ram_storage!(
     block_size = 20 * 35,
     block_count = 32,
     lookahead_size_ty = consts::U16,
-    filename_max_plus_one_ty = consts::U256,
-    path_max_plus_one_ty = consts::U256,
 );
 
 #[cfg(feature = "unstable-littlefs-patched")]
@@ -46,8 +42,6 @@ ram_storage!(
     block_size = 20 * 35,
     block_count = 64,
     lookahead_size_ty = consts::U16,
-    filename_max_plus_one_ty = consts::U256,
-    path_max_plus_one_ty = consts::U256,
 );
 
 #[test]

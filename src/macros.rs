@@ -15,8 +15,6 @@ macro_rules! ram_storage {
     block_size=$block_size:expr,
     block_count=$block_count:expr,
     lookahead_size_ty=$lookahead_size:path,
-    filename_max_plus_one_ty=$filename_max_plus_one:path,
-    path_max_plus_one_ty=$path_max_plus_one:path,
 
 ) => {
         pub struct $Backend {
@@ -98,8 +96,6 @@ macro_rules! ram_storage {
             block_size = 128,
             block_count = $bytes / 128,
             lookahead_size_ty = $crate::consts::U1,
-            filename_max_plus_one_ty = $crate::consts::U256,
-            path_max_plus_one_ty = $crate::consts::U256,
         );
     };
     (tiny) => {
@@ -113,8 +109,6 @@ macro_rules! ram_storage {
             block_size = 128,
             block_count = 8,
             lookahead_size_ty = $crate::consts::U1,
-            filename_max_plus_one_ty = $crate::consts::U256,
-            path_max_plus_one_ty = $crate::consts::U256,
         );
     };
     (large) => {
@@ -128,8 +122,6 @@ macro_rules! ram_storage {
             block_size = 256,
             block_count = 512,
             lookahead_size_ty = $crate::consts::U4,
-            filename_max_plus_one_ty = $crate::consts::U256,
-            path_max_plus_one_ty = $crate::consts::U256,
         );
     };
 }
@@ -146,8 +138,6 @@ macro_rules! const_ram_storage {
     block_size=$block_size:expr,
     block_count=$block_count:expr,
     lookahead_size_ty=$lookahead_size:path,
-    filename_max_plus_one_ty=$filename_max_plus_one:path,
-    path_max_plus_one_ty=$path_max_plus_one:path,
 
 ) => {
         pub struct $Name {
@@ -221,8 +211,6 @@ macro_rules! const_ram_storage {
             block_size = 512,
             block_count = $bytes / 512,
             lookahead_size_ty = $crate::consts::U1,
-            filename_max_plus_one_ty = $crate::consts::U256,
-            path_max_plus_one_ty = $crate::consts::U256,
         );
     };
 }

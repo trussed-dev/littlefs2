@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Added a const `new` function for backends generated with the `ram_storage!` macro.
 
+### Removed
+
+- Removed unused arguments `filename_max_plus_one_ty` and `path_max_plus_one_ty` from `ram_storage!` and `const_ram_storage!` macros.
+
 ## [v0.7.2](https://github.com/trussed-dev/littlefs2/releases/tag/0.7.2) - 2026-06-10
 
 ### Fixed
