@@ -6,6 +6,9 @@
 //!
 //! [`littlefs2`]: https://docs.rs/littlefs2
 
+#[cfg(test)]
+extern crate std;
+
 mod fs;
 mod io;
 mod object_safe;
