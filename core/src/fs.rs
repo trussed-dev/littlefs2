@@ -30,6 +30,7 @@ bitflags! {
 /// Regular file vs directory
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FileType {
     File,
     Dir,
@@ -48,6 +49,7 @@ impl FileType {
 /// File type (regular vs directory) and size of a file.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Metadata {
     file_type: FileType,
     size: usize,

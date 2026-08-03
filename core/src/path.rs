@@ -370,6 +370,13 @@ impl fmt::Debug for Path {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for Path {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "p{:?}", self.as_str_ref_with_trailing_nul())
+    }
+}
+
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_ref())
@@ -725,6 +732,7 @@ impl core::cmp::Eq for PathBuf {}
 
 /// Errors that arise from converting byte buffers into paths
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PathError {
     /// Byte buffer contains non-ASCII characters
     NotAscii,

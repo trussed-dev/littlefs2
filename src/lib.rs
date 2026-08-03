@@ -156,6 +156,18 @@ pub mod path {
 extern crate delog;
 generate_macros!();
 
+#[collapse_debuginfo(yes)]
+macro_rules! debug_lib {
+    ($s:literal $(, $x:expr)* $(,)?) => {
+        {
+            debug_now!($s $(, $x)*);
+
+            #[cfg(feature = "defmt")]
+            ::defmt::debug!($s $(, $x)*);
+        }
+    };
+}
+
 /// cf. Macros documentation
 #[macro_use]
 pub mod macros;
@@ -180,6 +192,7 @@ pub const DISK_VERSION: Version = Version(0x0002_0000);
 
 /// A littlefs version number.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Version(u32);
 
 impl Version {

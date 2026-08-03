@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
--
+### Added
+
+- Added optional support for `defmt`.
 
 ## [v0.8.0](https://github.com/trussed-dev/littlefs2/releases/tag/0.8.0) - 2026-06-23
 

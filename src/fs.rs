@@ -357,7 +357,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         use crate::path;
 
         if !self.exists(path) {
-            debug_now!("no such directory {}, early return", path);
+            debug_lib!("no such directory {}, early return", path);
             return Ok(RemoveDirAllProgress {
                 files_removed: 0,
                 skipped_any: false,
@@ -365,7 +365,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         }
         let mut skipped_any = false;
         let mut files_removed = 0;
-        debug_now!("starting to remove_dir_all_where in {}", path);
+        debug_lib!("starting to remove_dir_all_where in {}", path);
         self.read_dir_and_then(path, |read_dir| {
             // skip "." and ".."
             for entry in read_dir.skip(2) {
@@ -373,29 +373,29 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
 
                 if entry.file_type().is_file() {
                     if predicate(&entry) {
-                        debug_now!("removing file {}", &entry.path());
+                        debug_lib!("removing file {}", &entry.path());
                         self.remove(entry.path())?;
-                        debug_now!("...done");
+                        debug_lib!("...done");
                         files_removed += 1;
                     } else {
-                        debug_now!("skipping file {}", &entry.path());
+                        debug_lib!("skipping file {}", &entry.path());
                         skipped_any = true;
                     }
                 }
                 if entry.file_type().is_dir() {
-                    debug_now!("recursing into directory {}", &entry.path());
+                    debug_lib!("recursing into directory {}", &entry.path());
                     let progress = self.remove_dir_all_where_inner(entry.path(), predicate)?;
                     files_removed += progress.files_removed;
                     skipped_any |= progress.skipped_any;
-                    debug_now!("...back");
+                    debug_lib!("...back");
                 }
             }
             Ok(())
         })?;
         if !skipped_any && path != path!("") && path != path!("/") {
-            debug_now!("removing directory {} too", &path);
+            debug_lib!("removing directory {} too", &path);
             self.remove_dir(path)?;
-            debug_now!("..worked");
+            debug_lib!("..worked");
         }
         Ok(RemoveDirAllProgress {
             files_removed,

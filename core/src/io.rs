@@ -229,6 +229,31 @@ impl Debug for Error {
     }
 }
 
+// Keep it separate implementation from `Debug`
+// see: https://github.com/trussed-dev/littlefs2/pull/137#issuecomment-5201666242
+#[cfg(feature = "defmt")]
+impl defmt::Format for Error {
+    fn format(&self, fmt: defmt::Formatter) {
+        match self {
+            &Self::IO => defmt::write!(fmt, "IO"),
+            &Self::CORRUPTION => defmt::write!(fmt, "CORRUPTION"),
+            &Self::NO_SUCH_ENTRY => defmt::write!(fmt, "NO_SUCH_ENTRY"),
+            &Self::ENTRY_ALREADY_EXISTED => defmt::write!(fmt, "ENTRY_ALREADY_EXISTED"),
+            &Self::PATH_NOT_DIR => defmt::write!(fmt, "PATH_NOT_DIR"),
+            &Self::PATH_IS_DIR => defmt::write!(fmt, "PATH_IS_DIR"),
+            &Self::DIR_NOT_EMPTY => defmt::write!(fmt, "DIR_NOT_EMPTY"),
+            &Self::BAD_FILE_DESCRIPTOR => defmt::write!(fmt, "BAD_FILE_DESCRIPTOR"),
+            &Self::FILE_TOO_BIG => defmt::write!(fmt, "FILE_TOO_BIG"),
+            &Self::INVALID => defmt::write!(fmt, "INVALID"),
+            &Self::NO_SPACE => defmt::write!(fmt, "NO_SPACE"),
+            &Self::NO_MEMORY => defmt::write!(fmt, "NO_MEMORY"),
+            &Self::NO_ATTRIBUTE => defmt::write!(fmt, "NO_ATTRIBUTE"),
+            &Self::FILENAME_TOO_LONG => defmt::write!(fmt, "FILENAME_TOO_LONG"),
+            other => defmt::write!(fmt, "Error({})", &other.code),
+        }
+    }
+}
+
 impl From<Error> for c_int {
     fn from(error: Error) -> Self {
         error.code
