@@ -7,13 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-### Added
+-
 
-- Added optional support for `defmt`.
+## [v0.1.3](https://github.com/trussed-dev/littlefs2/releases/tag/core-0.1.3) - 2026-08-08
 
-### Changed
-
-- Documented the MSRV 1.74
+- Add optional support for `defmt`
+- Document the MSRV 1.74
 
 ## [v0.1.2](https://github.com/trussed-dev/littlefs2/releases/tag/core-0.1.2) - 2025-10-16
 
