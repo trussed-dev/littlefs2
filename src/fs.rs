@@ -1,6 +1,6 @@
 //! Experimental Filesystem version using closures.
 
-use core::ffi::{c_int, c_void};
+use core::ffi::{c_char, c_int, c_void};
 use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 use core::{
@@ -37,6 +37,14 @@ fn result_from<T>(return_value: T, error_code: c_int) -> Result<T> {
         Err(error)
     } else {
         Ok(return_value)
+    }
+}
+
+fn ll_path(path: &Path) -> *const c_char {
+    if path.is_empty() {
+        crate::path!("/").as_ptr()
+    } else {
+        path.as_ptr()
     }
 }
 
@@ -330,7 +338,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// Remove a file or directory.
     pub fn remove(&self, path: &Path) -> Result<()> {
         let return_code =
-            unsafe { ll::lfs_remove(&mut self.alloc.borrow_mut().state, path.as_ptr()) };
+            unsafe { ll::lfs_remove(&mut self.alloc.borrow_mut().state, ll_path(path)) };
         result_from((), return_code)
     }
 
@@ -416,8 +424,8 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let return_code = unsafe {
             ll::lfs_rename(
                 &mut self.alloc.borrow_mut().state,
-                from.as_ptr(),
-                to.as_ptr(),
+                ll_path(from),
+                ll_path(to),
             )
         };
         result_from((), return_code)
@@ -444,7 +452,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         // to our own structure.
         let mut info: ll::lfs_info = unsafe { mem::MaybeUninit::zeroed().assume_init() };
         let return_code =
-            unsafe { ll::lfs_stat(&mut self.alloc.borrow_mut().state, path.as_ptr(), &mut info) };
+            unsafe { ll::lfs_stat(&mut self.alloc.borrow_mut().state, ll_path(path), &mut info) };
 
         result_from((), return_code).map(|_| metadata(info))
     }
@@ -491,7 +499,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let return_code = unsafe {
             ll::lfs_getattr(
                 &mut self.alloc.borrow_mut().state,
-                path.as_ptr(),
+                ll_path(path),
                 id,
                 buffer as *mut _ as *mut c_void,
                 n,
@@ -515,7 +523,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
     /// Remove attribute.
     pub fn remove_attribute(&self, path: &Path, id: u8) -> Result<()> {
         let return_code =
-            unsafe { ll::lfs_removeattr(&mut self.alloc.borrow_mut().state, path.as_ptr(), id) };
+            unsafe { ll::lfs_removeattr(&mut self.alloc.borrow_mut().state, ll_path(path), id) };
         result_from((), return_code)
     }
 
@@ -524,7 +532,7 @@ impl<Storage: driver::Storage> Filesystem<'_, Storage> {
         let return_code = unsafe {
             ll::lfs_setattr(
                 &mut self.alloc.borrow_mut().state,
-                path.as_ptr(),
+                ll_path(path),
                 id,
                 data as *const _ as *const c_void,
                 u32::try_from(data.len()).unwrap_or(u32::MAX),
@@ -818,7 +826,7 @@ impl OpenOptions {
         let return_code = ll::lfs_file_opencfg(
             &mut fs.alloc.borrow_mut().state,
             addr_of_mut!(alloc.state),
-            path.as_ptr(),
+            ll_path(path),
             self.0.bits(),
             addr_of!(alloc.config),
         );
@@ -1089,7 +1097,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         let return_code = ll::lfs_dir_open(
             &mut self.alloc.borrow_mut().state,
             addr_of_mut!(alloc.state),
-            path.as_ptr(),
+            ll_path(path),
         );
 
         let read_dir = ReadDir {
@@ -1164,7 +1172,7 @@ impl<'a, Storage: driver::Storage> Filesystem<'a, Storage> {
         #[cfg(test)]
         println!("creating {path:?}");
         let return_code =
-            unsafe { ll::lfs_mkdir(&mut self.alloc.borrow_mut().state, path.as_ptr()) };
+            unsafe { ll::lfs_mkdir(&mut self.alloc.borrow_mut().state, ll_path(path)) };
         result_from((), return_code)
     }
 

@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
--
+### Fixed
+
+- Keep treating the empty path as the root directory with littlefs v2.10 and later, which reject it with `LFS_ERR_INVAL`. This fixes `create_dir_all` with absolute paths and `remove_dir_all_where` on the root.
 
 ## [v0.8.1](https://github.com/trussed-dev/littlefs2/releases/tag/0.8.1) - 2026-08-08
 
