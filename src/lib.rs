@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // FIXME
 #![allow(clippy::missing_safety_doc)]
@@ -125,6 +125,10 @@ fs.open_file_with_options_and_then(
 assert_eq!(&buf, b"black smoke");
 ```
 */
+
+#[cfg(test)]
+#[macro_use]
+extern crate std;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
--
+- `PathBuf` and `Path`: implement `Hash`
 
 ## [v0.1.3](https://github.com/trussed-dev/littlefs2/releases/tag/core-0.1.3) - 2026-08-08
 

@@ -1,10 +1,12 @@
 //! Paths
 
 use core::{
+    borrow::Borrow,
     cmp::Ordering,
     convert::TryFrom,
     ffi::{c_char, CStr},
     fmt,
+    hash::Hash,
     iter::FusedIterator,
     ops, ptr, slice, str,
 };
@@ -18,7 +20,8 @@ use crate::path;
 // Invariants:
 // 1. inner.to_bytes().is_ascii()
 // 2. inner.to_bytes().len() <= PathBuf::MAX_SIZE
-#[derive(PartialEq, Eq)]
+// Do not derive Ord/PartialOrd, see cmp_lfs and cmp_str for documentation why not
+#[derive(PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Path {
     inner: CStr,
@@ -639,6 +642,12 @@ impl TryFrom<&str> for PathBuf {
     }
 }
 
+impl Borrow<Path> for PathBuf {
+    fn borrow(&self) -> &Path {
+        self.as_path()
+    }
+}
+
 impl ops::Deref for PathBuf {
     type Target = Path;
 
@@ -705,30 +714,16 @@ impl core::cmp::PartialEq for PathBuf {
     fn eq(&self, other: &Self) -> bool {
         // from cstr_core
         self.as_ref() == other.as_ref()
-
-        // // use cortex_m_semihosting::hprintln;
-        // // hprintln!("inside PathBuf PartialEq");
-        // // hprintln!("self.len {}, other.len {}", self.len, other.len).ok();
-        // // hprintln!("self..len {:?}, other..len {:?}", &self.buf[..self.len], &other.buf[..other.len]).ok();
-        // self.len == other.len && self.buf[..self.len - 1] == other.buf[..other.len - 1]
     }
 }
 
 impl core::cmp::Eq for PathBuf {}
 
-// use core::cmp::Ordering;
-
-// impl Ord for PathBuf {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         self.len.cmp(&other.len)
-//     }
-// }
-
-// impl PartialOrd for PathBuf {
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-//         Some(self.cmp(other))
-//     }
-// }
+impl Hash for PathBuf {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.as_path().hash(state);
+    }
+}
 
 /// Errors that arise from converting byte buffers into paths
 #[derive(Clone, Copy, Debug)]
@@ -748,6 +743,7 @@ type Result<T> = core::result::Result<T, PathError>;
 mod tests {
     use super::{Path, PathBuf};
     use crate::path;
+    use std::collections::HashSet;
 
     const EMPTY: &Path = path!("");
     const SLASH: &Path = path!("/");
@@ -907,5 +903,24 @@ mod tests {
 
         let path = path!("/some/path/.././file.extension/");
         assert_eq!(path.file_name(), None);
+    }
+
+    #[test]
+    fn pathbuf_hash() {
+        let mut set = HashSet::<PathBuf>::new();
+
+        assert!(set.insert(path!("/").into()));
+        assert!(!set.insert(path!("/").into()));
+        assert!(set.insert(path!("/other").into()));
+        assert!(set.insert(path!("/other/other").into()));
+        assert_eq!(
+            set,
+            HashSet::from([
+                path!("/").into(),
+                path!("/other").into(),
+                path!("/other/other").into(),
+            ])
+        );
+        assert!(set.remove(path!("/other")));
     }
 }
