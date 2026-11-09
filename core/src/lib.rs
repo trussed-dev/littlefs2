@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 //! Core types for the [`littlefs2`][] crate.
 //!

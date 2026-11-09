@@ -1,7 +1,10 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // FIXME
 #![allow(clippy::missing_safety_doc)]
+
+#[cfg(test)]
+extern crate std;
 
 /*!
 
