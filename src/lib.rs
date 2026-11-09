@@ -3,9 +3,6 @@
 // FIXME
 #![allow(clippy::missing_safety_doc)]
 
-#[cfg(test)]
-extern crate std;
-
 /*!
 
 [littlefs](https://github.com/littlefs-project/littlefs) is a filesystem for microcontrollers
@@ -128,6 +125,10 @@ fs.open_file_with_options_and_then(
 assert_eq!(&buf, b"black smoke");
 ```
 */
+
+#[cfg(test)]
+#[macro_use]
+extern crate std;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

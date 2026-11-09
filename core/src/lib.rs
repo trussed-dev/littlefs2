@@ -1,10 +1,14 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 //! Core types for the [`littlefs2`][] crate.
 //!
 //! See the documentation for [`littlefs2`][] for more information.
 //!
 //! [`littlefs2`]: https://docs.rs/littlefs2
+
+#[cfg(test)]
+#[macro_use]
+extern crate std;
 
 mod fs;
 mod io;
